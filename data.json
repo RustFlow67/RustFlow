@@ -1,0 +1,2 @@
+﻿Get-Clipboard | Out-File data.json -Encoding utf8
+
