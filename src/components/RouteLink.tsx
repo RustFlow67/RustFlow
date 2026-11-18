@@ -11,7 +11,7 @@ export function RouteScroll({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
     const hash = window.location.hash.slice(1);
-    if (hash && !hash.startsWith("b=")) {
+    if (hash) {
       try { document.getElementById(decodeURIComponent(hash))?.scrollIntoView({ block: "start", behavior: "instant" }); }
       catch { /* A malformed hash is not a route error. */ }
     }

@@ -3,6 +3,7 @@
 import { AlertTriangle, X } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPopup } from "@/components/fx/useAnchoredPopup";
 
 const FOCUSABLE =
   ':is(a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]):not([tabindex="-1"])';
@@ -33,21 +34,20 @@ export function Modal({
   children: ReactNode;
 }) {
   const mounted = useSyncExternalStore(subscribeMounted, isClient, isServer);
-  const present = mounted && open;
+  const active = mounted && open;
+  const isProfile = variant === "profile";
+  const { present, panelRef } = useAnchoredPopup<HTMLDivElement>(active, isProfile ? returnFocus : undefined);
   const titleId = useId();
   const descId = useId();
   const backdropRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
 
   useLayoutEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  const isProfile = variant === "profile";
-
   useLayoutEffect(() => {
     const panel = panelRef.current;
     const backdrop = backdropRef.current;
-    if (!present || !panel || !backdrop) return;
+    if (!active || !panel || !backdrop) return;
     const previous = returnFocus?.current ?? document.activeElement;
     panel.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
 
@@ -80,19 +80,22 @@ export function Modal({
       document.removeEventListener("keydown", onKeyDown);
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [present, returnFocus]);
+  }, [active, returnFocus, panelRef]);
 
   if (!present) return null;
 
-  // Remove the backdrop at close, rather than keeping an input-blocking exit frame.
   return createPortal(
     <div
       ref={backdropRef}
       className={`modal-backdrop${isProfile ? " profile-backdrop" : ""}`}
       data-rf-modal=""
-      data-open=""
+      data-open={open ? "" : undefined}
+      inert={!open}
+      aria-hidden={!open || undefined}
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        // A portaled listbox bubbles through React but is not part of this backdrop.
+        const target = event.target;
+        if (target instanceof Node && event.currentTarget.contains(target) && !panelRef.current?.contains(target)) onClose();
       }}
     >
       <div className={`w-full min-w-0 ${maxWidth}`}>
@@ -100,11 +103,11 @@ export function Modal({
           ref={panelRef}
           id={id}
           role="dialog"
-          aria-modal="true"
+          aria-modal={open || undefined}
           aria-labelledby={titleId}
           aria-describedby={description ? descId : undefined}
-          data-open=""
-          className={`modal-panel rf-popup-motion overflow-y-auto ${isProfile ? "profile-panel p-4" : "max-h-[calc(100dvh-2rem)] p-5 sm:p-7"}`}
+          data-open={open ? "" : undefined}
+          className={`modal-panel overflow-y-auto ${isProfile && returnFocus ? "rf-anchored-popup" : "rf-popup-motion"} ${isProfile ? "profile-panel p-4" : "max-h-[calc(100dvh-2rem)] p-5 sm:p-7"}`}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">

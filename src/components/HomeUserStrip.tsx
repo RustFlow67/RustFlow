@@ -2,7 +2,7 @@
 
 import { Activity, CheckCircle2, Cpu, FileJson } from "lucide-react";
 import Link from "next/link";
-import { triggerBackupModal } from "@/components/Nav";
+import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import { Button } from "@/components/ui";
 import { useRustFlowStore } from "@/lib/storage/useStore";
 import { plural } from "@/lib/tweaks/meta";
@@ -60,7 +60,7 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
           <span className="block text-[12px] text-ink-3">Профиль в браузере</span>
           <strong className="block truncate text-[14px] font-bold text-ink">Экспорт / импорт</strong>
         </div>
-        <Button variant="secondary" size="sm" onClick={triggerBackupModal}>
+        <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
           <FileJson className="text-accent-hi" aria-hidden="true" />
           JSON
         </Button>

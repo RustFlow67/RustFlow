@@ -3,7 +3,8 @@
 import { ArrowUpRight, LoaderCircle, MessageCircle, Send, Square, Trash2, X } from "lucide-react";
 import Link from "@/components/RouteLink";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useAnchoredPopup } from "@/components/fx/useAnchoredPopup";
 import { RiskLevelBadge } from "@/components/Badges";
 import { apiUrl } from "@/lib/api-base";
 import { assistantBuild, currentAssistantBuild } from "@/lib/assistant/context";
@@ -70,10 +71,11 @@ async function responseError(response: Response) {
   return typeof json?.error === "string" ? json.error : NETWORK_ERROR;
 }
 
-export default function AiAssistant({ open, onClose }: {
-  open: boolean; onClose: (refocus?: boolean) => void;
+export default function AiAssistant({ open, onClose, opener }: {
+  opener: RefObject<HTMLElement | null>; open: boolean; onClose: (refocus?: boolean) => void;
 }) {
   const pathname = usePathname();
+  const { present, panelRef } = useAnchoredPopup<HTMLElement>(open, opener);
   const dock = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [history, setHistory] = useState<Turn[]>(() => readHistory() ?? []);
@@ -109,12 +111,22 @@ export default function AiAssistant({ open, onClose }: {
     if (!open) return;
     function escape(event: KeyboardEvent) {
       // A modal above the modeless assistant gets Escape first.
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || document.querySelector("[data-rf-modal]")) return;
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || document.querySelector("[data-rf-modal][data-open]")) return;
       event.preventDefault();
       onClose();
     }
+    function outside(event: PointerEvent) {
+      const target = event.target;
+      // Modeless: let the very same pointer gesture activate the underlying control.
+      // The dock trigger handles its own toggle; do not close and immediately reopen it.
+      if (target instanceof Element && !dock.current?.contains(target) && !target.closest("[data-assistant-trigger]")) onClose(false);
+    }
     document.addEventListener("keydown", escape);
-    return () => document.removeEventListener("keydown", escape);
+    document.addEventListener("pointerdown", outside, true);
+    return () => {
+      document.removeEventListener("keydown", escape);
+      document.removeEventListener("pointerdown", outside, true);
+    };
   }, [open, onClose]);
 
   useEffect(() => {
@@ -279,11 +291,11 @@ export default function AiAssistant({ open, onClose }: {
     input.current?.focus({ preventScroll: true });
   }
 
-  if (!open) return null;
+  if (!present) return null;
   const messages = draft ? [...history, draft] : history;
   return (
-    <div ref={dock} className={styles.dock} data-rf-assistant="open">
-      <section className={`glass rf-popup-motion ${styles.panel}`} id={panelId} role="dialog" aria-labelledby={titleId} data-open="">
+    <div ref={dock} className={styles.dock} data-rf-assistant={open ? "open" : "closing"} inert={!open} aria-hidden={!open || undefined}>
+      <section ref={panelRef} className={`glass rf-anchored-popup ${styles.panel}`} id={panelId} role="dialog" aria-labelledby={titleId} data-open={open ? "" : undefined}>
         <header className={styles.header}>
           <span className={styles.mark} aria-hidden="true"><MessageCircle /></span>
           <div className={styles.identity}>

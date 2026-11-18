@@ -17,8 +17,8 @@ const previewId = process.env.E2B_SANDBOX_ID;
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
-  // Allow this sandbox's proxied dev preview without trusting other origins.
-  allowedDevOrigins: previewId ? [`3000-${previewId}.e2b.app`] : undefined,
+  // Permit loopback and this sandbox's preview to hydrate and connect to HMR.
+  allowedDevOrigins: ["127.0.0.1", ...(previewId ? [`3000-${previewId}.e2b.app`] : [])],
   devIndicators: false,
   env: { VITE_API_BASE_URL: publicApiBase },
   // The ZIP endpoint reads the allowlisted project files at runtime, not the whole checkout.

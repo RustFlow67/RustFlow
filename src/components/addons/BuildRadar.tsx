@@ -1,7 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
-import { AnimatedNumber, tweenOnScreen } from "@/components/fx/AnimatedNumber";
+import { AnimatedNumber } from "@/components/fx/AnimatedNumber";
 import { Radar } from "lucide-react";
 import { presetBuildInput } from "@/lib/addons/build-tools";
 import { evaluateBuild10, type BreakdownKey, type BuildEvaluation, type BuildInput, type UserBuild } from "@/lib/models/build";
@@ -46,26 +45,6 @@ const polygon = (scale: (axis: BreakdownKey) => number) => AXES.map(({ key }, i)
   return `${x.toFixed(2)},${y.toFixed(2)}`;
 }).join(" ");
 
-function RadarPolygon({ className, points }: { className: string; points: string }) {
-  const ref = useRef<SVGPolygonElement>(null);
-  const [initial] = useState(points);
-  const shown = useRef(initial);
-  useLayoutEffect(() => {
-    const el = ref.current, from = shown.current;
-    if (!el || from === points) return;
-    const coordinates = (value: string) => value.split(/[ ,]/).map(Number);
-    const a = coordinates(from), b = coordinates(points);
-    return tweenOnScreen(el, (t) => {
-      shown.current = AXES.map((_, i) => {
-        const x = i * 2, y = x + 1;
-        return `${(a[x] + (b[x] - a[x]) * t).toFixed(2)},${(a[y] + (b[y] - a[y]) * t).toFixed(2)}`;
-      }).join(" ");
-      el.setAttribute("points", shown.current);
-    });
-  }, [points]);
-  return <polygon data-build-series="" ref={ref} className={className} points={initial} />;
-}
-
 export default function BuildRadar({ builds, compact = false }: { builds: readonly RadarBuild[]; compact?: boolean }) {
   const series = builds.slice(0, compact ? 1 : 4).flatMap(({ id, input, label, evaluation: calculated }) => {
     const evaluation = calculated ?? evaluateBuild10(input);
@@ -88,7 +67,7 @@ export default function BuildRadar({ builds, compact = false }: { builds: readon
             <text className={styles.chartText} x={at.x} y={at.y + 4} textAnchor="middle">{compact ? short ?? label : label}</text>
           </g>;
         })}
-        {series.map((item, i) => <RadarPolygon key={item.id} className={`${styles.plot} ${PALETTES[i]}`}
+        {series.map((item, i) => <polygon data-build-series="" key={item.id} className={`${styles.plot} ${PALETTES[i]}`}
           points={polygon((axis) => value(i, axis) / 10)} />)}
         {!compact && [2, 4, 6, 8, 10].map((score) => <text key={score} className={styles.chartTick} x={center.x + 5} y={center.y - radius * score / 10 + 3}>{score}</text>)}
         {compact && <>
@@ -101,7 +80,7 @@ export default function BuildRadar({ builds, compact = false }: { builds: readon
             const hint = axisTip(key, input, evaluation);
             const detail = evaluation.breakdown.find((item) => item.key === key)?.detail;
             const text = `${scoreLabel}. ${hint}.${detail ? ` ${detail}.` : ""}`;
-            const position = { cx: `${at.x}px`, cy: `${at.y}px` };
+            const position = { transform: `translate(${at.x}px, ${at.y}px)` };
             return <g key={key} className={styles.radarVertex} tabIndex={0} role="img" aria-label={text}>
               <title>{text}</title>
               <circle style={position} r="22" fill="transparent" />

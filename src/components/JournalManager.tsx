@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { triggerBackupModal } from "@/components/Nav";
+import { openPlayerProfile } from "@/components/auth/ProfileGate";
+import LiquidSelect from "@/components/LiquidSelect";
 import Segmented from "@/components/Segmented";
-import { Badge, Button, EmptyState, Input, Select, Skeleton } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -85,7 +86,7 @@ export default function JournalManager({
   const [confirmClearAll, setConfirmClearAll] = useState(false);
 
   const logs = useMemo(() => state?.logs ?? [], [state?.logs]);
-  const checkedSteps = useMemo(() => new Set(state?.setup.protocolChecks ?? []), [state?.setup.protocolChecks]);
+  const checkedSteps = useMemo(() => new Set(state?.protocolChecks ?? []), [state?.protocolChecks]);
   const hasSamples = logs.some((l) => l.isSample);
 
   const rows = useMemo(
@@ -138,7 +139,7 @@ export default function JournalManager({
     const next = new Set(checkedSteps);
     if (next.has(stepId)) next.delete(stepId);
     else next.add(stepId);
-    storage.updateSetup({ protocolChecks: Array.from(next) });
+    storage.setProtocolChecks(Array.from(next));
   }
 
   function openCreate() {
@@ -277,9 +278,9 @@ export default function JournalManager({
               <Plus aria-hidden="true" />
               Добавить замер до/после
             </Button>
-            <Button variant="secondary" onClick={triggerBackupModal}>
+            <Button variant="secondary" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
               <FileJson className="text-accent-hi" aria-hidden="true" />
-              Экспорт / импорт JSON
+              JSON в профиле игрока
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -639,12 +640,11 @@ export default function JournalManager({
         maxWidth="max-w-xl"
       >
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <Select
+          <LiquidSelect
             label="Связанный твик (необязательно)"
             options={selectTweaks}
             value={form.tweakSlug}
-            onChange={(e) => {
-              const slug = e.target.value;
+            onChange={(slug) => {
               const found = tweakOptions.find((t) => t.slug === slug);
               setForm((prev) => ({
                 ...prev,
@@ -663,11 +663,11 @@ export default function JournalManager({
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Select
+            <LiquidSelect
               label="Тип сервера"
               options={serverOptions}
               value={form.serverKind}
-              onChange={(e) => setForm((p) => ({ ...p, serverKind: e.target.value as ServerKind }))}
+              onChange={(serverKind) => setForm((p) => ({ ...p, serverKind }))}
             />
             <Input
               label="Сервер и сцена"

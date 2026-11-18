@@ -64,6 +64,10 @@ export const TWEAK_GROUPS: TweakGroupMeta[] = [
   },
 ];
 
+export const TWEAK_GROUP_BY_ID = Object.fromEntries(
+  TWEAK_GROUPS.map((g) => [g.id, g]),
+) as Record<TweakGroupId, TweakGroupMeta>;
+
 export const TWEAK_RISK_META: Record<
   TweakRiskLevel,
   { label: string; hint: string; order: number }
@@ -103,4 +107,14 @@ export interface UserTweakRecord extends UserOwnedRecord {
   fpsBefore: number | null;
   fpsAfter: number | null;
   note: string;
+}
+
+export function calcUserTweakDelta(
+  rec: Pick<UserTweakRecord, "fpsBefore" | "fpsAfter"> | undefined,
+): { diff: number; pct: number } | null {
+  if (!rec || rec.fpsBefore === null || rec.fpsAfter === null) return null;
+  if (!Number.isFinite(rec.fpsBefore) || !Number.isFinite(rec.fpsAfter) || rec.fpsBefore <= 0) return null;
+  const diff = Math.round((rec.fpsAfter - rec.fpsBefore) * 10) / 10;
+  const pct = Math.round(((rec.fpsAfter - rec.fpsBefore) / rec.fpsBefore) * 1000) / 10;
+  return { diff, pct };
 }

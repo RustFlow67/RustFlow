@@ -289,7 +289,7 @@ export default function DevHub({
         </h2>
         <div className="grid gap-4 lg:grid-cols-3" data-stagger>
           {/* Главный полный архив */}
-          <article className="glass glass-accent glass-hover tilt-3d sweep flex flex-col p-6" data-tilt>
+          <article className="glass glass-accent glass-hover sweep flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
@@ -360,7 +360,7 @@ export default function DevHub({
           </article>
 
           {/* Только код сайта */}
-          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-tilt>
+          <article className="glass glass-hover flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
@@ -432,7 +432,7 @@ export default function DevHub({
           </article>
 
           {/* Только App Kit */}
-          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-tilt>
+          <article className="glass glass-hover flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
@@ -985,7 +985,7 @@ sudo systemctl reload nginx`}
                       type="button"
                       aria-pressed={active}
                       onClick={() => setSiteGroup(g.value)}
-                      className={`chip !h-8 !px-3 transition-transform active:scale-95 ${
+                      className={`chip !h-8 !px-3 transition-transform ${
                         active ? "chip-accent font-bold" : "opacity-80 hover:opacity-100"
                       }`}
                     >
@@ -1001,7 +1001,7 @@ sudo systemctl reload nginx`}
                       type="button"
                       aria-pressed={active}
                       onClick={() => setKitGroup(g.value)}
-                      className={`chip !h-8 !px-3 transition-transform active:scale-95 ${
+                      className={`chip !h-8 !px-3 transition-transform ${
                         active ? "chip-accent font-bold" : "opacity-80 hover:opacity-100"
                       }`}
                     >

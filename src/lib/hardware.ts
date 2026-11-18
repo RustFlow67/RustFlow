@@ -40,7 +40,6 @@ export interface Gpu {
   idx: number;
   vram: number;
   vendor: "nvidia" | "amd" | "intel";
-  key: string;
 }
 
 const slug = (s: string) =>
@@ -60,10 +59,6 @@ const gpus = (group: string, vendor: Gpu["vendor"], rows: [string, number, numbe
     idx,
     vram,
     vendor,
-    key: name
-      .toLowerCase()
-      .replace(/^(geforce|radeon|intel)\s+/, "")
-      .replace(/\s+laptop$/, ""),
   }));
 
 export const CPUS: Cpu[] = [
@@ -283,22 +278,6 @@ const GPU_BY_ID = new Map(GPUS.map((g) => [g.id, g]));
 
 export const getCpu = (id: string) => CPU_BY_ID.get(id);
 export const getGpu = (id: string) => GPU_BY_ID.get(id);
-
-/** Tries to match a WebGL renderer string to a GPU from the list. */
-export function detectGpu(renderer: string): Gpu | null {
-  const text = renderer.toLowerCase().replace(/\(r\)|\(tm\)/g, "");
-  const laptop = /laptop|mobile|max-q/.test(text);
-  let best: Gpu | null = null;
-  for (const gpu of GPUS) {
-    if (!text.includes(gpu.key)) continue;
-    const isLaptopEntry = gpu.group === "Ноутбуки";
-    if (isLaptopEntry !== laptop && GPUS.some((g) => g.key === gpu.key && (g.group === "Ноутбуки") === laptop)) {
-      continue;
-    }
-    if (!best || gpu.key.length > best.key.length) best = gpu;
-  }
-  return best;
-}
 
 export const BOTTLENECK_LABEL: Record<Bottleneck, string> = {
   cpu: "Процессор",

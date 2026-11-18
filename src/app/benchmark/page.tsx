@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import BuildShare from "@/components/addons/BuildShare";
 import BenchmarkTool, { type TweakIndex } from "@/components/BenchmarkTool";
 import { PageHeader } from "@/components/PageHeader";
 import { getGraphicsProfile } from "@/lib/graphics-profiles";
@@ -49,7 +48,6 @@ export default async function BenchmarkPage({
         savedId={savedId}
         initialMode={initialMode}
       />
-      <div className="mt-6"><BuildShare /></div>
     </>
   );
 }

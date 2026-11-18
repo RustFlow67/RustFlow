@@ -132,7 +132,7 @@ export default function DataBackupModal({
         open={open}
         onClose={onClose}
         title="Резервная копия профиля (JSON)"
-        description="Копия сохранённых сборок и настроек браузера. Она не меняет сборку в аккаунте и не включает данные входа."
+        description="Копия сохранённых сборок, журнала замеров и настроек браузера. Она не меняет сборку в аккаунте и не включает данные входа."
         maxWidth="max-w-xl"
       >
         <Segmented
@@ -188,7 +188,7 @@ export default function DataBackupModal({
             <div className="hairline my-2" />
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <p className="text-[12.5px] text-ink-3">Очистить локальное хранилище (сборки, отметки, настройки)</p>
+              <p className="text-[12.5px] text-ink-3">Очистить локальное хранилище (сборки, журнал, отметки, настройки)</p>
               <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
                 <RotateCcw aria-hidden="true" />
                 Сбросить всё
@@ -242,7 +242,7 @@ export default function DataBackupModal({
                 <p className="text-[13px] text-ink-2">
                   Сборок: <strong>{preview.buildsCount}</strong> · Применённых твиков:{" "}
                   <strong>{preview.appliedCount}</strong> · Замеров FPS в карточках:{" "}
-                  <strong>{preview.measuredTweaksCount}</strong>.
+                  <strong>{preview.measuredTweaksCount}</strong> · Записей журнала: <strong>{preview.bundle.logs?.length ?? 0}</strong>.
                 </p>
                 {preview.myBuildTitle && (
                   <p className="text-[12.5px] text-ink-3">Главная сборка: {preview.myBuildTitle}</p>
@@ -275,7 +275,7 @@ export default function DataBackupModal({
         onClose={() => setConfirmReplace(false)}
         onConfirm={() => executeImport("replace")}
         title="Заменить текущие данные?"
-        description="Текущие сборки, отметки «применено» и настройки Твикера в этом браузере будут полностью перезаписаны данными из выбранного JSON-файла."
+        description="Текущие сборки, отметки «применено» и настройки Твикера в этом браузере будут полностью перезаписаны данными из выбранного JSON-файла. Если в нём есть журнал, он заменит текущие замеры."
         confirmLabel="Да, заменить"
       />
 
@@ -289,7 +289,7 @@ export default function DataBackupModal({
           onClose();
         }}
         title="Очистить все локальные данные?"
-        description="Будут удалены сохранённые сборки, отметки применённых твиков, поля FPS до/после и настройки Твикера. Рекомендуем сначала скачать JSON-копию."
+        description="Будут удалены записи журнала, сохранённые сборки, отметки применённых твиков, поля FPS до/после и настройки Твикера. Рекомендуем сначала скачать JSON-копию."
         confirmLabel="Удалить всё"
       />
     </>

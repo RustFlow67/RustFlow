@@ -109,11 +109,10 @@ export default function TweakCard({
   return (
     <>
       <article
-        className={`glass glass-hover tilt-3d group flex h-full flex-col p-5 ${
+        className={`glass glass-hover group flex h-full flex-col p-5 ${
           isHarmful ? "glass-danger" : ""
         }`}
         data-open={stepsOpen ? "" : undefined}
-        data-tilt
       >
         {/* Шапка карточки: иконка + бейджи риска и верификации */}
         <div className="flex items-start justify-between gap-3">
