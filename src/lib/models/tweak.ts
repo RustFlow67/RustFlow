@@ -23,8 +23,6 @@ export interface TweakGroupMeta {
   title: string;
   shortTitle: string;
   description: string;
-  from: string;
-  to: string;
 }
 
 export const TWEAK_GROUPS: TweakGroupMeta[] = [
@@ -33,54 +31,38 @@ export const TWEAK_GROUPS: TweakGroupMeta[] = [
     title: "CPU и Windows",
     shortTitle: "CPU / Win",
     description: "Схема питания, Game DVR, планировщик, приоритет, точка восстановления и анти-твики ОС.",
-    from: "#0a84ff",
-    to: "#5e5ce6",
   },
   {
     id: "gpu",
     title: "GPU и драйвер",
     shortTitle: "GPU",
     description: "Панель NVIDIA, AMD Adrenalin, HAGS, Reflex/Anti-Lag и чистка кэша шейдеров.",
-    from: "#30d158",
-    to: "#00a67d",
   },
   {
     id: "ram-ssd",
     title: "RAM и SSD",
     shortTitle: "RAM / SSD",
     description: "Профили XMP/EXPO, тайминги, двухканал, gc.buffer, файл подкачки и TRIM на SSD.",
-    from: "#bf5af2",
-    to: "#7d3cff",
   },
   {
     id: "network",
     title: "Сеть",
     shortTitle: "Сеть",
     description: "Энергосбережение сетевой карты, сброс Winsock/DNS и разбор TCP-мифов.",
-    from: "#64d2ff",
-    to: "#0a84ff",
   },
   {
     id: "rust-settings",
     title: "Настройки Rust",
     shortTitle: "Rust",
     description: "Пресеты client.cfg, каскады теней, вода, maxgibs, оверлеи Steam и полезные бинды.",
-    from: "#ff9f0a",
-    to: "#ff453a",
   },
   {
     id: "launch-options",
     title: "Launch-опции",
     shortTitle: "Launch",
     description: "Рабочие аргументы Unity для Steam и проверка нерабочих флагов из старых гайдов.",
-    from: "#ff6b4a",
-    to: "#d93829",
   },
 ];
-
-export const TWEAK_GROUP_BY_ID = Object.fromEntries(
-  TWEAK_GROUPS.map((g) => [g.id, g]),
-) as Record<TweakGroupId, TweakGroupMeta>;
 
 export const TWEAK_RISK_META: Record<
   TweakRiskLevel,
@@ -121,14 +103,4 @@ export interface UserTweakRecord extends UserOwnedRecord {
   fpsBefore: number | null;
   fpsAfter: number | null;
   note: string;
-}
-
-export function calcUserTweakDelta(
-  rec: Pick<UserTweakRecord, "fpsBefore" | "fpsAfter"> | undefined,
-): { diff: number; pct: number } | null {
-  if (!rec || rec.fpsBefore === null || rec.fpsAfter === null) return null;
-  if (!Number.isFinite(rec.fpsBefore) || !Number.isFinite(rec.fpsAfter) || rec.fpsBefore <= 0) return null;
-  const diff = Math.round((rec.fpsAfter - rec.fpsBefore) * 10) / 10;
-  const pct = Math.round(((rec.fpsAfter - rec.fpsBefore) / rec.fpsBefore) * 1000) / 10;
-  return { diff, pct };
 }

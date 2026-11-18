@@ -1,10 +1,15 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 
 const FOCUSABLE =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  ':is(a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), summary, [tabindex]):not([tabindex="-1"])';
+
+const subscribeMounted = () => () => {};
+const isClient = () => true;
+const isServer = () => false;
 
 export function Modal({
   open,
@@ -12,6 +17,9 @@ export function Modal({
   title,
   description,
   maxWidth = "max-w-xl",
+  variant,
+  id,
+  returnFocus,
   children,
 }: {
   open: boolean;
@@ -19,96 +27,110 @@ export function Modal({
   title: string;
   description?: string;
   maxWidth?: string;
+  variant?: "profile";
+  id?: string;
+  returnFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
+  const mounted = useSyncExternalStore(subscribeMounted, isClient, isServer);
+  const present = mounted && open;
   const titleId = useId();
   const descId = useId();
+  const backdropRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
 
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  useLayoutEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  useEffect(() => {
-    if (!open) return;
-    const prevFocus = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+  const isProfile = variant === "profile";
 
+  useLayoutEffect(() => {
     const panel = panelRef.current;
-    const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
-    first?.focus();
+    const backdrop = backdropRef.current;
+    if (!present || !panel || !backdrop) return;
+    const previous = returnFocus?.current ?? document.activeElement;
+    panel.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing ||
+        Array.from(document.querySelectorAll("[data-rf-modal][data-open]")).at(-1) !== backdrop) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
         onCloseRef.current();
-        return;
-      }
-      if (e.key === "Tab" && panel) {
-        const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
-        if (nodes.length === 0) return;
-        const firstEl = nodes[0];
-        const lastEl = nodes[nodes.length - 1];
-        if (e.shiftKey && document.activeElement === firstEl) {
-          e.preventDefault();
-          lastEl.focus();
-        } else if (!e.shiftKey && document.activeElement === lastEl) {
-          e.preventDefault();
-          firstEl.focus();
+      } else if (event.key === "Tab") {
+        const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((node) => {
+          const closed = node.closest("details:not([open])");
+          return node.getClientRects().length && (!closed || (node.tagName === "SUMMARY" && node.parentElement === closed));
+        });
+        const first = nodes[0];
+        const last = nodes.at(-1);
+        if (!first || !last) return;
+        const outside = !panel.contains(document.activeElement);
+        if (event.shiftKey && (outside || document.activeElement === first)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (outside || document.activeElement === last)) {
+          event.preventDefault();
+          first.focus();
         }
       }
     };
-
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
-      prevFocus?.focus?.();
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [present, returnFocus]);
 
-  if (!open) return null;
+  if (!present) return null;
 
-  return (
+  // Remove the backdrop at close, rather than keeping an input-blocking exit frame.
+  return createPortal(
     <div
-      className="modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      ref={backdropRef}
+      className={`modal-backdrop${isProfile ? " profile-backdrop" : ""}`}
+      data-rf-modal=""
+      data-open=""
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descId : undefined}
-        className={`modal-panel ${maxWidth} max-h-[calc(100dvh-2rem)] overflow-y-auto p-5 sm:p-7`}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-xl font-bold leading-snug tracking-tight text-ink">
-              {title}
-            </h2>
-            {description && (
-              <p id={descId} className="mt-1.5 text-sm leading-relaxed text-ink-2">
-                {description}
-              </p>
-            )}
+      <div className={`w-full min-w-0 ${maxWidth}`}>
+        <div
+          ref={panelRef}
+          id={id}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descId : undefined}
+          data-open=""
+          className={`modal-panel rf-popup-motion overflow-y-auto ${isProfile ? "profile-panel p-4" : "max-h-[calc(100dvh-2rem)] p-5 sm:p-7"}`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 id={titleId} className={`${isProfile ? "profile-heading" : "text-xl"} font-bold leading-snug tracking-tight text-ink`}>
+                {title}
+              </h2>
+              {description && (
+                <p id={descId} className="mt-1.5 text-sm leading-relaxed text-ink-2">
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              className="btn btn-icon !h-9 !w-9 flex-none"
+              onClick={onClose}
+              aria-label="Закрыть окно"
+            >
+              <X aria-hidden="true" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn btn-icon !h-9 !w-9 flex-none"
-            onClick={onClose}
-            aria-label="Закрыть окно"
-          >
-            <X aria-hidden="true" />
-          </button>
+          <div className={isProfile ? "mt-3" : "mt-5"}>{children}</div>
         </div>
-        <div className="mt-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

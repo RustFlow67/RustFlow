@@ -42,7 +42,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 const TONE_ICON: Record<ToastTone, { icon: typeof CheckCircle2; className: string }> = {
   success: { icon: CheckCircle2, className: "text-ok" },
-  info: { icon: Info, className: "text-sky" },
+  info: { icon: Info, className: "text-accent-hi" },
   warning: { icon: AlertTriangle, className: "text-warn" },
   error: { icon: XCircle, className: "text-danger" },
 };

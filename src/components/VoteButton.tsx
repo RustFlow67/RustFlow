@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/api-base";
+
 import { Heart } from "lucide-react";
 import { useState } from "react";
 
@@ -27,7 +29,7 @@ export default function VoteButton({
     setLikes((n) => Math.max(0, n + (optimistic ? 1 : -1)));
     if (optimistic) setBurst((n) => n + 1);
     try {
-      const res = await fetch(`/api/tweaks/${slug}/vote`, { method: "POST" });
+      const res = await fetch(apiUrl(`tweaks/${encodeURIComponent(slug)}/vote`), { method: "POST" });
       if (!res.ok) throw new Error("vote failed");
       const data = (await res.json()) as { likes: number; liked: boolean };
       setLikes(data.likes);

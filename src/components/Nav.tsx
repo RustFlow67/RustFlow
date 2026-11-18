@@ -1,177 +1,156 @@
 "use client";
 
-import {
-  Activity,
-  Code2,
-  Cpu,
-  FileJson,
-  Flame,
-  Gauge,
-  Home,
-  ListChecks,
-  ShieldAlert,
-  SlidersHorizontal,
-} from "lucide-react";
-import Link from "next/link";
+import { Flame } from "lucide-react";
+import DockIcon, { type DockGlyph } from "@/components/DockIcon";
+import Link from "@/components/RouteLink";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import DataBackupModal from "@/components/DataBackupModal";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import PlayerProfile from "@/components/PlayerProfile";
 import ThemeToggle from "@/components/ThemeToggle";
+import AiAssistant from "@/components/AiAssistant";
+import { OPEN_ASSISTANT } from "@/lib/assistant/open";
 
-export const OPEN_BACKUP_EVENT = "rustflow:open-backup";
-
-export function triggerBackupModal() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(OPEN_BACKUP_EVENT));
-  }
-}
-
-const TOP_ITEMS = [
-  { href: "/", label: "Главная", icon: Home },
-  { href: "/benchmark", label: "Сборка /10", icon: Gauge },
-  { href: "/tweaks", label: "Твики", icon: SlidersHorizontal },
-  { href: "/presets", label: "Пресеты", icon: Cpu },
-  { href: "/journal", label: "Журнал", icon: Activity },
-  { href: "/setup", label: "Сетап", icon: ListChecks },
-  { href: "/faq", label: "Мифы и EAC", icon: ShieldAlert },
-];
-
-const BOTTOM_ITEMS = [
-  { href: "/", label: "Главная", icon: Home },
-  { href: "/benchmark", label: "Сборка", icon: Gauge },
-  { href: "/tweaks", label: "Твики", icon: SlidersHorizontal },
-  { href: "/presets", label: "Пресеты", icon: Cpu },
-  { href: "/journal", label: "Журнал", icon: Activity },
-  { href: "/faq", label: "Мифы", icon: ShieldAlert },
+const DOCK_ITEMS: { href: string; label: string; glyph: DockGlyph }[] = [
+  { href: "/", label: "Главная", glyph: "home" },
+  { href: "/guide", label: "База знаний", glyph: "book" },
+  { href: "/benchmark", label: "Сборка", glyph: "gauge" },
+  { href: "/presets", label: "Пресеты", glyph: "gear" },
+  { href: "/tweaker", label: "Твикер", glyph: "sliders" },
+  { href: "/faq", label: "Мифы и EAC", glyph: "shield" },
 ];
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function TabBar({
-  items,
-}: {
-  items: { href: string; label: string; icon: typeof Home }[];
+function DockTabs({ pathname, chatOpen, chatTrigger, toggleChat }: {
+  pathname: string; chatOpen: boolean; chatTrigger: React.RefObject<HTMLButtonElement | null>; toggleChat: (opener: HTMLButtonElement) => void;
 }) {
-  const pathname = usePathname();
-  const ref = useRef<HTMLDivElement>(null);
-  const [hover, setHover] = useState<number | null>(null);
-  const [lens, setLens] = useState<{ x: number; w: number } | null>(null);
-  const active = items.findIndex((item) => isActive(pathname, item.href));
-  const target = hover ?? active;
+  const list = useRef<HTMLDivElement>(null);
+  const lens = useRef<HTMLSpanElement>(null);
+  const targetIndex = useRef(-1);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const active = DOCK_ITEMS.findIndex(({ href }) => isActive(pathname, href));
+  const target = hovered ?? (chatOpen ? DOCK_ITEMS.length : active);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || target < 0) {
-      setLens(null);
+  const alignLens = useCallback(() => {
+    const pill = lens.current;
+    const container = list.current;
+    if (!pill || !container) return;
+    const item = container.querySelectorAll<HTMLElement>("[data-tab]")[targetIndex.current];
+    if (!item || item.offsetParent !== container) {
+      pill.removeAttribute("data-positioned");
       return;
     }
-    const measure = () => {
-      const node = el.querySelectorAll<HTMLElement>("[data-tab]")[target];
-      setLens(node ? { x: node.offsetLeft, w: node.offsetWidth } : null);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [target, items.length]);
+    // Layout coordinates are in exactly the same space as the absolute lens.
+    // In particular, the pressed tab's scale must not affect its size or position.
+    pill.style.transform = `translate3d(${item.offsetLeft}px, ${item.offsetTop}px, 0)`;
+    pill.style.width = `${item.offsetWidth}px`;
+    pill.style.height = `${item.offsetHeight}px`;
+    pill.setAttribute("data-positioned", "");
+  }, []);
+
+  useLayoutEffect(() => {
+    targetIndex.current = target;
+    alignLens();
+  }, [target, alignLens]);
+
+  useEffect(() => {
+    const container = list.current;
+    if (!container) return;
+    // The row can have a fixed width while its children change (fonts/viewport).
+    const observer = new ResizeObserver(alignLens);
+    observer.observe(container);
+    container.querySelectorAll("[data-tab]").forEach((tab) => observer.observe(tab));
+    return () => observer.disconnect();
+  }, [alignLens]);
 
   return (
-    <div ref={ref} className="relative flex items-center" onPointerLeave={() => setHover(null)}>
-      <span
-        className="lens"
-        aria-hidden="true"
-        style={
-          lens
-            ? { transform: `translate3d(${lens.x}px,0,0)`, width: lens.w, opacity: 1 }
-            : { opacity: 0 }
-        }
-      />
-      {items.map((item, i) => {
-        const Icon = item.icon;
-        const current = i === active;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            data-tab
-            aria-current={current ? "page" : undefined}
-            className="nav-item"
-            onPointerEnter={(e) => {
-              if (e.pointerType === "mouse") setHover(i);
-            }}
-            onFocus={() => setHover(i)}
-            onBlur={() => setHover(null)}
-          >
-            <Icon aria-hidden="true" />
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
+    <div ref={list} className="dock-items" onPointerLeave={() => setHovered(null)} onPointerCancel={() => setHovered(null)}>
+      <span ref={lens} className="dock-lens" aria-hidden="true" />
+      {DOCK_ITEMS.map(({ href, label, glyph }, index) => (
+        <Link
+          key={href}
+          href={href}
+          data-tab
+          aria-current={index === active ? "page" : undefined}
+          className="nav-item"
+          prefetch
+          onPointerEnter={(event) => {
+            if (event.pointerType === "mouse" || event.pointerType === "pen") setHovered(index);
+          }}
+          onFocus={() => setHovered(index)} onBlur={() => setHovered(null)}
+        >
+          <DockIcon glyph={glyph} />
+          <span>{label}</span>
+        </Link>
+      ))}
+      <button type="button" ref={chatTrigger} className="nav-item" data-tab data-assistant-trigger="" aria-haspopup="dialog"
+        aria-expanded={chatOpen} aria-controls={chatOpen ? "rustflow-assistant-dialog" : undefined}
+        onPointerEnter={(event) => { if (event.pointerType !== "touch") setHovered(DOCK_ITEMS.length); }}
+        onFocus={() => setHovered(DOCK_ITEMS.length)} onBlur={() => setHovered(null)} onClick={(event) => toggleChat(event.currentTarget)}>
+        <DockIcon glyph="chat" /> <span>ИИ-ассистент</span>
+      </button>
     </div>
   );
 }
 
 export default function Nav() {
-  const [backupOpen, setBackupOpen] = useState(false);
-
-  useEffect(() => {
-    const onOpen = () => setBackupOpen(true);
-    window.addEventListener(OPEN_BACKUP_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_BACKUP_EVENT, onOpen);
+  const pathname = usePathname();
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatTrigger = useRef<HTMLButtonElement>(null);
+  const chatOpener = useRef<HTMLElement | null>(null);
+  const showChat = useCallback((opener?: HTMLElement) => {
+    chatOpener.current = opener ?? chatTrigger.current;
+    setChatOpen(true);
   }, []);
+  const closeChat = useCallback((refocus = true) => {
+    setChatOpen(false);
+    if (refocus) {
+      const opener = chatOpener.current?.isConnected ? chatOpener.current : chatTrigger.current;
+      opener?.focus({ preventScroll: true });
+    }
+  }, []);
+  useEffect(() => {
+    const launchChat = (event: Event) => {
+      const opener = (event as CustomEvent<HTMLElement>).detail;
+      showChat(opener instanceof HTMLElement && opener.isConnected ? opener : undefined);
+    };
+    window.addEventListener(OPEN_ASSISTANT, launchChat);
+    return () => window.removeEventListener(OPEN_ASSISTANT, launchChat);
+  }, [showChat]);
 
   return (
     <>
-      <div className="scroll-edge scroll-edge-top" aria-hidden="true" />
-      <div className="scroll-edge scroll-edge-bottom lg:hidden" aria-hidden="true" />
-
-      <header className="nav-shell">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 sm:px-6">
+      <div className="nav-capsules">
+        <div className="nav-identity">
           <Link
             href="/"
             aria-label="RustFlow — на главную"
-            className="glass nav-pill group flex h-11 flex-none items-center gap-2 pl-1.5 pr-3.5 hover:scale-[1.02] active:scale-95"
+            className="glass nav-pill nav-brand"
+            scrollHome
           >
             <span
-              className="icon-tile icon-tile-sm !h-8 !w-8 !rounded-full"
+              className="icon-tile nav-brand-mark"
               style={{ "--c1": "#ffb15c", "--c2": "#ff4d2e" } as CSSProperties}
             >
               <Flame aria-hidden="true" />
             </span>
-            <span className="text-[15px] font-extrabold tracking-tight">
+            <span className="nav-brand-name">
               Rust<span className="text-accent-hi">Flow</span>
             </span>
           </Link>
 
-          {/* Единственная blur-поверхность навигации на десктопе */}
-          <nav className="glass glass-blur nav-pill hidden p-1 lg:block" aria-label="Основная навигация">
-            <TabBar items={TOP_ITEMS} />
-          </nav>
-
-          <div className="flex flex-none items-center gap-1.5">
-                                      <button
-              type="button"
-              onClick={() => setBackupOpen(true)}
-              className="btn btn-sm !h-10 !px-2.5 sm:!px-3"
-              aria-label="Экспорт и импорт профиля JSON"
-              title="Экспорт и импорт JSON (сборка, твики, журнал)"
-            >
-              <FileJson className="text-accent-hi" aria-hidden="true" />
-              <span className="hidden 2xl:inline">Бэкап</span>
-            </button>
-            <ThemeToggle compact />
-          </div>
+          <ThemeToggle compact />
         </div>
-      </header>
+        <PlayerProfile />
+      </div>
 
-      {/* Единственная blur-поверхность навигации на мобильных */}
-      <nav className="glass glass-blur nav-pill tabbar-bottom lg:hidden" aria-label="Мобильная навигация">
-        <TabBar items={BOTTOM_ITEMS} />
+      <nav className="glass liquid-optics nav-pill tabbar-bottom" aria-label="Основная навигация">
+        <DockTabs pathname={pathname} chatOpen={chatOpen} chatTrigger={chatTrigger} toggleChat={(opener) => chatOpen ? closeChat() : showChat(opener)} />
       </nav>
 
-      <DataBackupModal open={backupOpen} onClose={() => setBackupOpen(false)} />
+      <AiAssistant open={chatOpen} onClose={closeChat} />
     </>
   );
 }

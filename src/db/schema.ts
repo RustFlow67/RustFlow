@@ -1,4 +1,5 @@
-import { integer, pgTable, serial, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, serial, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import type { BuildInput } from "../lib/models/build";
 
 /** Real download counters per tweak (and for the ZIP pack under the "_pack" slug). */
 export const tweakStats = pgTable("tweak_stats", {
@@ -32,3 +33,21 @@ export const benchmarks = pgTable("benchmarks", {
   fpsLow: integer("fps_low").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Account identities are private, independent of public benchmark records. */
+export const accounts = pgTable("rf_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  login: varchar("login", { length: 254 }).unique(),
+  displayName: varchar("display_name", { length: 40 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 160 }),
+  avatarUrl: varchar("avatar_url", { length: 512 }),
+  googleSub: varchar("google_sub", { length: 255 }).unique(),
+  activeBuild: jsonb("active_build").$type<BuildInput>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const accountSessions = pgTable("rf_account_sessions", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, (t) => [index("rf_account_sessions_account_idx").on(t.accountId)]);

@@ -9,8 +9,8 @@ export const THEME_KEY = "rustflow:theme";
 const THEME_EVENT = "rustflow:theme-change";
 
 export const THEME_META_COLOR: Record<ResolvedTheme, string> = {
-  dark: "#050609",
-  light: "#f4efe6",
+  dark: "#0A0908",
+  light: "#F2EFEA",
 };
 
 function readChoice(): ThemeChoice {
@@ -83,7 +83,7 @@ function subscribe(fn: () => void): () => void {
         const mq = window.matchMedia("(prefers-color-scheme: light)");
         mq.addEventListener("change", () => {
           if (readChoice() === "system") {
-            applyThemeChoice("system", { transition: false, persist: false });
+            applyThemeChoice("system", { persist: false });
           }
         });
       } catch {
@@ -102,84 +102,24 @@ function subscribe(fn: () => void): () => void {
 
 const serverSnapshot: ThemeSnapshot = { choice: "system", resolved: "dark" };
 
-/**
- * Сериализация переходов темы: повторные клики во время активного перехода
- * применяются мгновенно, а устаревший VT-колбэк отменяется токеном.
- * Гарантия: каждый клик меняет состояние, залипаний и потерянных тоглов нет.
- */
-let vtInflight = false;
-let vtSeq = 0;
-
-/** Применяет тему с плавным cross-fade через View Transitions API (fallback — мгновенно). */
-export function applyThemeChoice(
-  next: ThemeChoice,
-  opts?: { transition?: boolean; persist?: boolean },
-): ResolvedTheme {
+/** Apply the palette immediately; don't freeze the document in a view snapshot. */
+export function applyThemeChoice(next: ThemeChoice, opts?: { persist?: boolean }): ResolvedTheme {
   const resolved = resolveChoice(next);
   if (typeof window === "undefined" || typeof document === "undefined") return resolved;
   const root = document.documentElement;
-
-  const doApply = () => {
-    root.setAttribute("data-theme", resolved);
-    try {
-      root.style.colorScheme = resolved;
-    } catch {
-      /* noop */
-    }
-    if (opts?.persist !== false) {
-      try {
-        window.localStorage.setItem(THEME_KEY, next);
-      } catch {
-        /* quota / private mode — theme still applies for the session */
-      }
-    }
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", THEME_META_COLOR[resolved]);
-    emit();
-  };
-
-  let reduce = false;
-  try {
-    reduce =
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
-      root.getAttribute("data-motion") === "reduced";
-  } catch {
-    /* noop */
+  root.dataset.theme = resolved;
+  root.style.colorScheme = resolved;
+  if (opts?.persist !== false) {
+    try { window.localStorage.setItem(THEME_KEY, next); }
+    catch { /* quota / private mode — theme still applies for the session */ }
   }
-  const vt = (document as Document & { startViewTransition?: (cb: () => void) => { finished?: Promise<unknown> } })
-    .startViewTransition;
-  if (opts?.transition !== false && typeof vt === "function" && !reduce && !vtInflight) {
-    const my = ++vtSeq;
-    vtInflight = true;
-    const settle = () => {
-      vtInflight = false;
-    };
-    try {
-      const t = vt.call(document, () => {
-        // Устаревший колбэк (поверх уже применённого нового интента) отменяется.
-        if (my === vtSeq) doApply();
-      });
-      if (t && typeof t.finished?.then === "function") {
-        t.finished.then(settle, settle);
-      } else {
-        setTimeout(settle, 600);
-      }
-      // Страховка: флаг не должен зависнуть, даже если finished не сетится.
-      setTimeout(settle, 1500);
-      return resolved;
-    } catch {
-      settle();
-    }
-  }
-  // Мгновенный путь: новый интент побеждает ожидающий VT-колбэк.
-  vtSeq += 1;
-  doApply();
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_META_COLOR[resolved]);
+  emit();
   return resolved;
 }
 
 export function toggleTheme(): ResolvedTheme {
-  const current = snapshot().resolved;
-  return applyThemeChoice(current === "dark" ? "light" : "dark");
+  return applyThemeChoice(snapshot().resolved === "dark" ? "light" : "dark");
 }
 
 export function useTheme(): {

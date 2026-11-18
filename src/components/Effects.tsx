@@ -1,174 +1,110 @@
 "use client";
 
 import { useEffect } from "react";
-import { clearPointerPosition, setPointerPosition } from "@/lib/pointer";
+import { applyMotionChoice, getMotionReduced, MOTION_KEY } from "@/lib/motion";
 
-declare global {
-  interface Window {
-    __rf?: boolean;
-  }
-}
+const SURFACE = ".glass, .btn, .tile, .profile-option, .nav-item, .segmented-item, .modal-panel, .popover";
+const CARD = ".glass-hover, article.glass, .tile-hover, [data-tilt]";
 
-const SHEEN_SELECTOR = ".glass, .btn";
-
-/**
- * Флагманский слой motion:
- * - cinematic scroll-reveal + staggered-группы [data-stagger],
- * - спекулярный блик, 3D-tilt [data-tilt] и magnetic [data-magnetic] — один rAF,
- * - параллакс обоев, data-scrolled и hue-сдвиг секций при скролле.
- * Всё уважает data-motion="reduced" и data-lite.
- */
+/** One event-driven frame for wallpaper parallax and the local glass highlight. */
 export default function Effects() {
   useEffect(() => {
-    window.__rf = true;
     const root = document.documentElement;
-    const calm = () =>
-      root.getAttribute("data-motion") === "reduced" || root.hasAttribute("data-lite");
+    const backdrop = document.querySelector<HTMLElement>(".wallpaper-scene");
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const finePointer = window.matchMedia("(any-hover: hover) and (any-pointer: fine)");
+    let frame = 0;
+    let last: MouseEvent | null = null;
+    let lit: HTMLElement[] = [];
+    let tilted: HTMLElement | null = null;
 
-    /* ---------- scroll reveal + stagger groups ---------- */
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.setAttribute("data-revealed", "");
-            io.unobserve(entry.target);
-          }
-        }
-      },
-      { rootMargin: "0px 0px -4% 0px", threshold: 0.02 },
-    );
-
-    const stagger = (scope: ParentNode) => {
-      scope.querySelectorAll("[data-stagger]:not([data-staggered])").forEach((group) => {
-        group.setAttribute("data-staggered", "");
-        group.querySelectorAll(":scope [data-reveal]").forEach((child, i) => {
-          (child as HTMLElement).style.setProperty("--d", String(Math.min(i, 10)));
-        });
-      });
-    };
-
-    const scan = (node: ParentNode) => {
-      stagger(node);
-      node.querySelectorAll("[data-reveal]:not([data-revealed])").forEach((el) => io.observe(el));
-    };
-    scan(document);
-
-    const mo = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        m.addedNodes.forEach((n) => {
-          if (n.nodeType !== 1) return;
-          const el = n as Element;
-          if (el.matches("[data-reveal]:not([data-revealed])")) io.observe(el);
-          scan(el);
-        });
-      }
-    });
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    /* ---------- pointer: sheen + tilt + magnetic (один rAF) ---------- */
-    let raf = 0;
-    let last: PointerEvent | null = null;
-    let magneticEl: HTMLElement | null = null;
-    let tiltEl: HTMLElement | null = null;
-
-    const resetFx = (el: HTMLElement | null) => {
-      if (!el) return;
-      el.style.removeProperty("--tilt-x");
-      el.style.removeProperty("--tilt-y");
-      el.style.removeProperty("--tilt-lift");
-      if (el.hasAttribute("data-magnetic")) el.style.transform = "";
-    };
-
-    const applyPointer = () => {
-      raf = 0;
-      const e = last;
-      if (!e) return;
-      setPointerPosition(e.clientX, e.clientY);
-      if (calm()) return;
-
-      const target = e.target as Element | null;
-      const sheen = target?.closest?.(SHEEN_SELECTOR) as HTMLElement | null;
-      if (sheen) {
-        const r = sheen.getBoundingClientRect();
-        sheen.style.setProperty("--mx", `${(e.clientX - r.left).toFixed(0)}px`);
-        sheen.style.setProperty("--my", `${(e.clientY - r.top).toFixed(0)}px`);
-      }
-
-      const tilt = target?.closest?.("[data-tilt]") as HTMLElement | null;
-      if (tiltEl && tiltEl !== tilt) resetFx(tiltEl);
-      tiltEl = tilt;
-      if (tilt) {
-        const r = tilt.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
-          const px = (e.clientX - r.left) / r.width - 0.5;
-          const py = (e.clientY - r.top) / r.height - 0.5;
-          tilt.style.setProperty("--tilt-x", `${(-py * 7).toFixed(2)}deg`);
-          tilt.style.setProperty("--tilt-y", `${(px * 9).toFixed(2)}deg`);
-          tilt.style.setProperty("--tilt-lift", "-4px");
+    function enabled() { return !document.hidden && !getMotionReduced() && !root.hasAttribute("data-lite"); }
+    function resetTilt() { tilted?.removeAttribute("data-rf-tilt"); tilted = null; }
+    function clearHighlights() {
+      resetTilt();
+      for (const node of lit) node.removeAttribute("data-glint");
+      lit = [];
+    }
+    function clear() {
+      last = null;
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      clearHighlights();
+      backdrop?.style.removeProperty("--mouse-x");
+      backdrop?.style.removeProperty("--mouse-y");
+    }
+    function motion() {
+      let choice = "auto";
+      try { choice = localStorage.getItem(MOTION_KEY) ?? "auto"; } catch { /* unavailable */ }
+      applyMotionChoice(choice === "full" || choice === "reduced" ? choice : "auto", { persist: false });
+      if (!enabled()) clear();
+    }
+    function visibility() {
+      root.toggleAttribute("data-rfx-paused", document.hidden);
+      if (document.hidden) clear();
+    }
+    function update() {
+      frame = 0;
+      if (!enabled()) { clear(); return; }
+      const event = last;
+      last = null;
+      if (!event) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const surface = target?.closest<HTMLElement>(SURFACE);
+      const card = target?.closest<HTMLElement>(CARD) ?? null;
+      const outer = card ?? surface?.closest<HTMLElement>(".glass, .modal-panel, .popover");
+      const nodes = surface ? (outer && outer !== surface ? [surface, outer] : [surface]) : [];
+      const points = nodes.map((node) => ({ node, bounds: node.getBoundingClientRect() }));
+      // Mouse offsets are local to the fixed wallpaper; scrolling never moves it.
+      const x = (event.clientX / Math.max(1, window.innerWidth) * 2 - 1) * 16;
+      const y = (event.clientY / Math.max(1, window.innerHeight) * 2 - 1) * 12;
+      backdrop?.style.setProperty("--mouse-x", `${x.toFixed(1)}px`);
+      backdrop?.style.setProperty("--mouse-y", `${y.toFixed(1)}px`);
+      if (tilted && tilted !== card) resetTilt();
+      for (const node of lit) if (!nodes.includes(node)) node.removeAttribute("data-glint");
+      for (const { node, bounds } of points) {
+        if (!bounds.width || !bounds.height) continue;
+        const u = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+        const v = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+        node.style.setProperty("--mx", `${u * 100}%`);
+        node.style.setProperty("--my", `${v * 100}%`);
+        node.dataset.glint = "";
+        if (card === node) {
+          node.style.setProperty("--tilt-x", `${(0.5 - v) * 5.6}deg`);
+          node.style.setProperty("--tilt-y", `${(u - .5) * 5.6}deg`);
+          node.dataset.rfTilt = "";
+          tilted = node;
         }
       }
+      lit = nodes;
+    }
+    function track(event: MouseEvent) {
+      const source = (event as MouseEvent & { sourceCapabilities?: { firesTouchEvents?: boolean } }).sourceCapabilities;
+      if (!finePointer.matches || source?.firesTouchEvents || !enabled()) return;
+      last = event;
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    function scroll() {
+      last = null;
+      clearHighlights();
+    }
 
-      const mag = target?.closest?.("[data-magnetic]") as HTMLElement | null;
-      if (magneticEl && magneticEl !== mag) resetFx(magneticEl);
-      magneticEl = mag;
-      if (mag) {
-        const r = mag.getBoundingClientRect();
-        const dx = e.clientX - (r.left + r.width / 2);
-        const dy = e.clientY - (r.top + r.height / 2);
-        const dist = Math.hypot(dx, dy) || 1;
-        const pull = Math.min(1, 90 / dist);
-        mag.style.transform = `translate3d(${(dx * 0.12 * pull).toFixed(1)}px, ${(dy * 0.16 * pull).toFixed(1)}px, 0) scale(1.03)`;
-      }
-    };
-
-    const onPointer = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
-      last = e;
-      if (!raf) raf = requestAnimationFrame(applyPointer);
-    };
-    const onLeave = () => {
-      clearPointerPosition();
-      resetFx(magneticEl);
-      resetFx(tiltEl);
-      magneticEl = null;
-      tiltEl = null;
-    };
-    window.addEventListener("pointermove", onPointer, { passive: true });
-    document.documentElement.addEventListener("pointerleave", onLeave);
-
-    /* ---------- scroll: parallax + hue-shift + nav state ---------- */
-    const parallax = document.getElementById("backdrop-parallax");
-    let scrollRaf = 0;
-    const applyScroll = () => {
-      scrollRaf = 0;
-      const y = window.scrollY;
-      root.toggleAttribute("data-scrolled", y > 20);
-      if (calm()) return;
-      if (parallax) {
-        parallax.style.transform = `translate3d(0, ${(-Math.min(y, 5000) * 0.05).toFixed(1)}px, 0)`;
-      }
-      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const hue = Math.min(1, y / max) * 70;
-      root.style.setProperty("--hue-shift", `${hue.toFixed(1)}deg`);
-    };
-    const onScroll = () => {
-      if (!scrollRaf) scrollRaf = requestAnimationFrame(applyScroll);
-    };
-    applyScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-
+    visibility();
+    document.addEventListener("visibilitychange", visibility);
+    preference.addEventListener("change", motion);
+    window.addEventListener("mousemove", track, { passive: true });
+    window.addEventListener("scroll", scroll, { passive: true });
+    root.addEventListener("mouseleave", clear);
+    window.addEventListener("blur", clear);
     return () => {
-      io.disconnect();
-      mo.disconnect();
-      window.removeEventListener("pointermove", onPointer);
-      document.documentElement.removeEventListener("pointerleave", onLeave);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      document.removeEventListener("visibilitychange", visibility);
+      preference.removeEventListener("change", motion);
+      window.removeEventListener("mousemove", track);
+      window.removeEventListener("scroll", scroll);
+      root.removeEventListener("mouseleave", clear);
+      window.removeEventListener("blur", clear);
+      clear();
     };
   }, []);
-
   return null;
 }

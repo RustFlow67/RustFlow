@@ -8,11 +8,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/RouteLink";
 import { EvidenceBadge, RiskLevelBadge } from "@/components/Badges";
 import FaqList from "@/components/FaqList";
 import { PageHeader, SectionHead } from "@/components/PageHeader";
 import { EAC_RULES, FAQ, HARMFUL_TWEAKS, MYTHS } from "@/lib/content";
+import { tweakerHref } from "@/lib/tweaker";
 
 export const metadata: Metadata = {
   title: "Мифы, безопасность EAC и FAQ",
@@ -28,9 +29,9 @@ export default function FaqPage() {
     <div className="space-y-16 sm:space-y-20">
       <div>
         <PageHeader
-          eyebrow="Мифы и безопасность"
-          title="Античит EAC, вредные советы и разбор плацебо"
-          text="Что гарантированно приводит к бану Easy Anti-Cheat, какие «оптимизации» ломают Windows без прироста FPS и какие популярные флаги Rust просто игнорирует."
+          eyebrow="Мифы и EAC"
+          title="Что не стоит применять"
+          text="Разбираем риски для Easy Anti-Cheat, вредные «оптимизации» Windows и флаги, которые Rust игнорирует."
         >
           <div className="mt-5 flex flex-wrap gap-2">
             <a href="#eac" className="btn btn-sm">
@@ -55,7 +56,7 @@ export default function FaqPage() {
             <div className="glass glass-danger p-6 sm:p-7">
               <div className="flex items-center gap-2.5">
                 <ShieldAlert className="h-6 w-6 flex-none text-danger" aria-hidden="true" />
-                <h2 id="eac-heading" className="text-xl font-bold tracking-tight text-ink">
+                <h2 id="eac-heading" className="rf-page-content text-xl font-bold tracking-tight text-ink">
                   EAC: перманентный бан
                 </h2>
               </div>
@@ -79,8 +80,8 @@ export default function FaqPage() {
             <div className="glass p-6 sm:p-7">
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="h-6 w-6 flex-none text-ok" aria-hidden="true" />
-                <h2 className="text-xl font-bold tracking-tight text-ink">
-                  EAC: полностью безопасно
+                <h2 className="rf-page-content text-xl font-bold tracking-tight text-ink">
+                  EAC: штатные настройки
                 </h2>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-ink-2">
@@ -106,12 +107,12 @@ export default function FaqPage() {
       <section id="harmful" className="scroll-mt-24" aria-labelledby="harmful-heading">
         <SectionHead
           eyebrow="Красный список"
-          title={<span id="harmful-heading">Вредные твики — никогда не применяйте</span>}
+          title={<span id="harmful-heading">Вредные твики: чего избегать</span>}
           text="Отключение Defender и Windows Update, чистильщики реестра и закрытые .exe не дают кадров, но ломают ОС, античит и безопасность аккаунта."
         />
-        <ul className="grid gap-4 md:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {HARMFUL_TWEAKS.map((item) => (
-            <li key={item.title} className="glass glass-hover flex flex-col p-5 sm:p-6" data-reveal>
+            <li key={item.title} className="glass glass-hover flex flex-col p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <RiskLevelBadge level="harmful" />
                 <span className="chip">{item.danger}</span>
@@ -129,7 +130,7 @@ export default function FaqPage() {
               </div>
               {item.tweakSlug && (
                 <Link
-                  href={`/tweaks/${item.tweakSlug}`}
+                  href={tweakerHref(item.tweakSlug)}
                   className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-accent-hi hover:text-white"
                 >
                   Инструкция проверки / восстановления
@@ -148,9 +149,9 @@ export default function FaqPage() {
           title={<span id="myths-heading">Список плацебо и популярных мифов</span>}
           text="Советы, которые годами копируют из гайда в гайд, хотя на современном клиенте Rust они не меняют ни FPS, ни пинг."
         />
-        <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {MYTHS.map((myth) => (
-            <li key={myth.title} className="glass glass-hover flex flex-col p-5" data-reveal>
+            <li key={myth.title} className="glass glass-hover flex flex-col p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <EvidenceBadge status="myth" />
                 <span className="text-[12px] font-bold tabular-nums text-ink-3">
@@ -164,10 +165,10 @@ export default function FaqPage() {
               <p className="mt-2.5 text-[13.5px] leading-relaxed text-ink-2">{myth.truth}</p>
               {myth.tweakSlug && (
                 <Link
-                  href={`/tweaks/${myth.tweakSlug}`}
+                  href={tweakerHref(myth.tweakSlug)}
                   className="mt-auto inline-flex items-center gap-1 pt-3 text-[12.5px] font-semibold text-accent-hi hover:text-white"
                 >
-                  Подробнее в библиотеке
+                  Подробнее в Твикере
                   <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               )}
@@ -181,26 +182,20 @@ export default function FaqPage() {
         <SectionHead
           eyebrow="FAQ"
           title={<span id="faq-heading">Частые вопросы</span>}
-          text="Короткие ответы про античит, замеры, память и хранение профиля."
+          text="Ответы про античит, профиль и настройки из базы знаний: Windows, Rust, драйверы, бинды и диагностика."
         />
         <FaqList items={FAQ} />
       </section>
 
-      <section className="glass flex flex-wrap items-center justify-between gap-5 p-6 sm:p-8" data-reveal>
+      <section className="glass flex flex-wrap items-center justify-between gap-5 p-6 sm:p-8">
         <div className="max-w-xl">
           <h2 className="headline text-[1.55rem]">Нужна пошаговая методика замера?</h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-            Откройте Руководство пользователя или сразу внесите контрольный прогон в Журнал до/после.
+            В базе знаний — как провести контрольный прогон и отличить эффект от погрешности.
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <Link href="/journal" className="btn btn-primary">
-            Открыть Журнал
-            <ArrowRight aria-hidden="true" />
-          </Link>
-          <Link href="/guide" className="btn">
-            Руководство
-          </Link>
+          <Link href="/guide#measure" className="btn btn-primary">Протокол замера <ArrowRight aria-hidden="true" /></Link>
         </div>
       </section>
     </div>

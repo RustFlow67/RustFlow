@@ -4,9 +4,9 @@ export const CLOUD_AND_DEPLOY_FILES: AppKitFile[] = [
   /* ------------------------ CLOUD / STAGE 2 ------------------------ */
   {
     path: "app-kit/cloud/schema.sql",
-    title: "cloud/schema.sql — БД профилей, сборок, твиков и журнала (RLS)",
+    title: "cloud/schema.sql — БД профилей, сборок и твиков (RLS)",
     description:
-      "Полная схема PostgreSQL / Supabase для Этапа 2: аккаунты, облачные сборки, применённые твики, журнал замеров до/после и пользовательские пресеты с политиками Row-Level Security по owner_id.",
+      "Полная схема PostgreSQL / Supabase для Этапа 2: аккаунты, облачные сборки, применённые твики и пользовательские пресеты с политиками Row-Level Security по owner_id.",
     group: "cloud",
     language: "sql",
     content: `-- RustFlow — полная SQL-схема Этапа 2 (PostgreSQL 16+ / Supabase)
@@ -29,7 +29,7 @@ create table if not exists user_profiles (
   updated_at timestamptz not null default now()
 );
 
--- 2. Сохранённые сборки ПК (/10)
+-- 2. Сохранённые сборки ПК
 create table if not exists user_builds (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references user_profiles(owner_id) on delete cascade,
@@ -68,28 +68,7 @@ create table if not exists user_tweaks (
 );
 create index if not exists user_tweaks_owner_idx on user_tweaks(owner_id);
 
--- 4. Журнал замеров до/после
-create table if not exists benchmark_logs (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references user_profiles(owner_id) on delete cascade,
-  build_id uuid references user_builds(id) on delete set null,
-  tweak_slug varchar(64),
-  title varchar(120) not null,
-  server_kind varchar(24) not null default 'official',
-  scene varchar(160) not null,
-  before_avg numeric(6,1) not null check (before_avg > 0),
-  after_avg numeric(6,1) not null check (after_avg > 0),
-  before_low1 numeric(6,1) not null check (before_low1 > 0),
-  after_low1 numeric(6,1) not null check (after_low1 > 0),
-  before_ft numeric(6,2) not null check (before_ft > 0),
-  after_ft numeric(6,2) not null check (after_ft > 0),
-  notes text not null default '',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index if not exists benchmark_logs_owner_idx on benchmark_logs(owner_id, created_at desc);
-
--- 5. Счётчики сайта (уже используются в src/db/schema.ts)
+-- 4. Счётчики сайта (уже используются в src/db/schema.ts)
 create table if not exists tweak_stats (
   slug varchar(64) primary key,
   downloads integer not null default 0
@@ -103,16 +82,14 @@ create table if not exists tweak_votes (
   unique (slug, voter)
 );
 
--- 6. Row-Level Security (для Supabase / PostgREST: раскомментируйте при подключении auth.uid())
+-- 5. Row-Level Security (для Supabase / PostgREST: раскомментируйте при подключении auth.uid())
 -- alter table user_profiles enable row level security;
 -- alter table user_builds enable row level security;
 -- alter table user_tweaks enable row level security;
--- alter table benchmark_logs enable row level security;
 --
 -- create policy "own_profile" on user_profiles for all using (auth.uid() = owner_id);
 -- create policy "own_builds"  on user_builds   for all using (auth.uid() = owner_id or is_public);
 -- create policy "own_tweaks"  on user_tweaks   for all using (auth.uid() = owner_id);
--- create policy "own_logs"    on benchmark_logs for all using (auth.uid() = owner_id);
 `,
   },
   {
@@ -258,7 +235,7 @@ export function createCloudSync(config: CloudSyncConfig): CloudSyncController {
       "Положите в src/app/api/sync/route.ts после подключения авторизации (Auth.js / Better Auth / Lucia / Steam OpenID). Хранит и отдаёт облачный профиль пользователя в PostgreSQL.",
     group: "cloud",
     language: "typescript",
-    content: `import { db } from "@/db";
+    content: `import { getDb } from "@/db";
 import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -277,7 +254,7 @@ export async function GET(req: Request) {
   const ownerId = await getAuthenticatedOwnerId(req);
   if (!ownerId) return Response.json({ error: "Требуется авторизация" }, { status: 401 });
 
-  const rows = await db.execute(
+  const rows = await getDb().execute(
     sql\`select bundle_json from user_profiles where owner_id = \${ownerId}::uuid limit 1\`,
   );
   const row = rows.rows[0] as { bundle_json?: unknown } | undefined;
@@ -294,7 +271,7 @@ export async function PUT(req: Request) {
   }
 
   const stamped = JSON.stringify({ ...body.bundle, ownerId, syncedAt: new Date().toISOString() });
-  await db.execute(sql\`
+  await getDb().execute(sql\`
     insert into user_profiles (owner_id, bundle_json, updated_at)
     values (\${ownerId}::uuid, \${stamped}::jsonb, now())
     on conflict (owner_id)
@@ -335,6 +312,8 @@ server {
     gzip_types text/plain text/css application/json application/javascript image/svg+xml;
 
     add_header X-Content-Type-Options "nosniff" always;
+    # По умолчанию запрещаем чужие iframe. При встраивании замените на
+    # Content-Security-Policy с frame-ancestors для конкретных доверенных хостов.
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
@@ -355,8 +334,12 @@ server {
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $host;
+        # Доверяем только адресу, который установил прокси.
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # Чат RustFlow отдаёт ответы потоком, включая при префиксе /backend/api.
+        proxy_buffering off;
     }
 }
 `,
@@ -379,7 +362,7 @@ WorkingDirectory=/var/www/rustflow
 EnvironmentFile=/var/www/rustflow/.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
-ExecStart=/usr/bin/npm run start
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1
 Restart=always
 RestartSec=5
 
@@ -398,7 +381,7 @@ WantedBy=multi-user.target
     language: "markdown",
     content: `# Полное руководство: Свой сайт + Windows-приложение (.exe) на базе RustFlow
 
-Этот архив содержит **100% исходного кода сайта RustFlow** (все стили Liquid Glass iOS 26, тёмную и светлую темы, шрифты с кириллицей, 32 твика, 7 пресетов железа, оценщик сборки /10, журнал замеров, FPS-лабораторию и генератор ZIP) плюс **полный App Kit** для превращения его в настоящее десктопное приложение Windows и облачный сервис.
+Этот архив содержит **100% исходного кода сайта RustFlow** (Minimalistic Liquid Glass, тёмная и светлая темы, Твикер, 43 пресета железа, Сборка и генератор ZIP) плюс **полный App Kit** для превращения его в настоящее десктопное приложение Windows и облачный сервис.
 
 ---
 
@@ -412,29 +395,31 @@ WantedBy=multi-user.target
 ### Шаг 2. Первый запуск на своём ПК
 \`\`\`bash
 # Распакуйте архив RustFlow-Complete-Edition.zip и откройте папку в терминале:
-npm install
-cp .env.example .env
+npm ci
+cp -n .env.example .env
 # Впишите в .env ваш DATABASE_URL (PostgreSQL)
-npx drizzle-kit push
+npm run db:push
 npm run dev
 \`\`\`
 Откройте \`http://localhost:3000\` — ваш сайт полностью работает!
 
 ### Шаг 3. Как переделать под свой бренд и добавить материал
-- **Название, описание, домен**: \`src/app/layout.tsx\`, \`src/app/manifest.ts\`, \`src/components/Nav.tsx\`, \`src/components/Footer.tsx\`.
+- **Название, описание, домен**: \`src/app/layout.tsx\`, \`public/manifest.json\`, \`src/components/Nav.tsx\`, \`src/components/Footer.tsx\`.
 - **Цвета и Liquid Glass**: \`src/app/globals.css\` (секция \`:root\` — тёмная тема, \`:root[data-theme="light"]\` — светлая фарфоровая тема).
-- **Добавить свой твик**: откройте \`src/lib/tweaks/windows.ts\`, \`game.ts\` или \`extras.ts\` и добавьте объект \`Tweak\` — страница \`/tweaks/[slug]\`, скачивание файла \`/api/download/[slug]\` и включение в ZIP \`/api/pack\` заработают автоматически!
+- **Добавить свой твик**: откройте \`src/lib/tweaks/windows.ts\`, \`game.ts\` или \`extras.ts\` и добавьте объект \`Tweak\` — он появится в соответствующей категории Твикера. Включение в ZIP зависит от риска, верификации и выбора пользователя.
 - **Добавить процессор / видеокарту**: \`src/lib/hardware.ts\` (массивы \`CPUS\` и \`GPUS\`).
 - **Добавить пресет железа**: \`src/lib/models/preset.ts\` (массив \`HARDWARE_PRESETS\`).
 
 ### Шаг 4. Публикация сайта в интернет
+Укажите \`NEXT_PUBLIC_SITE_URL\` и при необходимости \`VITE_API_BASE_URL\` перед сборкой. Для обычного запуска оставьте префикс пустым (\`/api\` на домене сайта). Пример \`VITE_API_BASE_URL=/backend\` использует \`/backend/api\` с внутренним rewrite Next.js. HTTPS нужен для облачных аккаунтов и установки PWA. Шаблон Nginx перезаписывает X-Forwarded-For, X-Forwarded-Host и X-Forwarded-Proto; не открывайте порт Next.js напрямую в обход прокси. Секреты (в том числе \`GOOGLE_CLIENT_SECRET\`, \`RUSTFLOW_LLM_API_KEY\`, \`RUSTFLOW_ADMIN_TOKEN\`) задаются только при запуске. Google включается через \`VITE_GOOGLE_CLIENT_ID\` и секрет, с callback \`/api/auth/google/callback\`. Модель чата — gpt-4o-mini.
+
 - **Вариант А — Vercel + Neon (бесплатно, за 5 минут)**:
   1. Залейте проект в приватный репозиторий GitHub (**не коммитьте \`.env\`!**).
   2. Создайте бесплатную PostgreSQL базу на Neon.tech и скопируйте \`DATABASE_URL\`.
-  3. Импортируйте репозиторий в Vercel, добавьте переменную \`DATABASE_URL\` и нажмите Deploy.
+  3. Импортируйте репозиторий в Vercel, добавьте переменную \`DATABASE_URL\` и нажмите Deploy. Примените схему к этой базе командой npm run db:push с DATABASE_URL в серверном окружении.
 - **Вариант Б — Свой VPS (Ubuntu 24.04 + Docker + домен)**:
   1. Скопируйте проект на сервер в \`/opt/rustflow\`.
-  2. Поменяйте пароль БД в \`docker-compose.yml\` и запустите \`docker compose up -d --build\`.
+  2. Поменяйте пароль БД в \`docker-compose.yml\` и запустите \`docker compose up -d --build\` и примените схему: \`docker compose exec web npm run db:push\`.
   3. Поставьте Nginx + Certbot, подключите \`app-kit/deploy/nginx.conf\` и выпустите HTTPS: \`sudo certbot --nginx -d ваш-домен.ru\`.
 
 ---
@@ -511,11 +496,11 @@ npx electron-builder --config electron/electron-builder.yml --win
 
 ## Часть 4. Аккаунты и облачная синхронизация (Этап 2)
 
-Все данные в RustFlow уже разделены на модели (\`builds\`, \`tweaks\`, \`presets\`, \`logs\`) и содержат поле \`ownerId\`:
+Все данные в RustFlow уже разделены на модели (\`builds\`, \`tweaks\`, \`presets\`) и содержат поле \`ownerId\`:
 1. Выполните \`app-kit/cloud/schema.sql\` в вашей PostgreSQL или Supabase.
 2. Подключите авторизацию (**Better Auth**, **Auth.js** или **Supabase Auth** — удобно включить вход через **Steam**, **Discord** и **Google**).
 3. Положите \`app-kit/cloud/api-sync-route.ts\` в \`src/app/api/sync/route.ts\` и подставьте ID пользователя из сессии.
-4. Запустите \`createCloudSync({ endpoint: "/api/sync" }).start()\` после входа — локальная сборка, применённые твики и журнал автоматически сольются с облаком и синхронизируются между сайтом и \`.exe\`!
+4. Запустите \`createCloudSync({ endpoint: "/api/sync" }).start()\` после входа — локальная сборки, отметки и настройки Твикера автоматически сольются с облаком и синхронизируются между сайтом и \`.exe\`!
 
 ---
 

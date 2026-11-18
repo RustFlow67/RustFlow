@@ -1,56 +1,69 @@
 "use client";
 
+import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import {
   ArrowRight,
   BookmarkCheck,
   Calculator,
-  Check,
   Cpu,
-  FileJson,
   Gauge,
   Info,
   Lightbulb,
   Monitor,
   ScanLine,
-  Sparkles,
   Target,
-  Trash2,
 } from "lucide-react";
-import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import Link from "@/components/RouteLink";
+import { useEffect, useMemo, useState } from "react";
 import CategoryIcon from "@/components/CategoryIcon";
 import Combobox from "@/components/Combobox";
-import { triggerBackupModal } from "@/components/Nav";
-import ScoreRing from "@/components/ScoreRing";
+import LiquidSelect from "@/components/LiquidSelect";
+import GraphicsPicker from "@/components/GraphicsPicker";
+import { AnimatedNumber } from "@/components/fx/AnimatedNumber";
+import ProfileGate, { ProfileLock } from "@/components/auth/ProfileGate";
+import { MemoryControls, PersonalBuildSettings } from "@/components/BuildSetupControls";
+import BuildRadar from "@/components/addons/BuildRadar";
+import { useAccount } from "@/components/auth/AccountProvider";
 import Segmented from "@/components/Segmented";
-import { Badge, Button, Input, Meter, Select, Skeleton, Switch } from "@/components/ui";
-import { ConfirmDialog } from "@/components/ui/Modal";
+import { Badge, Button, Input, Meter, Skeleton, Switch } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { publishAssistantBuild } from "@/lib/assistant/context";
 import {
   BOTTLENECK_LABEL,
   CPUS,
   detectGpu,
   GPUS,
+  getGpu,
   RAM_OPTIONS,
-  RESOLUTION_OPTIONS,
   STORAGE_OPTIONS,
-  type ResolutionId,
   type StorageId,
 } from "@/lib/hardware";
 import {
-  calcRamLatencyNs,
-  defaultClForMhz,
   evaluateBuild10,
-  QUICK_SAMPLE_BUILDS,
-  RAM_CL_OPTIONS,
-  RAM_FREQ_OPTIONS,
   RUST_SCORE_WEIGHTS,
   type BuildInput,
 } from "@/lib/models/build";
-import { HARDWARE_PRESETS } from "@/lib/models/preset";
+import {
+  BUILD_RESOLUTION_OPTIONS,
+  formatBuildResolution,
+  getResolutionSize,
+  isResolutionDimension,
+  MAX_RESOLUTION_DIMENSION,
+  MIN_RESOLUTION_DIMENSION,
+  MIN_RESOLUTION_HEIGHT,
+  RESOLUTION_SIZES,
+  type BuildResolutionId,
+} from "@/lib/models/build-resolution";
 import type { TweakGroupId } from "@/lib/models/tweak";
 import { useRustFlowStore } from "@/lib/storage/useStore";
-import { PRESETS } from "@/lib/tweaks/meta";
+import { getGraphicsProfile, type GraphicsProfileId } from "@/lib/graphics-profiles";
+import { SCENARIOS, frameMs, type RustScenario } from "@/lib/models/fps-calibration";
+import { bestUpgrade } from "@/lib/models/build-upgrade";
+import { defaultMemoryKit, DEFAULT_CONNECTION, DEFAULT_MONITOR_HZ, getMemoryType, isRamValue, requiredMemory, RAM_MHZ_BOUNDS, RAM_CL_BOUNDS } from "@/lib/models/build-settings";
+import { personalPlanHref, tweakerHref } from "@/lib/tweaker";
+
+const dimensionMin = (axis: "width" | "height") => axis === "height" ? MIN_RESOLUTION_HEIGHT : MIN_RESOLUTION_DIMENSION;
+const pixelFormat = new Intl.NumberFormat("ru-RU");
 
 export interface TweakIndex {
   [slug: string]: {
@@ -61,31 +74,35 @@ export interface TweakIndex {
   };
 }
 
-export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }) {
+type Props = { tweakIndex: TweakIndex; presetInput?: BuildInput; initialMode?: GraphicsProfileId; accountBuild?: boolean; savedId?: string };
+
+export default function BenchmarkTool({ accountBuild, ...props }: Props) {
+  const { session, problem } = useAccount();
+  if (accountBuild && !session && !problem) return <section id="build-config" className="glass p-4 sm:p-6" aria-busy="true">
+    <p role="status" className="mb-3 text-sm text-ink-2">Загружаем сборку аккаунта…</p>
+    <Skeleton className="h-44 w-full" />
+  </section>;
+  const user = session?.user;
+  if ((accountBuild || props.savedId) && !user) return <section id="build-config" className="glass liquid-glass-card p-4 sm:p-6">
+    <ProfileLock action="Открыть сохранённую сборку" />
+    <Link href="/benchmark" className="link mt-3 inline-block">Перейти к свободному расчёту</Link>
+  </section>;
+  return <BenchmarkForm key={accountBuild ? user?.id : "personal"} {...props}
+    presetInput={accountBuild ? user?.build ?? props.presetInput : props.presetInput} editingAccount={Boolean(accountBuild && user)} />;
+}
+
+function BenchmarkForm({ tweakIndex, presetInput, initialMode = "competitive", editingAccount, savedId }: Props & {
+  editingAccount: boolean;
+}) {
+  const { session, saveBuild } = useAccount();
+  const user = session?.user;
   const { state, hydrated, storage } = useRustFlowStore();
   const { toast } = useToast();
-  const resultRef = useRef<HTMLDivElement>(null);
 
   const initialSeed = useMemo<{ input: BuildInput; id?: string }>(() => {
-    if (typeof window !== "undefined") {
-      const presetSlug = new URLSearchParams(window.location.search).get("preset");
-      const found = presetSlug ? HARDWARE_PRESETS.find((p) => p.slug === presetSlug) : undefined;
-      if (found) {
-        return {
-          input: {
-            name: found.title,
-            cpuId: found.cpuId,
-            gpuId: found.gpuId,
-            ramGb: found.ramGb,
-            ramMhz: found.ramMhz,
-            ramCl: found.ramCl,
-            storage: found.storageId,
-            resolution: found.resolution,
-          },
-        };
-      }
-    }
-    const active = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
+    if (presetInput) return { input: presetInput };
+    const active = user && (state?.builds.find((b) => b.id === (savedId ?? state.activeBuildId))
+      ?? state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0]);
     if (active) return { input: active.input, id: active.id };
     return {
       input: {
@@ -94,16 +111,17 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
         gpuId: "geforce-rtx-5060",
         ramGb: 32,
         ramMhz: 3600,
-        ramCl: 18,
+        ramCl: 16,
         storage: "nvme",
         resolution: "1080p",
       },
     };
-  }, [state]);
+  }, [state, presetInput, savedId, user]);
 
   const [draft, setDraft] = useState<{ input: BuildInput; id?: string } | null>(null);
   const current = draft ?? initialSeed;
   const input = current.input;
+  useEffect(() => hydrated ? publishAssistantBuild(input) : undefined, [hydrated, input]);
   const editingId = current.id;
   const { name, cpuId, gpuId, ramGb, ramMhz, ramCl, storage: storageType, resolution } = input;
 
@@ -114,40 +132,33 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
     });
 
   const setName = (v: string) => patchInput({ name: v });
-  const setCpuId = (v: string) => patchInput({ cpuId: v });
+  const setCpuId = (cpuId: string) => {
+    const fixed = requiredMemory(cpuId), memory = getMemoryType(input);
+    patchInput({ cpuId, ...(fixed && fixed !== memory ? defaultMemoryKit(fixed) : { memoryType: memory }) });
+  };
   const setGpuId = (v: string) => patchInput({ gpuId: v });
   const setRamGb = (v: number) => patchInput({ ramGb: v });
-  const setRamCl = (v: number) => patchInput({ ramCl: v });
   const setStorageType = (v: StorageId) => patchInput({ storage: v });
-  const setResolution = (v: ResolutionId) => patchInput({ resolution: v });
+  const resolutionSize = getResolutionSize(input);
+  const setResolution = (v: BuildResolutionId) => patchInput({
+    resolution: v,
+    customResolution: v === "custom" ? resolutionSize ?? RESOLUTION_SIZES["1080p"] : undefined,
+  });
+  const setDimension = (axis: "width" | "height", value: number) => patchInput({
+    customResolution: { ...RESOLUTION_SIZES["1080p"], ...input.customResolution, [axis]: value },
+  });
 
   const [detectNotes, setDetectNotes] = useState<string[] | null>(null);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showWeights, setShowWeights] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const evaluation = useMemo(() => evaluateBuild10(input), [input]);
-  const latencyNs = calcRamLatencyNs(ramMhz, ramCl);
-  const savedBuilds = state?.builds ?? [];
-  const activeBuild =
-    savedBuilds.find((b) => b.id === state?.activeBuildId) ?? savedBuilds[0] ?? null;
-
-  function applySample(sample: BuildInput) {
-    setDraft({ input: { ...sample }, id: undefined });
-    toast({
-      title: "Конфигурация подставлена",
-      description: `${sample.name} — нажмите «Сохранить как мою сборку», чтобы закрепить.`,
-      tone: "info",
-    });
-  }
-
-  function handleFreqChange(nextMhz: number) {
-    const wasDdr5 = ramMhz >= 4400;
-    const isDdr5 = nextMhz >= 4400;
-    patchInput({
-      ramMhz: nextMhz,
-      ...(wasDdr5 !== isDdr5 ? { ramCl: defaultClForMhz(nextMhz) } : {}),
-    });
-  }
+  const [mode, setMode] = useState<GraphicsProfileId>(initialMode);
+  const [scene, setScene] = useState<RustScenario>("coast");
+  const evaluation = useMemo(() => evaluateBuild10(input, mode, scene), [input, mode, scene]);
+  const upgrade = useMemo(() => evaluation ? bestUpgrade(input, mode, scene) : null, [evaluation, input, mode, scene]);
+  const activeBuild = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
+  const ramValid = isRamValue(ramMhz, RAM_MHZ_BOUNDS) && isRamValue(ramCl, RAM_CL_BOUNDS);
+  const tuning = { monitorHz: input.monitorHz ?? DEFAULT_MONITOR_HZ, connection: input.connection ?? DEFAULT_CONNECTION };
 
   function handleAutoDetect() {
     const notes: string[] = [];
@@ -177,62 +188,39 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
     toast({ title: "Автопроверка выполнена", description: "Проверьте CPU и параметры RAM.", tone: "info" });
   }
 
-  function handleSaveBuild(asNew = false) {
-    if (!evaluation) {
+  async function handleSaveBuild(asNew = false) {
+    if (!evaluation || !user || saving) return;
+    const configured: BuildInput = { ...input, ...tuning, memoryType: getMemoryType(input), biosProfile: input.biosProfile ?? "xmp" };
+    setSaving(true);
+    try {
+      if (!asNew) await saveBuild(configured);
+      if (asNew || !editingAccount) {
+        const saved = storage.saveBuild(configured, asNew ? undefined : editingId);
+        if (saved && !editingAccount) setDraft((latest) => ({
+          input: latest && latest.input !== input ? latest.input : saved.input,
+          id: saved.id,
+        }));
+      }
       toast({
-        title: "Выберите CPU и GPU из списка",
-        tone: "warning",
-      });
-      return;
-    }
-    const saved = storage.saveBuild(input, asNew ? undefined : editingId);
-    if (saved) {
-      setDraft({ input: saved.input, id: saved.id });
-      toast({
-        title: "Сохранено как «Моя сборка»",
-        description: `${saved.input.name} · Оценка ${saved.score10}/10 (хранится в localStorage)`,
+        title: asNew ? "Копия сохранена в браузере" : user.kind === "local" ? "Сборка сохранена в локальном профиле" : "Сборка сохранена в аккаунте",
+        description: "Сборки и JSON доступны в профиле игрока.",
         tone: "success",
       });
-      if (window.innerWidth < 1024) {
-        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-  }
-
-  function loadSavedBuild(id: string) {
-    const b = savedBuilds.find((x) => x.id === id);
-    if (!b) return;
-    storage.setActiveBuild(b.id);
-    setDraft({ input: { ...b.input }, id: b.id });
-    toast({ title: "Активная сборка переключена", description: b.input.name, tone: "info" });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Не удалось сохранить сборку", tone: "error" });
+    } finally { setSaving(false); }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Быстрые референсы */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12.5px] font-semibold text-ink-3">Быстрый пример:</span>
-        {QUICK_SAMPLE_BUILDS.map((sample) => (
-          <button
-            key={sample.label}
-            type="button"
-            onClick={() => applySample(sample.input)}
-            className="chip !h-8 !px-3 transition-transform hover:bg-white/15 hover:text-white active:scale-95"
-          >
-            <Sparkles className="text-accent-hi" aria-hidden="true" />
-            {sample.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-stretch">
         {/* ----------------------- Форма конфигурации ----------------------- */}
         <section
-          className="glass glass-blur relative z-20 p-5 sm:p-7"
+          id="build-config"
+          className="glass glass-blur liquid-glass-card build-config-layout relative z-20 scroll-mt-[calc(var(--header-size)+12px)] p-5 sm:p-7"
           aria-label="Параметры вашей сборки ПК"
         >
           <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <h2 className="text-xl font-bold tracking-tight">Конфигурация ПК</h2>
+            <h2 className="rf-page-content text-xl font-bold tracking-tight">Конфигурация ПК</h2>
             <Button variant="secondary" size="sm" onClick={handleAutoDetect}>
               <ScanLine aria-hidden="true" />
               Определить GPU
@@ -243,14 +231,14 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
             <ul className="well pop-in mt-4 space-y-1.5 p-3.5 text-[12.5px] leading-relaxed text-ink-2" aria-live="polite">
               {detectNotes.map((n, i) => (
                 <li key={i} className="flex gap-2">
-                  <Info className="mt-0.5 h-4 w-4 flex-none text-sky" aria-hidden="true" />
+                  <Info className="mt-0.5 h-4 w-4 flex-none text-accent-hi" aria-hidden="true" />
                   <span>{n}</span>
                 </li>
               ))}
             </ul>
           )}
 
-          <div className="mt-5 space-y-4">
+          <div className="build-fields mt-5 grid min-w-0 gap-4">
             <Input
               label="Название профиля"
               placeholder="Моя сборка"
@@ -288,21 +276,7 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Select
-                label="Частота RAM"
-                options={RAM_FREQ_OPTIONS}
-                value={ramMhz}
-                onChange={(e) => handleFreqChange(Number(e.target.value))}
-              />
-              <Select
-                label="Первый тайминг (CAS)"
-                options={RAM_CL_OPTIONS}
-                value={ramCl}
-                onChange={(e) => setRamCl(Number(e.target.value))}
-                hint={`Задержка доступа: ~${latencyNs} нс`}
-              />
-            </div>
+            <MemoryControls input={input} patch={patchInput} />
 
             <div>
               <span className="mb-1.5 block text-[13px] font-semibold text-ink-2">
@@ -317,91 +291,91 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
               />
             </div>
 
-            <div>
-              <span className="mb-1.5 block text-[13px] font-semibold text-ink-2">Целевое разрешение</span>
-              <Segmented
-                options={RESOLUTION_OPTIONS.map((r) => ({ value: r.id, label: r.label }))}
+            <div className="space-y-2.5">
+              <LiquidSelect
+                label="Целевое разрешение"
+                options={BUILD_RESOLUTION_OPTIONS}
                 value={resolution}
                 onChange={setResolution}
-                ariaLabel="Разрешение экрана"
-                className="w-full"
               />
+              <OriginDisclosure open={resolution === "custom"}>
+                <fieldset aria-label="Размеры кастомного разрешения" className="grid grid-cols-2 gap-2.5">
+                  {([ ["width", "Ширина, px"], ["height", "Высота, px"] ] as const).map(([axis, label]) => {
+                    const value = input.customResolution?.[axis];
+                    return <Input key={axis} label={label} type="number" inputMode="numeric" required
+                      min={dimensionMin(axis)} max={MAX_RESOLUTION_DIMENSION} step={1}
+                      value={value !== undefined && Number.isFinite(value) ? value : ""}
+                      error={isResolutionDimension(value, axis) ? undefined : `${dimensionMin(axis)}–${MAX_RESOLUTION_DIMENSION} px (целое число)`}
+                      onChange={(event) => setDimension(axis, event.target.valueAsNumber)} />;
+                  })}
+                </fieldset>
+              </OriginDisclosure>
+              <p className="text-[12px] leading-relaxed text-ink-3" aria-live="polite">
+                {resolutionSize
+                  ? `${resolutionSize.width}×${resolutionSize.height} · ${pixelFormat.format(resolutionSize.width * resolutionSize.height)} пикселей`
+                  : "Укажите ширину 800–7680 px и высоту 600–7680 px."}
+              </p>
             </div>
+            <PersonalBuildSettings input={input} patch={patchInput} evaluation={evaluation} />
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2.5">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => handleSaveBuild(false)}
-              disabled={!evaluation}
-              className="flex-1"
-            >
-              <BookmarkCheck aria-hidden="true" />
-              {editingId ? "Обновить «Мою сборку»" : "Сохранить как мою сборку"}
-            </Button>
-            {editingId && (
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => handleSaveBuild(true)}
-                title="Сохранить копию под новым ID для сравнения"
-              >
-                + Копия
+            <ProfileGate className="w-full" action="Сохранить как мою сборку">
+              <Button variant="primary" size="lg" onClick={() => void handleSaveBuild()} loading={saving}
+                disabled={!evaluation} className="liquid-glass-btn build-save-button flex-1">
+                <BookmarkCheck aria-hidden="true" />
+                {editingAccount ? (user?.kind === "local" ? "Сохранить в профиле" : "Сохранить в аккаунте") : editingId ? "Обновить «Мою сборку»" : "Сохранить как мою сборку"}
               </Button>
-            )}
+              {(editingId || editingAccount) && <Button size="sm" onClick={() => void handleSaveBuild(true)} disabled={!evaluation || saving}>
+                {editingAccount ? "Копия в браузер" : "+ Копия"}
+              </Button>}
+            </ProfileGate>
           </div>
-          <p className="mt-2.5 text-center text-[12px] text-ink-3">
-            Без бэкенда: профиль сохраняется в localStorage и подставляется в «Сетап» и «Пресеты».
-          </p>
+          {user && <p className="mt-2 text-center text-xs text-ink-3">Сохранение в профиле; копии в браузере доступны для JSON.</p>}
         </section>
 
         {/* --------------------- Результат оценки /10 --------------------- */}
-        <div ref={resultRef} className="scroll-mt-24 space-y-6" aria-live="polite">
-          {!hydrated ? (
-            <Skeleton className="h-[460px] w-full" />
-          ) : !evaluation ? (
-            <section className="glass p-8 text-center">
+        <section className="flex min-w-0 scroll-mt-24 flex-col gap-6" aria-label="Анализ сборки ПК">
+          {/* A default/preset calculation doesn't depend on browser storage. */}
+          {!evaluation ? (
+            <section className="glass liquid-glass-card flex flex-1 flex-col justify-center p-8 text-center">
               <Gauge className="mx-auto h-10 w-10 text-ink-3" aria-hidden="true" />
-              <h2 className="mt-4 text-xl font-bold">Выберите CPU и GPU</h2>
+              <h2 className="mt-4 text-xl font-bold">{!ramValid ? "Проверьте частоту ОЗУ и CL" : resolutionSize ? "Выберите CPU и GPU" : "Проверьте размеры разрешения"}</h2>
               <p className="mt-2 text-sm text-ink-2">
-                Как только будут выбраны комплектующие, появится взвешенная оценка /10 и расчёт FPS.
+                {resolutionSize && ramValid
+                  ? "Как только будут выбраны комплектующие, появится взвешенная оценка и расчёт FPS."
+                  : "До исправления оценка недоступна. Используйте целые числа в допустимых пределах."}
               </p>
             </section>
           ) : (
             <>
               {/* Карточка главного балла /10 + разбивка по 5 факторам */}
-              <section className="glass p-5 sm:p-7" aria-label="Итоговая оценка сборки /10">
+              <section className="glass liquid-glass-card p-5 sm:p-7" aria-label="Итоговая оценка сборки">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Badge tone="accent" title="Расчётная модель по индексам железа, не фактический бенчмарк">
                     <Calculator aria-hidden="true" />
                     Оценка, не замер
                   </Badge>
-                  {activeBuild && editingId === activeBuild.id && (
+                  {user && activeBuild && editingId === activeBuild.id && (
                     <Badge tone="safe" dot>
-                      Сохранено как «Моя сборка»
+                      {input === activeBuild.input ? "Сохранено как «Моя сборка»" : "Редактируется «Моя сборка»"}
                     </Badge>
                   )}
                 </div>
 
                 <div className="mt-5 flex flex-col items-center gap-6 sm:flex-row">
-                  <ScoreRing
-                    value={evaluation.score10 * 10}
-                    size={164}
-                    stroke={13}
-                    color={evaluation.verdictColor}
-                    colorTo="#ffffff"
-                  >
-                    <div>
-                      <span className="block text-[44px] font-extrabold leading-none tracking-tighter tabular-nums">
-                        {evaluation.score10.toFixed(1)}
-                      </span>
-                      <span className="mt-1 block text-[12.5px] font-semibold text-ink-2">из 10.0</span>
+                  <div className="w-full max-w-[240px] flex-none sm:w-[42%]">
+                    <div className="flex items-baseline justify-center gap-2">
+                      <strong className="font-mono text-[36px] font-extrabold leading-none tabular-nums">
+                        <AnimatedNumber value={evaluation.score10} digits={1} />
+                      </strong>
+                      <span className="text-[12.5px] font-semibold text-ink-2">из 10.0</span>
                     </div>
-                  </ScoreRing>
+                    <BuildRadar builds={[{ id: "benchmark", input, evaluation }]} compact />
+                  </div>
 
                   <div className="min-w-0 flex-1 text-center sm:text-left">
-                    <h2 className="headline text-[1.75rem]">{evaluation.verdictLabel}</h2>
+                    <h2 className="headline rf-page-content text-[1.75rem]">{evaluation.verdictLabel}</h2>
                     <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink-2">
                       {evaluation.verdictSummary}
                     </p>
@@ -409,6 +383,8 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                       {evaluation.cpuName} · {evaluation.gpuName} ({evaluation.vramGb} ГБ) · {ramGb} ГБ @{" "}
                       {ramMhz} CL{ramCl} (~{evaluation.ramLatencyNs} нс)
                     </p>
+                    <p className="mt-2.5 text-sm font-semibold text-ink-2">Узкое место: {BOTTLENECK_LABEL[evaluation.bottleneck]}</p>
+                    <a href="#build-recommendations" className="link mt-1.5 inline-block text-sm">К рекомендациям</a>
                   </div>
                 </div>
 
@@ -427,8 +403,8 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                   </button>
                 </div>
 
-                {showWeights && (
-                  <div className="well pop-in mt-3 space-y-1.5 p-3.5 text-[12.5px] leading-relaxed text-ink-2">
+                <OriginDisclosure open={showWeights} className="mt-3">
+                  <div className="well space-y-1.5 p-3.5 text-[12.5px] leading-relaxed text-ink-2">
                     <p className="font-semibold text-ink">
                       Формула: Итог = 0.35×CPU + 0.20×RAM + 0.22×GPU + 0.13×VRAM + 0.10×SSD
                     </p>
@@ -441,7 +417,7 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                       </p>
                     ))}
                   </div>
-                )}
+                </OriginDisclosure>
 
                 <div className="mt-4 space-y-3.5">
                   {evaluation.breakdown.map((item) => (
@@ -454,18 +430,18 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                           </span>
                         </span>
                         <span className="font-bold tabular-nums text-ink">
-                          {item.score.toFixed(1)}
+                          <AnimatedNumber value={item.score} digits={1} />
                           <span className="text-[12px] font-normal text-ink-3">
                             {" "}
-                            / 10 (+{item.weighted.toFixed(1)})
+                            / 10 (+<AnimatedNumber value={item.weighted} digits={1} />)
                           </span>
                         </span>
                       </div>
                       <Meter
                         percent={item.score * 10}
                         label={`${item.label}: ${item.score} из 10`}
-                        fromColor={item.score >= 7.5 ? "#30d158" : item.score >= 5 ? "#ff8e4f" : "#ff6961"}
-                        toColor={item.score >= 7.5 ? "#a7f8c2" : item.score >= 5 ? "#ffd4a6" : "#ffb5b0"}
+                        fromColor="#e05a2b"
+                        toColor="#ffc38b"
                       />
                       <p className="mt-1 text-[12px] text-ink-3">{item.detail}</p>
                     </div>
@@ -473,89 +449,56 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                 </div>
               </section>
 
-              {/* Ожидаемый диапазон FPS: Моддед vs Официал */}
-              <section className="glass p-5 sm:p-7" aria-label="Ожидаемый диапазон FPS">
+              {/* Ожидаемый диапазон FPS: MODDED 2X / OFFICIAL HIGH POP */}
+              <section className="glass liquid-glass-card flex-1 p-5 sm:p-7" aria-label="Ожидаемый диапазон FPS">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold tracking-tight">Ожидаемый диапазон FPS</h2>
+                  <h2 className="rf-page-content text-xl font-bold tracking-tight">Ожидаемый диапазон FPS</h2>
                   <Badge tone="accent">Оценка, не замер</Badge>
                 </div>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-                  Соревновательные настройки в {resolution === "4k" ? "4K" : resolution}. Фактический FPS зависит
-                  от онлайна, числа построек и дня вайпа — свои реальные цифры фиксируйте в{" "}
-                  <Link href="/journal" className="link">
-                    Журнале замеров
-                  </Link>
-                  .
+                  {getGraphicsProfile(mode)?.short} · {formatBuildResolution(input)}. При упоре в CPU смена разрешения может мало влиять на FPS. Сравнивайте показатели в одной сцене.
                 </p>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="tile p-4">
-                    <span className="text-[12px] font-bold uppercase tracking-wider text-sky">
-                      Моддед 2x (180–250 онл.)
-                    </span>
-                    <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-ink">
-                      {evaluation.fpsModded.min}–{evaluation.fpsModded.max}{" "}
-                      <span className="text-sm font-semibold text-ink-3">FPS</span>
-                    </p>
-                    <Meter
-                      percent={Math.min(100, (evaluation.fpsModded.max / 240) * 100)}
-                      fromColor="#0a84ff"
-                      toColor="#8ce0ff"
-                      className="mt-3"
-                    />
-                    <p className="mt-2 text-[12.5px] text-ink-2">
-                      Оценка 1% low: <strong className="tabular-nums">~{evaluation.fpsModded.low1} FPS</strong>
-                    </p>
-                  </div>
-
-                  <div className="tile p-4">
-                    <span className="text-[12px] font-bold uppercase tracking-wider text-accent-hi">
-                      Официал High Pop (350–500 онл.)
-                    </span>
-                    <p className="mt-2 text-3xl font-extrabold tabular-nums tracking-tight text-ink">
-                      {evaluation.fpsOfficial.min}–{evaluation.fpsOfficial.max}{" "}
-                      <span className="text-sm font-semibold text-ink-3">FPS</span>
-                    </p>
-                    <Meter
-                      percent={Math.min(100, (evaluation.fpsOfficial.max / 240) * 100)}
-                      className="mt-3"
-                    />
-                    <p className="mt-2 text-[12.5px] text-ink-2">
-                      Оценка 1% low: <strong className="tabular-nums">~{evaluation.fpsOfficial.low1} FPS</strong>
-                    </p>
-                  </div>
+                <div className="mt-3"><GraphicsPicker value={mode} onChange={setMode} label="Режим графики сборки" /></div>
+                <div className="mt-4">
+                  <h3 className="mb-2 text-sm font-bold">Симулятор сценариев Rust</h3>
+                  <Segmented options={SCENARIOS} value={scene} onChange={setScene} presentation="grid"
+                    className="scenario-picker" ariaLabel="Симулятор сценариев Rust" />
+                  <p className="mt-2 min-h-8 text-xs text-ink-3">{SCENARIOS.find((s) => s.value === scene)?.hint}</p>
                 </div>
-
-                {/* Сравнение по пресетам графики */}
-                <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                  {PRESETS.map((p) => {
-                    const est = evaluation.fpsByPreset[p.id];
-                    const rec = evaluation.recommendedPreset === p.id;
-                    return (
-                      <div
-                        key={p.id}
-                        className="well p-3"
-                        style={
-                          rec
-                            ? { boxShadow: "inset 0 0 0 1.5px rgb(255 160 98 / 0.6)" }
-                            : undefined
-                        }
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[12.5px] font-semibold text-ink-2">{p.title}</span>
-                          {rec && <Check className="h-3.5 w-3.5 text-accent-hi" aria-hidden="true" />}
-                        </div>
-                        <p className="mt-1 text-lg font-extrabold tabular-nums">
-                          ≈ {est.avg} <span className="text-[12px] font-normal text-ink-3">FPS (low ~{est.low})</span>
-                        </p>
-                      </div>
-                    );
-                  })}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2" aria-live="polite">
+                  {[
+                    { name: "MODDED 2X", online: "180–250 игроков", fps: evaluation.fpsModded },
+                    { name: "OFFICIAL HIGH POP", online: "350–500 игроков", fps: evaluation.fpsOfficial },
+                  ].map(({ name, online, fps }) => <div key={name} className="well p-4" data-server={name}>
+                    <h3 className="text-xs font-extrabold tracking-wider text-accent-hi">{name}</h3>
+                    <p className="mt-0.5 text-xs text-ink-3">{online}</p>
+                    <p className="rf-page-content mt-2 font-display text-3xl font-extrabold tabular-nums tracking-tight text-accent-hi">
+                      <AnimatedNumber value={fps.min} />–<AnimatedNumber value={fps.max} /> <span className="font-sans text-sm font-semibold">FPS</span>
+                    </p>
+                    <Meter percent={Math.min(100, (fps.max / 240) * 100)} fromColor="#e05a2b" toColor="#ffc38b" className="mt-3" />
+                    <p className="mt-2 text-xs text-ink-2">1% low: <strong className="font-display tabular-nums text-accent-hi">~<AnimatedNumber value={fps.low1} /></strong> FPS · <AnimatedNumber value={frameMs(fps)} digits={1} /> мс/кадр</p>
+                  </div>)}
                 </div>
+                <article className="tile tile-hover mt-4 p-4" aria-labelledby="upgrade-title">
+                  <h3 id="upgrade-title" className="font-bold">Умный вердикт по апгрейду</h3>
+                  {upgrade ? <>
+                    <p className="mt-2 font-bold text-accent-hi">{upgrade.title}</p>
+                    <p className="mt-1 text-sm text-ink-2">{upgrade.detail}</p>
+                    <p className="mt-2 text-xs text-ink-3">OFFICIAL в этой сцене: ≈ <strong className="text-accent-hi">+<AnimatedNumber value={upgrade.avg} />% FPS</strong> · +<AnimatedNumber value={upgrade.low} />% к 1% low. Это прогноз, не замер.</p>
+                  </> : <p className="mt-2 text-sm text-ink-2">Для этой сцены нет явного выигрыша среди проверенных замен. Сначала замерьте время кадра и 1% low.</p>}
+                  {evaluation.vramGb <= 6 && upgrade?.textureLimit === undefined && <p className="mt-2 text-xs text-ink-3">У GPU {evaluation.vramGb} ГБ VRAM. Сначала попробуйте лёгкие текстуры и повторите замер, особенно в 1440p и на серверах с большим числом скинов.</p>}
+                </article>
               </section>
+            </>
+          )}
+        </section>
 
-              {/* Узкое место + персональный список твиков */}
-              <section className="glass p-5 sm:p-7" aria-label="Узкое место и персональный список твиков">
+        {/* Узкое место + персональный список твиков */}
+        {evaluation && (
+          <section id="build-recommendations" className="glass liquid-glass-card scroll-mt-24 p-5 sm:p-7 lg:col-span-2" aria-label="Узкое место и персональный список твиков">
+            <div className="grid grid-cols-1 gap-5 lg:gap-6">
+              <div className="min-w-0">
                 <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight">
                   <Target className="h-5 w-5 text-accent-hi" aria-hidden="true" />
                   Узкое место: {BOTTLENECK_LABEL[evaluation.bottleneck]}
@@ -568,15 +511,14 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                     </li>
                   ))}
                 </ul>
-
-                <div className="hairline my-5" />
-
-                <h3 className="text-lg font-bold tracking-tight">Персональный план твиков</h3>
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold tracking-tight">Персональный план твиков</h2>
                 <p className="mt-1 text-[13px] text-ink-3">
                   Подобран по слабым местам вашей сборки. Применяйте по одному и отмечайте выполнение.
                 </p>
 
-                <ol className="mt-4 space-y-2.5">
+                <ol className="build-rec-list mt-4 grid grid-cols-1 gap-2.5 lg:grid-cols-2">
                   {evaluation.recommendations.map((rec) => {
                     const meta = tweakIndex[rec.slug];
                     if (!meta) return null;
@@ -586,7 +528,7 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                         <CategoryIcon group={meta.group} size="sm" />
                         <div className="min-w-0 flex-1">
                           <Link
-                            href={`/tweaks/${rec.slug}`}
+                            href={tweakerHref(rec.slug)}
                             className="block text-[14.5px] font-bold leading-snug hover:text-accent-hi"
                           >
                             {meta.title}
@@ -611,108 +553,20 @@ export default function BenchmarkTool({ tweakIndex }: { tweakIndex: TweakIndex }
                 </ol>
 
                 <div className="mt-5 flex flex-wrap gap-2.5">
-                  <Link href="/setup" className="btn btn-primary flex-1">
-                    Открыть полную настройку + ZIP
-                    <ArrowRight aria-hidden="true" />
-                  </Link>
+                  <ProfileGate className="w-full sm:flex-1" action="Подобрать конфиг под этот ПК">
+                    <Link href={personalPlanHref(mode, getGpu(input.gpuId)?.vendor ?? "intel", input.ramGb, evaluation.vramGb, input.storage, tuning)} className="btn btn-primary liquid-glass-btn build-plan-button flex-1">
+                      Подобрать конфиг под этот ПК
+                      <ArrowRight aria-hidden="true" />
+                    </Link>
+                  </ProfileGate>
                   <Link href="/presets" className="btn">
                     Сравнить с пресетами
                   </Link>
                 </div>
-              </section>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ---------------- Сохранённые сборки (localStorage) ---------------- */}
-      <section className="glass p-5 sm:p-7" aria-label="Мои сохранённые сборки">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight">Мои сохранённые сборки</h2>
-            <p className="mt-1 text-[13px] text-ink-3">
-              Хранятся локально в вашем браузере (готовы к экспорту JSON и переходу на облачный профиль).
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" onClick={triggerBackupModal}>
-            <FileJson className="text-accent-hi" aria-hidden="true" />
-            Экспорт / импорт JSON
-          </Button>
-        </div>
-
-        {!hydrated ? (
-          <Skeleton className="mt-4 h-20 w-full" />
-        ) : savedBuilds.length === 0 ? (
-          <div className="well mt-4 flex flex-wrap items-center justify-between gap-3 p-4">
-            <p className="text-sm text-ink-2">
-              У вас пока нет сохранённой сборки. Нажмите «Сохранить как мою сборку» выше, чтобы закрепить профиль.
-            </p>
-            <Button variant="primary" size="sm" onClick={() => handleSaveBuild(false)}>
-              Сохранить текущую
-            </Button>
-          </div>
-        ) : (
-          <ul className="mt-4 grid gap-3 md:grid-cols-2">
-            {savedBuilds.map((b) => {
-              const isActive = activeBuild?.id === b.id;
-              return (
-                <li
-                  key={b.id}
-                  className="tile flex items-center gap-3.5 p-3.5"
-                  style={
-                    isActive
-                      ? { boxShadow: "inset 0 0 0 1.5px rgb(255 160 98 / 0.6)" }
-                      : undefined
-                  }
-                >
-                  <button
-                    type="button"
-                    onClick={() => loadSavedBuild(b.id)}
-                    className="flex min-w-0 flex-1 items-center gap-3.5 text-left"
-                  >
-                    <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-white/10 text-base font-extrabold tabular-nums text-accent-hi">
-                      {b.score10.toFixed(1)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2">
-                        <span className="truncate text-sm font-bold text-ink">{b.input.name}</span>
-                        {isActive && <Badge tone="safe">Активна</Badge>}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[12.5px] text-ink-3">
-                        {b.input.ramGb} ГБ@{b.input.ramMhz} CL{b.input.ramCl} · {b.input.resolution} · Моддед{" "}
-                        {b.fpsModded[0]}–{b.fpsModded[1]} / Офиц {b.fpsOfficial[0]}–{b.fpsOfficial[1]} FPS
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetId(b.id)}
-                    className="grid h-9 w-9 flex-none place-items-center rounded-full bg-white/8 text-ink-3 hover:bg-danger/25 hover:text-danger"
-                    aria-label={`Удалить сборку «${b.input.name}»`}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+              </div>
+            </div>
+          </section>
         )}
-      </section>
-
-      <ConfirmDialog
-        open={deleteTargetId !== null}
-        onClose={() => setDeleteTargetId(null)}
-        onConfirm={() => {
-          if (deleteTargetId) {
-            storage.deleteBuild(deleteTargetId);
-            if (editingId === deleteTargetId) setDraft(null);
-            toast({ title: "Сборка удалена", tone: "info" });
-          }
-        }}
-        title="Удалить сохранённую сборку?"
-        description="Запись будет удалена из локального хранилища браузера. Отмеченные твики и журнал замеров останутся."
-        confirmLabel="Удалить"
-      />
     </div>
   );
 }

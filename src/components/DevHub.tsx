@@ -1,5 +1,7 @@
 "use client";
 
+import { apiUrl } from "@/lib/api-base";
+
 import {
   Check,
   Cloud,
@@ -74,7 +76,7 @@ const CUSTOMIZE_MAP = [
     openPath: "src/lib/tweaks/game.ts",
   },
   {
-    what: "Формула и веса оценки ПК /10 + база CPU и GPU",
+    what: "Формула и веса оценки ПК + база CPU и GPU",
     where: "src/lib/models/build.ts · src/lib/hardware.ts",
     openPath: "src/lib/models/build.ts",
   },
@@ -167,7 +169,7 @@ export default function DevHub({
     if (activeContent !== undefined || isBinaryActive || loadError) return;
     let cancelled = false;
 
-    const url = `/api/source?source=${tab}&file=${encodeURIComponent(activePath)}`;
+    const url = `${apiUrl("source")}?source=${tab}&file=${encodeURIComponent(activePath)}`;
     fetch(url)
       .then(async (res) => {
         if (!res.ok) throw new Error("Не удалось загрузить файл");
@@ -287,7 +289,7 @@ export default function DevHub({
         </h2>
         <div className="grid gap-4 lg:grid-cols-3" data-stagger>
           {/* Главный полный архив */}
-          <article className="glass glass-accent glass-hover tilt-3d sweep flex flex-col p-6" data-reveal data-tilt>
+          <article className="glass glass-accent glass-hover tilt-3d sweep flex flex-col p-6" data-tilt>
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
@@ -306,7 +308,7 @@ export default function DevHub({
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-2">
               Весь исходный код этого сайта (Liquid Glass iOS 26, тёмная и светлая темы, шрифты, все 32 твика, 7
-              пресетов, Сборка /10, журнал, FPS-лаб, ZIP-генератор) <strong>плюс</strong> Tauri v2 (.exe), Electron
+              пресетов, Сборка, Твикер и ZIP-генератор) <strong>плюс</strong> Tauri v2 (.exe), Electron
               (.exe), Docker, Nginx, SQL-схема облака и русский гайд.
             </p>
 
@@ -340,7 +342,7 @@ export default function DevHub({
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
-                Все бинарники внутри: 6 шрифтов, <code className="font-mono text-ink">hero.jpg</code>,{" "}
+                Все бинарники внутри: 6 шрифтов, скриншот Rust (если добавлен),{" "}
                 <code className="font-mono text-ink">wallpaper.jpg</code>, <code className="font-mono text-ink">icon.svg</code>,{" "}
                 <code className="font-mono text-ink">favicon.ico</code>
               </li>
@@ -348,7 +350,7 @@ export default function DevHub({
 
             <div className="mt-auto pt-5">
               <DownloadButton
-                href="/api/source?download=full"
+                href={`${apiUrl("source")}?download=full`}
                 label="Скачать всё (Complete ZIP)"
                 variant="primary"
                 size="lg"
@@ -358,11 +360,11 @@ export default function DevHub({
           </article>
 
           {/* Только код сайта */}
-          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-reveal data-tilt>
+          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-tilt>
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
-                style={{ "--c1": "#38bdf8", "--c2": "#2563eb" } as CSSProperties}
+                style={{ "--c1": "#ffcb9b", "--c2": "#d47740" } as CSSProperties}
               >
                 <Globe aria-hidden="true" />
               </span>
@@ -373,8 +375,8 @@ export default function DevHub({
               Исходный код этого сайта
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-2">
-              Чистый проект веб-сайта со всем материалом: 32 твика с инструкциями и откатами, оценщик ПК /10, база
-              CPU/GPU, пресеты, журнал FPS, мифы/EAC, PWA-манифест, Dockerfile и docker-compose.yml.
+              Чистый проект веб-сайта со всем материалом: 32 твика с инструкциями и откатами, раздел «Сборка», база
+              CPU/GPU, пресеты, Твикер, мифы/EAC, PWA-манифест, Dockerfile и docker-compose.yml.
             </p>
 
             <div className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
@@ -409,7 +411,7 @@ export default function DevHub({
 
             <div className="mt-auto flex flex-col gap-2 pt-5">
               <DownloadButton
-                href="/api/source?download=site"
+                href={`${apiUrl("source")}?download=site`}
                 label="Скачать код сайта (ZIP)"
                 variant="glass"
                 className="w-full"
@@ -430,11 +432,11 @@ export default function DevHub({
           </article>
 
           {/* Только App Kit */}
-          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-reveal data-tilt>
+          <article className="glass glass-hover tilt-3d flex flex-col p-6" data-tilt>
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
-                style={{ "--c1": "#c084fc", "--c2": "#7c3aed" } as CSSProperties}
+                style={{ "--c1": "#faac80", "--c2": "#be4d34" } as CSSProperties}
               >
                 <Laptop aria-hidden="true" />
               </span>
@@ -481,7 +483,7 @@ export default function DevHub({
 
             <div className="mt-auto flex flex-col gap-2 pt-5">
               <DownloadButton
-                href="/api/source?download=app-kit"
+                href={`${apiUrl("source")}?download=app-kit`}
                 label="Скачать App Kit (ZIP)"
                 variant="glass"
                 className="w-full"
@@ -500,7 +502,7 @@ export default function DevHub({
       </section>
 
       {/* ==================== 1.5 БИНАРНЫЕ АССЕТЫ ==================== */}
-      <section aria-labelledby="assets-heading" className="glass p-5 sm:p-7" data-reveal>
+      <section aria-labelledby="assets-heading" className="glass p-5 sm:p-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="eyebrow">Проверено и упаковано</p>
@@ -564,7 +566,7 @@ export default function DevHub({
       </section>
 
       {/* ==================== 2. ДОРОЖНАЯ КАРТА СБОРКИ ==================== */}
-      <section aria-labelledby="roadmap-heading" className="glass p-5 sm:p-8" data-reveal>
+      <section aria-labelledby="roadmap-heading" className="glass p-5 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow">Пошаговая инструкция</p>
@@ -610,7 +612,7 @@ npm install
 
 # 3. Создайте .env из шаблона и укажите DATABASE_URL (PostgreSQL)
 cp .env.example .env
-npx drizzle-kit push
+npm run db:push
 
 # 4. Запустите сайт в режиме разработки -> http://localhost:3000
 npm run dev
@@ -619,7 +621,7 @@ npm run dev
 npm run typecheck && npm run lint && npm run build`}
               />
               <p className="text-xs leading-relaxed text-ink-3">
-                Подсказка: Сборка /10, библиотека твиков, пресеты, журнал, бэкап JSON, скачивание .reg/.bat и сборка
+                Подсказка: Сборка, Твикер, пресеты и бэкап JSON, скачивание .reg/.bat и сборка
                 ZIP-пакетов работают даже без базы данных — PostgreSQL нужна только для общих счётчиков, лайков и
                 облачной синхронизации.
               </p>
@@ -819,7 +821,7 @@ sudo systemctl reload nginx`}
               </h3>
               <p className="text-sm leading-relaxed text-ink-2">
                 Все сущности проекта (<code className="font-mono text-ink">builds</code>,{" "}
-                <code className="font-mono text-ink">tweaks</code>, <code className="font-mono text-ink">logs</code>)
+                <code className="font-mono text-ink">tweaks</code>)
                 уже содержат <code className="font-mono text-ink">ownerId</code> и работают через единый адаптер:
               </p>
               <ol className="space-y-2 text-[13.5px] text-ink-2">
@@ -836,7 +838,7 @@ sudo systemctl reload nginx`}
                   <code className="font-mono text-ink">api-sync-route.ts</code> в{" "}
                   <code className="font-mono text-ink">src/app/api/sync/route.ts</code> и вызовите{" "}
                   <code className="font-mono text-ink">createCloudSync</code> — сайт и .exe начнут синхронизировать
-                  сборку и журнал автоматически.
+                  сборки и отметки автоматически.
                 </li>
               </ol>
               <div className="flex flex-wrap gap-2">
@@ -1112,7 +1114,7 @@ sudo systemctl reload nginx`}
                     {copiedCode ? "Скопировано" : "Копировать"}
                   </button>
                   <a
-                    href={`/api/source?source=${tab}&file=${encodeURIComponent(activePath)}&raw=1`}
+                    href={`${apiUrl("source")}?source=${tab}&file=${encodeURIComponent(activePath)}&raw=1`}
                     download
                     className="btn btn-sm btn-primary !h-9 !px-3.5"
                   >

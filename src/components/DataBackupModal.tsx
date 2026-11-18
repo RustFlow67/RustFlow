@@ -6,43 +6,14 @@ import Segmented from "@/components/Segmented";
 import { Badge, Button } from "@/components/ui";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import type { ImportPreview } from "@/lib/storage/adapter";
+import { storage, type ImportPreview } from "@/lib/storage/adapter";
 import { useRustFlowStore } from "@/lib/storage/useStore";
 
-/**
- * Модальное окно экспорта/импорта JSON:
- * «Моя сборка + применённые твики + FPS до/после + журнал замеров».
- */
-export default function DataBackupModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { state, storage } = useRustFlowStore();
+export type BackupTab = "export" | "import";
+
+function useDownloadBackup() {
   const { toast } = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const [tab, setTab] = useState<"export" | "import">("export");
-  const [rawInput, setRawInput] = useState("");
-  const [importError, setImportError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [confirmReplace, setConfirmReplace] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const buildsCount = state?.builds.length ?? 0;
-  const appliedCount = state
-    ? Object.values(state.tweaks).filter((t) => t.applied).length
-    : 0;
-  const measuredCount = state
-    ? Object.values(state.tweaks).filter((t) => t.fpsBefore !== null && t.fpsAfter !== null).length
-    : 0;
-  const logsCount = state?.logs.length ?? 0;
-  const activeBuild = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
-
-  function handleDownloadJson() {
+  return () => {
     const bundle = storage.exportBundle();
     const json = JSON.stringify(bundle, null, 2);
     const blob = new Blob([json], { type: "application/json;charset=utf-8" });
@@ -57,10 +28,47 @@ export default function DataBackupModal({
     URL.revokeObjectURL(url);
     toast({
       title: "JSON-профиль скачан",
-      description: `Сборок: ${bundle.builds.length}, твиков: ${bundle.appliedTweaks.length}, замеров: ${bundle.logs.length}.`,
+      description: `Сборок: ${bundle.builds.length}, твиков: ${bundle.appliedTweaks.length}.`,
       tone: "success",
     });
-  }
+  };
+}
+
+/**
+ * Модальное окно экспорта/импорта JSON:
+ * «Моя сборка + применённые твики + FPS до/после + настройки Твикера».
+ */
+export default function DataBackupModal({
+  open,
+  onClose,
+  tab,
+  onTabChange,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tab: BackupTab;
+  onTabChange: (tab: BackupTab) => void;
+}) {
+  const { state } = useRustFlowStore();
+  const { toast } = useToast();
+  const handleDownloadJson = useDownloadBackup();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [rawInput, setRawInput] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const buildsCount = state?.builds.length ?? 0;
+  const appliedCount = state
+    ? Object.values(state.tweaks).filter((t) => t.applied).length
+    : 0;
+  const measuredCount = state
+    ? Object.values(state.tweaks).filter((t) => t.fpsBefore !== null && t.fpsAfter !== null).length
+    : 0;
+  const activeBuild = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
 
   async function handleCopyJson() {
     try {
@@ -105,11 +113,11 @@ export default function DataBackupModal({
   }
 
   function executeImport(mode: "merge" | "replace") {
-    if (!preview) return;
+    if (!open || !preview) return;
     storage.applyImport(preview.bundle, mode);
     toast({
       title: mode === "replace" ? "Профиль заменён из JSON" : "Данные объединены из JSON",
-      description: `Загружено сборок: ${preview.buildsCount}, применённых твиков: ${preview.appliedCount}, замеров: ${preview.logsCount}.`,
+      description: `Загружено сборок: ${preview.buildsCount}, применённых твиков: ${preview.appliedCount}.`,
       tone: "success",
     });
     setRawInput("");
@@ -124,13 +132,13 @@ export default function DataBackupModal({
         open={open}
         onClose={onClose}
         title="Резервная копия профиля (JSON)"
-        description="Все данные хранятся локально в вашем браузере. Экспортируйте JSON перед переустановкой Windows или для переноса на другой ПК."
+        description="Копия сохранённых сборок и настроек браузера. Она не меняет сборку в аккаунте и не включает данные входа."
         maxWidth="max-w-xl"
       >
         <Segmented
           ariaLabel="Режим работы с JSON"
           value={tab}
-          onChange={setTab}
+          onChange={onTabChange}
           options={[
             { value: "export", label: "Экспорт JSON" },
             { value: "import", label: "Импорт JSON" },
@@ -145,7 +153,7 @@ export default function DataBackupModal({
                 <span className="text-sm font-semibold text-ink">Текущие данные в браузере</span>
                 <Badge tone="measured">schema v1 · localStorage</Badge>
               </div>
-              <div className="grid grid-cols-2 gap-2.5 pt-1 text-sm sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 pt-1 text-sm sm:grid-cols-3">
                 <div className="tile p-3 text-center">
                   <span className="block text-xl font-extrabold tabular-nums">{buildsCount}</span>
                   <span className="text-[12px] text-ink-3">сборок</span>
@@ -157,10 +165,6 @@ export default function DataBackupModal({
                 <div className="tile p-3 text-center">
                   <span className="block text-xl font-extrabold tabular-nums">{measuredCount}</span>
                   <span className="text-[12px] text-ink-3">FPS в твиках</span>
-                </div>
-                <div className="tile p-3 text-center">
-                  <span className="block text-xl font-extrabold tabular-nums">{logsCount}</span>
-                  <span className="text-[12px] text-ink-3">в журнале</span>
                 </div>
               </div>
               {activeBuild && (
@@ -184,7 +188,7 @@ export default function DataBackupModal({
             <div className="hairline my-2" />
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <p className="text-[12.5px] text-ink-3">Очистить локальное хранилище (сборки, отметки, журнал)</p>
+              <p className="text-[12.5px] text-ink-3">Очистить локальное хранилище (сборки, отметки, настройки)</p>
               <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
                 <RotateCcw aria-hidden="true" />
                 Сбросить всё
@@ -199,6 +203,7 @@ export default function DataBackupModal({
                 type="file"
                 accept=".json,application/json"
                 className="sr-only"
+                tabIndex={-1}
                 onChange={handleFileSelect}
               />
               <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}>
@@ -237,8 +242,7 @@ export default function DataBackupModal({
                 <p className="text-[13px] text-ink-2">
                   Сборок: <strong>{preview.buildsCount}</strong> · Применённых твиков:{" "}
                   <strong>{preview.appliedCount}</strong> · Замеров FPS в карточках:{" "}
-                  <strong>{preview.measuredTweaksCount}</strong> · Записей журнала:{" "}
-                  <strong>{preview.logsCount}</strong>.
+                  <strong>{preview.measuredTweaksCount}</strong>.
                 </p>
                 {preview.myBuildTitle && (
                   <p className="text-[12.5px] text-ink-3">Главная сборка: {preview.myBuildTitle}</p>
@@ -267,24 +271,25 @@ export default function DataBackupModal({
       </Modal>
 
       <ConfirmDialog
-        open={confirmReplace}
+        open={open && confirmReplace}
         onClose={() => setConfirmReplace(false)}
         onConfirm={() => executeImport("replace")}
         title="Заменить текущие данные?"
-        description="Текущие сборки, отметки «применено» и записи журнала в этом браузере будут полностью перезаписаны данными из выбранного JSON-файла."
+        description="Текущие сборки, отметки «применено» и настройки Твикера в этом браузере будут полностью перезаписаны данными из выбранного JSON-файла."
         confirmLabel="Да, заменить"
       />
 
       <ConfirmDialog
-        open={confirmReset}
+        open={open && confirmReset}
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {
+          if (!open) return;
           storage.resetAll();
           toast({ title: "Все локальные данные очищены", tone: "info" });
           onClose();
         }}
         title="Очистить все локальные данные?"
-        description="Будут удалены сохранённые сборки, отметки применённых твиков, поля FPS до/после и весь журнал замеров. Рекомендуем сначала скачать JSON-копию."
+        description="Будут удалены сохранённые сборки, отметки применённых твиков, поля FPS до/после и настройки Твикера. Рекомендуем сначала скачать JSON-копию."
         confirmLabel="Удалить всё"
       />
     </>

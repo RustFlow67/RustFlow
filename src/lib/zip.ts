@@ -69,9 +69,11 @@ export function createZip(files: ZipEntry[], options: ZipOptions = {}): Buffer {
     const compressed = useStore ? file.data : deflateRawSync(file.data);
     const crc = isDir ? 0 : crc32(file.data);
     const method = useStore ? 0 : 8;
-    // version made by: 0x0314 = Unix + ZIP 2.0 (нужно для флага каталога)
+    // The Unix producer flag requires Unix mode bits as well as the DOS directory flag.
+    // Without them, Info-ZIP extracts the explicit directories with permissions 000.
     const versionMadeBy = 0x0314;
-    const externalAttrs = isDir ? 0x10 : 0;
+    const unixMode = isDir ? 0o40755 : 0o100644;
+    const externalAttrs = ((unixMode << 16) | (isDir ? 0x10 : 0)) >>> 0;
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);

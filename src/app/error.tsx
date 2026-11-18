@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, TriangleAlert } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/RouteLink";
 import { useEffect, type CSSProperties } from "react";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {

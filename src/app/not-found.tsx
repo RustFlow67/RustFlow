@@ -1,5 +1,5 @@
 import { ArrowRight, Compass } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/RouteLink";
 import type { CSSProperties } from "react";
 
 export default function NotFound() {
@@ -15,7 +15,7 @@ export default function NotFound() {
           Возможно, твик переименован или ссылка устарела. Все твики собраны в каталоге.
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-3">
-          <Link href="/tweaks" className="btn btn-primary">
+          <Link href="/tweaker" className="btn btn-primary">
             Открыть каталог
             <ArrowRight aria-hidden="true" />
           </Link>

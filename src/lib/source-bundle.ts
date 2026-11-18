@@ -1,3 +1,5 @@
+import "server-only";
+
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import path from "node:path";
 import { APP_KIT_FILES, getAppKitFile, type AppKitGroup } from "@/lib/app-kit";
@@ -6,7 +8,7 @@ import { createZip, type ZipEntry } from "@/lib/zip";
 /**
  * Гарантированный белый список бинарных ассетов.
  * Эти файлы ОБЯЗАНЫ попасть в каждый архив (full / site): шрифты с кириллицей,
- * фоновое и hero-изображения, иконка и favicon. Пути совпадают 1-в-1 с
+ * фоновое изображение, иконка и favicon. Пути совпадают 1-в-1 с
  * @font-face в src/app/globals.css и с разметкой страниц.
  */
 export const REQUIRED_BINARY_ASSETS = [
@@ -16,9 +18,10 @@ export const REQUIRED_BINARY_ASSETS = [
   "public/fonts/unbounded-latin-wght-normal.woff2",
   "public/fonts/jetbrains-mono-cyrillic-wght-normal.woff2",
   "public/fonts/jetbrains-mono-latin-wght-normal.woff2",
-  "public/images/hero.jpg",
   "public/images/wallpaper.jpg",
   "public/icon.svg",
+  "public/icons/rustflow-192.png",
+  "public/icons/rustflow-512.png",
   "public/favicon.ico",
   "src/app/icon.svg",
 ] as const;
@@ -37,11 +40,11 @@ export interface AssetManifestRow {
 export function getAssetManifest(): AssetManifestRow[] {
   const rootDir = process.cwd();
   return REQUIRED_BINARY_ASSETS.map((rel) => {
-    const abs = path.join(rootDir, rel);
+    const abs = path.join(/* turbopackIgnore: true */ rootDir, rel);
     const exists = existsSync(abs) && statSync(abs).isFile();
     const ext = path.posix.extname(rel).toLowerCase();
     const isFont = ext === ".woff2" || ext === ".woff";
-    const isIcon = ext === ".ico" || rel.includes("icon.svg");
+    const isIcon = ext === ".ico" || (rel.includes("icon.svg") || rel.startsWith("public/icons/"));
     // public/x → /x ; src/app/icon.svg → /icon.svg
     const url = rel.startsWith("public/")
       ? `/${rel.slice("public/".length)}`
@@ -94,17 +97,22 @@ export interface ProjectManifest {
   kitTotalBytes: number;
 }
 
+// Keep deployment tracing scoped to these paths (see next.config.ts).
 const ROOT_ALLOWLIST = [
   "README.md",
   "package.json",
+  "package-lock.json",
   "tsconfig.json",
   "next.config.ts",
   "postcss.config.mjs",
   "eslint.config.mjs",
-  "drizzle.config.json",
+  "drizzle.config.ts",
   ".env.example",
+  ".dockerignore",
   "Dockerfile",
   "docker-compose.yml",
+  "docs/production-audit.md",
+  "docs/addons.md",
 ] as const;
 
 const DIR_ALLOWLIST = ["src", "public"] as const;
@@ -140,8 +148,8 @@ tsconfig.tsbuildinfo
 
 # Secrets (NEVER commit)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # OS
 .DS_Store
@@ -204,11 +212,11 @@ export function collectSiteFiles(): SiteFileMeta[] {
   const files: SiteFileMeta[] = [];
 
   for (const name of ROOT_ALLOWLIST) {
-    const abs = path.join(rootDir, name);
-    if (existsSync(abs) && statSync(abs).isFile()) {
+    const abs = path.join(/* turbopackIgnore: true */ rootDir, name);
+    if (existsSync(/* turbopackIgnore: true */ abs) && statSync(/* turbopackIgnore: true */ abs).isFile()) {
       files.push({
         path: name,
-        size: statSync(abs).size,
+        size: statSync(/* turbopackIgnore: true */ abs).size,
         binary: false,
         group: "root",
       });
@@ -260,8 +268,8 @@ export function readInspectableFile(
   const allowed = collectSiteFiles().find((f) => f.path === relPath && !f.binary);
   if (!allowed) return null;
   const rootDir = process.cwd();
-  const resolved = path.resolve(rootDir, allowed.path);
-  if (!resolved.startsWith(path.resolve(rootDir) + path.sep)) return null;
+  const resolved = path.resolve(/* turbopackIgnore: true */ rootDir, allowed.path);
+  if (!resolved.startsWith(rootDir + path.sep)) return null;
   const content = readFileSync(resolved, "utf8");
   return { path: allowed.path, content, size: Buffer.byteLength(content, "utf8") };
 }
@@ -284,7 +292,7 @@ export function buildSourceZip(mode: BundleMode): {
         : "RustFlow-App-Kit";
 
   const pushFile = (rel: string, store: boolean) => {
-    const abs = path.join(rootDir, rel);
+    const abs = path.join(/* turbopackIgnore: true */ rootDir, rel);
     if (!existsSync(abs) || !statSync(abs).isFile()) return false;
     entries.push({ name: `${prefix}/${rel}`, data: readFileSync(abs), store });
     return true;
@@ -311,8 +319,8 @@ export function buildSourceZip(mode: BundleMode): {
 
   if (mode === "full" || mode === "app-kit") {
     if (mode === "app-kit") {
-      for (const extra of ["README.md", ".env.example", "Dockerfile", "docker-compose.yml"]) {
-        const abs = path.join(rootDir, extra);
+      for (const extra of ["README.md", ".env.example", ".dockerignore", "Dockerfile", "docker-compose.yml"]) {
+        const abs = path.join(/* turbopackIgnore: true */ rootDir, extra);
         if (existsSync(abs)) {
           entries.push({
             name: `${prefix}/${extra}`,

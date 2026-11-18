@@ -1,24 +1,18 @@
+import "server-only";
+
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+// No DB is a supported mode for the calculator and browser-only profiles.
+const shared = globalThis as typeof globalThis & { __rustFlowPgPool?: Pool };
+let instance: ReturnType<typeof drizzle> | undefined;
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+export function getDb() {
+  if (instance) return instance;
+  const connectionString = process.env.DATABASE_URL?.trim();
+  if (!connectionString) throw new Error("Database not configured");
+  const pool = shared.__rustFlowPgPool ??= new Pool({ connectionString, connectionTimeoutMillis: 2200, statement_timeout: 4000 });
+  // Idle sockets can close when Postgres restarts. A request can retry without restarting Next.
+  if (!pool.listenerCount("error")) pool.on("error", () => {});
+  return instance = drizzle(pool);
 }
-
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
-};
-
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
-}
-
-export const db = drizzle(pool);

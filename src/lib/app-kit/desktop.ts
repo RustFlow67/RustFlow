@@ -23,7 +23,7 @@ export const DESKTOP_KIT_FILES: AppKitFile[] = [
     content: `[package]
 name = "rustflow"
 version = "1.0.0"
-description = "RustFlow — твикер, бенчмарк /10 и настройка системы для Rust"
+description = "RustFlow — твикер, оценка сборки и настройка системы для Rust"
 authors = ["RustFlow"]
 edition = "2021"
 rust-version = "1.77.2"
@@ -548,7 +548,7 @@ fn profile_file_path() -> Result<PathBuf, String> {
     Ok(dir.join("profile-v1.json"))
 }
 
-/// 7. Чтение/сохранение профиля (сборка, твики, журнал) на диск в %APPDATA%/RustFlow.
+/// 7. Чтение/сохранение профиля (сборки, твики и настройки Твикера) на диск в %APPDATA%/RustFlow.
 #[tauri::command]
 fn save_local_profile(json: String) -> Result<String, String> {
     serde_json::from_str::<serde_json::Value>(&json)

@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, Search } from "lucide-react";
+import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export interface ComboItem {
@@ -27,6 +28,7 @@ export default function Combobox({
 }) {
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -55,7 +57,7 @@ export default function Combobox({
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("pointerdown", onDown);
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
     return () => document.removeEventListener("pointerdown", onDown);
   }, [open]);
 
@@ -70,6 +72,7 @@ export default function Combobox({
     onChange(item.id);
     setOpen(false);
     setQuery("");
+    trigger.current?.focus({ preventScroll: true });
   }
 
   function onKeyDown(e: KeyboardEvent) {
@@ -86,6 +89,7 @@ export default function Combobox({
     } else if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
+      trigger.current?.focus({ preventScroll: true });
     }
   }
 
@@ -95,6 +99,7 @@ export default function Combobox({
         {label}
       </span>
       <button
+        ref={trigger}
         type="button"
         className="field flex items-center justify-between gap-3 text-left"
         data-open={open ? "" : undefined}
@@ -116,8 +121,8 @@ export default function Combobox({
         />
       </button>
 
-      {open && (
-        <div className="popover absolute inset-x-0 top-full z-40 mt-2 p-2">
+      <OriginDisclosure open={open} className="pointer-events-none absolute inset-x-0 top-full z-40 mt-2">
+        <div className="popover pointer-events-auto p-2">
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3"
@@ -175,7 +180,7 @@ export default function Combobox({
             })}
           </div>
         </div>
-      )}
+      </OriginDisclosure>
     </div>
   );
 }

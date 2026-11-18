@@ -1,0 +1,23 @@
+{
+  "id": "/",
+  "name": "RustFlow: сборка, твики и настройка Rust",
+  "short_name": "RustFlow",
+  "description": "Оценка ПК под Rust, 43 пресета, база знаний и конфиги с откатом.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B0908",
+  "theme_color": "#0B0908",
+  "lang": "ru",
+  "categories": ["utilities", "games"],
+  "icons": [
+    { "src": "/icons/rustflow-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/rustflow-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Сборка", "url": "/benchmark", "description": "Оценка FPS и симулятор сценариев" },
+    { "name": "Твикер", "url": "/tweaker", "description": "client.cfg и настройки с откатом" },
+    { "name": "Пресеты", "url": "/presets", "description": "Сравнение сборок и режимов графики" }
+  ]
+}

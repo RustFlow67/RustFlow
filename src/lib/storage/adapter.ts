@@ -6,30 +6,15 @@ import {
   type UserBuild,
 } from "@/lib/models/build";
 import { LOCAL_OWNER_ID, makeId, nowIso, SCHEMA_VERSION } from "@/lib/models/common";
-import { SAMPLE_LOGS, type BenchmarkLog, type NewBenchmarkLog, type ServerKind } from "@/lib/models/log";
 import type { UserTweakRecord } from "@/lib/models/tweak";
-import type { GpuVendor, PresetId, ProfileId } from "@/lib/tweaks/meta";
+import { readTweakerPreferences, type TweakerPreferences } from "@/lib/tweaker";
+import { createExtensionState, type ExtensionState } from "./extension-state";
 
-/**
- * Единый модуль-адаптер клиентского хранилища (Этап 1: localStorage).
- * Подготовлен к Этапу 2: все сущности (builds / tweaks / logs) разделены,
- * содержат ownerId и работают через интерфейс StorageAdapter, который позже
- * заменяется на адаптер BaaS/auth без переписывания UI-компонентов.
- */
-
+// Keep v1 identifiers so earlier builds and tweak markers remain readable.
 const STORE_KEY = "rustflow:store:v1";
 const LEGACY_RATING_KEY = "rustflow:rating";
 const LEGACY_SETUP_KEY = "rustflow:setup";
 const CHANGE_EVENT = "rustflow:store-change";
-
-export interface SetupPreferences {
-  ownerId: string;
-  profile: ProfileId;
-  preset: PresetId;
-  gpu: GpuVendor;
-  protocolChecks: string[];
-  updatedAt: string;
-}
 
 export interface PersistedState {
   schemaVersion: number;
@@ -37,12 +22,10 @@ export interface PersistedState {
   activeBuildId: string | null;
   builds: UserBuild[];
   tweaks: Record<string, UserTweakRecord>;
-  logs: BenchmarkLog[];
-  setup: SetupPreferences;
-  samplesDismissed: boolean;
+  tweaker: TweakerPreferences | null;
 }
 
-/** Формат экспорта/импорта JSON «моя сборка + применённые твики + журнал». */
+/** Формат экспорта/импорта JSON «моя сборка + применённые твики + настройки Твикера». */
 export interface ExportBundle {
   app: "RustFlow";
   schemaVersion: number;
@@ -52,8 +35,7 @@ export interface ExportBundle {
   myBuild: UserBuild | null;
   builds: UserBuild[];
   appliedTweaks: UserTweakRecord[];
-  logs: BenchmarkLog[];
-  setup: SetupPreferences;
+  tweaker: TweakerPreferences | null;
 }
 
 export interface ImportPreview {
@@ -61,11 +43,11 @@ export interface ImportPreview {
   buildsCount: number;
   appliedCount: number;
   measuredTweaksCount: number;
-  logsCount: number;
   myBuildTitle: string | null;
 }
 
 export interface StorageAdapter {
+  readonly addons: ExtensionState;
   getOwnerId(): string;
   getState(): PersistedState;
   subscribe(listener: () => void): () => void;
@@ -77,20 +59,8 @@ export interface StorageAdapter {
 
   // Tweaks (applied + before/after FPS)
   setTweakApplied(slug: string, applied: boolean): UserTweakRecord;
-  setTweakFps(slug: string, fpsBefore: number | null, fpsAfter: number | null, note?: string): UserTweakRecord;
-  resetTweakProgress(): void;
 
-  // Logs (benchmark journal)
-  addLog(entry: NewBenchmarkLog): BenchmarkLog;
-  updateLog(id: string, patch: Partial<NewBenchmarkLog>): BenchmarkLog | null;
-  deleteLog(id: string): void;
-  clearSampleLogs(): void;
-  clearAllLogs(): void;
-  restoreSampleLogs(): void;
-  restoreLogs(entries: BenchmarkLog[]): void;
-
-  // Setup & protocol
-  updateSetup(patch: Partial<Pick<SetupPreferences, "profile" | "preset" | "gpu" | "protocolChecks">>): void;
+  updateTweaker(prefs: TweakerPreferences): void;
 
   // JSON Export / Import / Reset
   exportBundle(): ExportBundle;
@@ -99,27 +69,14 @@ export interface StorageAdapter {
   resetAll(): void;
 }
 
-function defaultSetup(ownerId: string = LOCAL_OWNER_ID): SetupPreferences {
-  return {
-    ownerId,
-    profile: "recommended",
-    preset: "balanced",
-    gpu: "all",
-    protocolChecks: [],
-    updatedAt: nowIso(),
-  };
-}
-
-function defaultState(withSamples = true): PersistedState {
+function defaultState(): PersistedState {
   return {
     schemaVersion: SCHEMA_VERSION,
     ownerId: LOCAL_OWNER_ID,
     activeBuildId: null,
     builds: [],
     tweaks: {},
-    logs: withSamples ? SAMPLE_LOGS.map((l) => ({ ...l })) : [],
-    setup: defaultSetup(LOCAL_OWNER_ID),
-    samplesDismissed: !withSamples,
+    tweaker: null,
   };
 }
 
@@ -128,10 +85,6 @@ function sanitizeFps(v: unknown): number | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0 || n > 2000) return null;
   return Math.round(n * 10) / 10;
-}
-
-function sanitizeServerKind(v: unknown): ServerKind {
-  return v === "modded" || v === "official" || v === "staging" ? v : "official";
 }
 
 function buildRecordFromInput(input: BuildInput, ownerId: string, existing?: UserBuild): UserBuild | null {
@@ -185,8 +138,6 @@ function migrateLegacy(base: PersistedState): PersistedState {
         if (built) {
           next.builds = [built];
           next.activeBuildId = built.id;
-          next.setup.preset = built.recommendedPreset;
-          next.setup.gpu = built.vendor;
         }
       }
     }
@@ -196,21 +147,8 @@ function migrateLegacy(base: PersistedState): PersistedState {
   try {
     const rawSetup = window.localStorage.getItem(LEGACY_SETUP_KEY);
     if (rawSetup) {
-      const s = JSON.parse(rawSetup) as {
-        profile?: ProfileId;
-        preset?: PresetId;
-        gpu?: GpuVendor;
-        done?: unknown;
-      };
-      if (s.profile === "safe" || s.profile === "recommended" || s.profile === "max") {
-        next.setup.profile = s.profile;
-      }
-      if (s.preset === "competitive" || s.preset === "balanced" || s.preset === "quality") {
-        next.setup.preset = s.preset;
-      }
-      if (s.gpu === "nvidia" || s.gpu === "amd" || s.gpu === "all") {
-        next.setup.gpu = s.gpu;
-      }
+      const s = JSON.parse(rawSetup) as { done?: unknown; preset?: unknown; gpu?: unknown };
+      next.tweaker = readTweakerPreferences(s);
       if (Array.isArray(s.done)) {
         const ts = nowIso();
         for (const slug of s.done) {
@@ -237,6 +175,7 @@ function migrateLegacy(base: PersistedState): PersistedState {
 }
 
 class LocalStorageAdapter implements StorageAdapter {
+  readonly addons = createExtensionState(() => this.getOwnerId(), (listener) => this.subscribe(listener));
   private cache: PersistedState | null = null;
   private boundStorage = false;
   private listeners = new Set<() => void>();
@@ -276,41 +215,37 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   getState(): PersistedState {
-    if (typeof window === "undefined") return defaultState(true);
+    if (typeof window === "undefined") return defaultState();
     if (this.cache) return this.cache;
     try {
       const raw = window.localStorage.getItem(STORE_KEY);
       if (!raw) {
-        const migrated = migrateLegacy(defaultState(true));
+        const migrated = migrateLegacy(defaultState());
         this.persist(migrated, false);
         return migrated;
       }
-      const parsed = JSON.parse(raw) as Partial<PersistedState>;
+      const parsed = JSON.parse(raw) as Partial<PersistedState> & { setup?: unknown };
       const ownerId =
         typeof parsed.ownerId === "string" && parsed.ownerId.trim() ? parsed.ownerId : LOCAL_OWNER_ID;
-      const samplesDismissed = Boolean(parsed.samplesDismissed);
+      // Old or partially written entries must not break the profile or calculator.
+      const ids = new Set<string>();
+      const builds = (Array.isArray(parsed.builds) ? parsed.builds.slice(0, 12) : []).filter((build) => {
+        if (!build || typeof build.id !== "string" || !build.id || ids.has(build.id) || !isValidBuildInput(build.input)) return false;
+        ids.add(build.id);
+        return true;
+      });
       const state: PersistedState = {
         schemaVersion: SCHEMA_VERSION,
         ownerId,
-        activeBuildId: typeof parsed.activeBuildId === "string" ? parsed.activeBuildId : null,
-        builds: Array.isArray(parsed.builds) ? parsed.builds : [],
+        activeBuildId: typeof parsed.activeBuildId === "string" && ids.has(parsed.activeBuildId) ? parsed.activeBuildId : builds[0]?.id ?? null,
+        builds,
         tweaks: parsed.tweaks && typeof parsed.tweaks === "object" ? parsed.tweaks : {},
-        logs: Array.isArray(parsed.logs)
-          ? parsed.logs
-          : samplesDismissed
-            ? []
-            : SAMPLE_LOGS.map((l) => ({ ...l })),
-        setup: {
-          ...defaultSetup(ownerId),
-          ...(parsed.setup && typeof parsed.setup === "object" ? parsed.setup : {}),
-          ownerId,
-        },
-        samplesDismissed,
+        tweaker: readTweakerPreferences(parsed.tweaker ?? parsed.setup),
       };
       this.cache = state;
       return state;
     } catch {
-      const fallback = defaultState(true);
+      const fallback = defaultState();
       this.cache = fallback;
       return fallback;
     }
@@ -339,12 +274,6 @@ class LocalStorageAdapter implements StorageAdapter {
       ...state,
       activeBuildId: record.id,
       builds,
-      setup: {
-        ...state.setup,
-        preset: record.recommendedPreset,
-        gpu: record.vendor,
-        updatedAt: nowIso(),
-      },
     });
     return record;
   }
@@ -356,12 +285,6 @@ class LocalStorageAdapter implements StorageAdapter {
     this.persist({
       ...state,
       activeBuildId: found.id,
-      setup: {
-        ...state.setup,
-        preset: found.recommendedPreset,
-        gpu: found.vendor,
-        updatedAt: nowIso(),
-      },
     });
   }
 
@@ -400,141 +323,8 @@ class LocalStorageAdapter implements StorageAdapter {
     return updated;
   }
 
-  setTweakFps(slug: string, fpsBefore: number | null, fpsAfter: number | null, note?: string): UserTweakRecord {
-    const state = this.getState();
-    const prev = this.getOrCreateTweak(state, slug);
-    const updated: UserTweakRecord = {
-      ...prev,
-      fpsBefore: sanitizeFps(fpsBefore),
-      fpsAfter: sanitizeFps(fpsAfter),
-      note: note !== undefined ? note.slice(0, 200) : prev.note,
-      updatedAt: nowIso(),
-    };
-    this.persist({
-      ...state,
-      tweaks: { ...state.tweaks, [slug]: updated },
-    });
-    return updated;
-  }
-
-  resetTweakProgress(): void {
-    const state = this.getState();
-    this.persist({ ...state, tweaks: {} });
-  }
-
-  addLog(entry: NewBenchmarkLog): BenchmarkLog {
-    const state = this.getState();
-    const ts = nowIso();
-    const record: BenchmarkLog = {
-      id: makeId("log"),
-      ownerId: state.ownerId,
-      createdAt: ts,
-      updatedAt: ts,
-      title: entry.title.trim().slice(0, 120) || "Замер без названия",
-      tweakSlug: entry.tweakSlug || null,
-      serverKind: sanitizeServerKind(entry.serverKind),
-      scene: entry.scene.trim().slice(0, 160) || "Обычная сцена",
-      beforeAvg: Math.max(1, Math.round(entry.beforeAvg * 10) / 10),
-      afterAvg: Math.max(1, Math.round(entry.afterAvg * 10) / 10),
-      beforeLow1: Math.max(1, Math.round(entry.beforeLow1 * 10) / 10),
-      afterLow1: Math.max(1, Math.round(entry.afterLow1 * 10) / 10),
-      beforeFrametime: Math.max(0.5, Math.round(entry.beforeFrametime * 10) / 10),
-      afterFrametime: Math.max(0.5, Math.round(entry.afterFrametime * 10) / 10),
-      notes: (entry.notes || "").trim().slice(0, 260),
-      isSample: false,
-    };
-    this.persist({
-      ...state,
-      logs: [record, ...state.logs].slice(0, 200),
-    });
-    return record;
-  }
-
-  updateLog(id: string, patch: Partial<NewBenchmarkLog>): BenchmarkLog | null {
-    const state = this.getState();
-    const idx = state.logs.findIndex((l) => l.id === id);
-    if (idx === -1) return null;
-    const prev = state.logs[idx];
-    const updated: BenchmarkLog = {
-      ...prev,
-      ...patch,
-      id: prev.id,
-      ownerId: prev.ownerId,
-      createdAt: prev.createdAt,
-      updatedAt: nowIso(),
-      isSample: false,
-    };
-    const logs = [...state.logs];
-    logs[idx] = updated;
-    this.persist({ ...state, logs });
-    return updated;
-  }
-
-  deleteLog(id: string): void {
-    const state = this.getState();
-    const remaining = state.logs.filter((l) => l.id !== id);
-    const hasSamples = remaining.some((l) => l.isSample);
-    this.persist({
-      ...state,
-      logs: remaining,
-      samplesDismissed: state.samplesDismissed || !hasSamples,
-    });
-  }
-
-  clearSampleLogs(): void {
-    const state = this.getState();
-    this.persist({
-      ...state,
-      logs: state.logs.filter((l) => !l.isSample),
-      samplesDismissed: true,
-    });
-  }
-
-  clearAllLogs(): void {
-    const state = this.getState();
-    this.persist({ ...state, logs: [], samplesDismissed: true });
-  }
-
-  restoreSampleLogs(): void {
-    const state = this.getState();
-    const custom = state.logs.filter((l) => !l.isSample);
-    this.persist({
-      ...state,
-      logs: [...custom, ...SAMPLE_LOGS.map((l) => ({ ...l, ownerId: state.ownerId }))],
-      samplesDismissed: false,
-    });
-  }
-
-  /** Восстановление удалённых записей (undo) с сохранением исходных id. */
-  restoreLogs(entries: BenchmarkLog[]): void {
-    if (!Array.isArray(entries) || entries.length === 0) return;
-    const state = this.getState();
-    const ids = new Set(state.logs.map((l) => l.id));
-    const fresh = entries.filter(
-      (l): l is BenchmarkLog =>
-        Boolean(l) && typeof l.id === "string" && !ids.has(l.id),
-    );
-    if (fresh.length === 0) return;
-    const merged = [...state.logs, ...fresh].slice(0, 200);
-    const hasSamples = merged.some((l) => l.isSample);
-    this.persist({
-      ...state,
-      logs: merged,
-      samplesDismissed: state.samplesDismissed && !hasSamples,
-    });
-  }
-
-  updateSetup(patch: Partial<Pick<SetupPreferences, "profile" | "preset" | "gpu" | "protocolChecks">>): void {
-    const state = this.getState();
-    this.persist({
-      ...state,
-      setup: {
-        ...state.setup,
-        ...patch,
-        ownerId: state.ownerId,
-        updatedAt: nowIso(),
-      },
-    });
+  updateTweaker(prefs: TweakerPreferences): void {
+    this.persist({ ...this.getState(), tweaker: readTweakerPreferences(prefs) });
   }
 
   exportBundle(): ExportBundle {
@@ -553,8 +343,7 @@ class LocalStorageAdapter implements StorageAdapter {
       myBuild,
       builds: state.builds,
       appliedTweaks,
-      logs: state.logs,
-      setup: state.setup,
+      tweaker: state.tweaker,
     };
   }
 
@@ -633,64 +422,10 @@ class LocalStorageAdapter implements StorageAdapter {
       }
     }
 
-    // Валидируем журнал
-    const validLogs: BenchmarkLog[] = [];
-    if (Array.isArray(parsed.logs)) {
-      for (const item of parsed.logs.slice(0, 200)) {
-        if (!item || typeof item !== "object") continue;
-        const l = item as Partial<BenchmarkLog>;
-        const bAvg = sanitizeFps(l.beforeAvg);
-        const aAvg = sanitizeFps(l.afterAvg);
-        const bLow = sanitizeFps(l.beforeLow1);
-        const aLow = sanitizeFps(l.afterLow1);
-        if (!bAvg || !aAvg || !bLow || !aLow) continue;
-        const bFt = sanitizeFps(l.beforeFrametime) ?? Math.round((1000 / bAvg) * 10) / 10;
-        const aFt = sanitizeFps(l.afterFrametime) ?? Math.round((1000 / aAvg) * 10) / 10;
-        const ts = nowIso();
-        validLogs.push({
-          id: typeof l.id === "string" && l.id ? l.id.slice(0, 64) : makeId("log"),
-          ownerId: typeof l.ownerId === "string" && l.ownerId ? l.ownerId.slice(0, 64) : ownerId,
-          createdAt: typeof l.createdAt === "string" ? l.createdAt : ts,
-          updatedAt: typeof l.updatedAt === "string" ? l.updatedAt : ts,
-          title: typeof l.title === "string" && l.title.trim() ? l.title.trim().slice(0, 120) : "Замер",
-          tweakSlug: typeof l.tweakSlug === "string" && l.tweakSlug ? l.tweakSlug.slice(0, 64) : null,
-          serverKind: sanitizeServerKind(l.serverKind),
-          scene: typeof l.scene === "string" ? l.scene.trim().slice(0, 160) : "Сцена не указана",
-          beforeAvg: bAvg,
-          afterAvg: aAvg,
-          beforeLow1: bLow,
-          afterLow1: aLow,
-          beforeFrametime: bFt,
-          afterFrametime: aFt,
-          notes: typeof l.notes === "string" ? l.notes.slice(0, 260) : "",
-          isSample: Boolean(l.isSample),
-        });
-      }
+    const tweaker = readTweakerPreferences(parsed.tweaker ?? parsed.setup);
+    if (validBuilds.length === 0 && validTweaks.length === 0 && !tweaker) {
+      return { ok: false, error: "В файле не найдено корректных сборок, отметок или настроек Твикера." };
     }
-
-    if (validBuilds.length === 0 && validTweaks.length === 0 && validLogs.length === 0) {
-      return { ok: false, error: "В файле не найдено корректных сборок, отметок твиков или записей журнала." };
-    }
-
-    const rawSetup = (parsed.setup && typeof parsed.setup === "object"
-      ? parsed.setup
-      : {}) as Partial<SetupPreferences>;
-    const setup: SetupPreferences = {
-      ownerId,
-      profile:
-        rawSetup.profile === "safe" || rawSetup.profile === "recommended" || rawSetup.profile === "max"
-          ? rawSetup.profile
-          : "recommended",
-      preset:
-        rawSetup.preset === "competitive" || rawSetup.preset === "balanced" || rawSetup.preset === "quality"
-          ? rawSetup.preset
-          : "balanced",
-      gpu: rawSetup.gpu === "nvidia" || rawSetup.gpu === "amd" || rawSetup.gpu === "all" ? rawSetup.gpu : "all",
-      protocolChecks: Array.isArray(rawSetup.protocolChecks)
-        ? rawSetup.protocolChecks.filter((x): x is string => typeof x === "string").slice(0, 20)
-        : [],
-      updatedAt: nowIso(),
-    };
 
     const activeId =
       typeof parsed.activeBuildId === "string" && validBuilds.some((b) => b.id === parsed.activeBuildId)
@@ -707,8 +442,7 @@ class LocalStorageAdapter implements StorageAdapter {
       myBuild,
       builds: validBuilds,
       appliedTweaks: validTweaks,
-      logs: validLogs,
-      setup,
+      tweaker,
     };
 
     return {
@@ -718,7 +452,6 @@ class LocalStorageAdapter implements StorageAdapter {
         buildsCount: validBuilds.length,
         appliedCount: validTweaks.filter((t) => t.applied).length,
         measuredTweaksCount: validTweaks.filter((t) => t.fpsBefore !== null && t.fpsAfter !== null).length,
-        logsCount: validLogs.length,
         myBuildTitle: myBuild ? `${myBuild.input.name} (${myBuild.score10}/10)` : null,
       },
     };
@@ -739,9 +472,7 @@ class LocalStorageAdapter implements StorageAdapter {
         activeBuildId: bundle.activeBuildId,
         builds: bundle.builds.map((b) => ({ ...b, ownerId })),
         tweaks: tweaksMap,
-        logs: bundle.logs.map((l) => ({ ...l, ownerId })),
-        setup: { ...bundle.setup, ownerId, updatedAt: nowIso() },
-        samplesDismissed: true,
+        tweaker: bundle.tweaker,
       });
       return;
     }
@@ -755,22 +486,18 @@ class LocalStorageAdapter implements StorageAdapter {
     for (const b of [...bundle.builds, ...current.builds]) {
       if (!buildMap.has(b.id)) buildMap.set(b.id, { ...b, ownerId });
     }
-    const logMap = new Map<string, BenchmarkLog>();
-    for (const l of [...bundle.logs, ...current.logs]) {
-      if (!logMap.has(l.id)) logMap.set(l.id, { ...l, ownerId });
-    }
     const builds = Array.from(buildMap.values()).slice(0, 12);
     this.persist({
       ...current,
       builds,
       activeBuildId: bundle.activeBuildId ?? current.activeBuildId ?? builds[0]?.id ?? null,
       tweaks: mergedTweaks,
-      logs: Array.from(logMap.values()).slice(0, 200),
-      samplesDismissed: true,
+      tweaker: bundle.tweaker ?? current.tweaker,
     });
   }
 
   resetAll(): void {
+    this.addons.clear();
     if (typeof window !== "undefined") {
       try {
         window.localStorage.removeItem(LEGACY_RATING_KEY);
@@ -779,7 +506,7 @@ class LocalStorageAdapter implements StorageAdapter {
         /* ignore */
       }
     }
-    this.persist(defaultState(false));
+    this.persist(defaultState());
   }
 }
 

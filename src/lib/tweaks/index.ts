@@ -105,12 +105,9 @@ export function toLite(t: Tweak): TweakLite {
 
 export const TWEAKS_LITE: TweakLite[] = TWEAKS.map(toLite);
 
-/** Только полезные (не вредные и не мифические) твики для счётчиков и пакета. */
-export const ACTIONABLE_TWEAKS = TWEAKS.filter((t) => !t.excludeFromPack);
-
-export function encodeFile(file: TweakFile): Buffer {
+export function encodeFile(file: TweakFile) {
   const text = file.content.replace(/\r?\n/g, "\r\n");
-  return Buffer.from(file.kind === "txt" ? `\uFEFF${text}` : text, "utf8");
+  return new TextEncoder().encode(file.kind === "txt" ? `\uFEFF${text}` : text);
 }
 
 export function isAscii(text: string): boolean {
