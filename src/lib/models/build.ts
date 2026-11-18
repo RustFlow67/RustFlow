@@ -1,14 +1,17 @@
+import { type GraphicsProfileId } from "@/lib/graphics-profiles";
 import {
   CPUS,
   getCpu,
   getGpu,
   GPUS,
   type Bottleneck,
-  type ResolutionId,
   type StorageId,
 } from "@/lib/hardware";
 import type { GpuVendor, PresetId } from "@/lib/tweaks/meta";
+import { formatBuildResolution, getResolutionSize, RESOLUTION_SIZES, type BuildResolution } from "./build-resolution";
+import { getBiosProfile, getMemoryType, isRamValue, isValidBuildSettings, RAM_CL_BOUNDS, RAM_MHZ_BOUNDS, type BuildSettings } from "./build-settings";
 import { clamp, round1, type UserOwnedRecord } from "./common";
+import { avgFps, calibratedFps, type RustScenario } from "./fps-calibration";
 
 /**
  * Модель пользовательской сборки и прозрачной взвешенной оценки /10 под Rust (builds).
@@ -19,6 +22,7 @@ export const RAM_FREQ_OPTIONS = [
   { value: 2133, label: "2133 МТ/с (JEDEC DDR4)" },
   { value: 2400, label: "2400 МТ/с (DDR4)" },
   { value: 2666, label: "2666 МТ/с (DDR4)" },
+  { value: 2933, label: "2933 МТ/с (DDR4)" },
   { value: 3000, label: "3000 МТ/с (DDR4)" },
   { value: 3200, label: "3200 МТ/с (DDR4 XMP)" },
   { value: 3600, label: "3600 МТ/с (DDR4 Sweet Spot)" },
@@ -28,7 +32,10 @@ export const RAM_FREQ_OPTIONS = [
   { value: 5600, label: "5600 МТ/с (DDR5)" },
   { value: 6000, label: "6000 МТ/с (DDR5 Sweet Spot)" },
   { value: 6400, label: "6400 МТ/с (DDR5 OC)" },
+  { value: 6800, label: "6800 МТ/с (DDR5 OC)" },
   { value: 7200, label: "7200 МТ/с (DDR5 High)" },
+  { value: 7600, label: "7600 МТ/с (DDR5)" },
+  { value: 8000, label: "8000 МТ/с (DDR5)" },
 ] as const;
 
 export const RAM_CL_OPTIONS = [
@@ -40,11 +47,13 @@ export const RAM_CL_OPTIONS = [
   { value: 28, label: "CL28 (ужатые DDR5)" },
   { value: 30, label: "CL30 (отличные DDR5-6000)" },
   { value: 32, label: "CL32 (хорошие DDR5)" },
+  { value: 34, label: "CL34 (DDR5)" },
   { value: 36, label: "CL36 (средние DDR5)" },
+  { value: 38, label: "CL38 (DDR5)" },
   { value: 40, label: "CL40 (JEDEC DDR5)" },
 ] as const;
 
-export interface BuildInput {
+export interface BuildInput extends BuildResolution, BuildSettings {
   name: string;
   cpuId: string;
   gpuId: string;
@@ -52,7 +61,6 @@ export interface BuildInput {
   ramMhz: number;
   ramCl: number;
   storage: StorageId;
-  resolution: ResolutionId;
 }
 
 export type BreakdownKey = "cpuSingle" | "ramLatency" | "ssdRandom" | "gpuTier" | "vramHeadroom";
@@ -81,7 +89,7 @@ export const RUST_SCORE_WEIGHTS: Record<BreakdownKey, { label: string; weight: n
   gpuTier: {
     label: "Тир GPU в выбранном разрешении",
     weight: 0.22,
-    why: "Растеризация шейдеров, воды, теней и растительности с учётом 1080p/1440p/4K.",
+    why: "Растеризация шейдеров, воды, теней и растительности с учётом числа выводимых пикселей.",
   },
   vramHeadroom: {
     label: "Запас видеопамяти (VRAM)",
@@ -143,7 +151,7 @@ export function defaultClForMhz(mhz: number): number {
   if (mhz >= 6000) return 30;
   if (mhz >= 5200) return 36;
   if (mhz >= 4800) return 40;
-  if (mhz >= 3600) return 18;
+  if (mhz >= 3600) return 16;
   if (mhz >= 3000) return 16;
   return 22;
 }
@@ -154,46 +162,48 @@ export function calcRamLatencyNs(mhz: number, cl: number): number {
   return round1((cl * 2000) / mhz);
 }
 
-const RES_GPU_SCALE: Record<ResolutionId, number> = {
-  "1080p": 1,
-  "1440p": 0.72,
-  "4k": 0.44,
-};
+// Keep the existing 1080p / 1440p / 4K calibration points. Other sizes
+// interpolate (or extrapolate GPU load) by pixel area, not aspect ratio.
+const RES_LOAD_POINTS = ([
+  { id: "1080p", gpu: 1, min: 6, comfy: 8, ideal: 12 },
+  { id: "1440p", gpu: 0.72, min: 8, comfy: 12, ideal: 16 },
+  { id: "4k", gpu: 0.44, min: 10, comfy: 16, ideal: 24 },
+] as const).map(({ id, ...load }) => ({ ...load, pixels: RESOLUTION_SIZES[id].width * RESOLUTION_SIZES[id].height }));
 
-const RES_VRAM_TARGET: Record<ResolutionId, { min: number; comfy: number; ideal: number }> = {
-  "1080p": { min: 6, comfy: 8, ideal: 12 },
-  "1440p": { min: 8, comfy: 12, ideal: 16 },
-  "4k": { min: 10, comfy: 16, ideal: 24 },
-};
+function resolutionLoad(pixels: number) {
+  const exact = RES_LOAD_POINTS.find((point) => point.pixels === pixels);
+  if (exact) return exact;
+  const i = pixels < RES_LOAD_POINTS[1].pixels ? 0 : 1;
+  const a = RES_LOAD_POINTS[i];
+  const b = RES_LOAD_POINTS[i + 1];
+  const t = Math.log(pixels / a.pixels) / Math.log(b.pixels / a.pixels);
+  const vramT = clamp(t, 0, 1);
+  const lerp = (low: number, high: number) => low + (high - low) * vramT;
+  return {
+    gpu: a.gpu * (b.gpu / a.gpu) ** t,
+    min: lerp(a.min, b.min), comfy: lerp(a.comfy, b.comfy), ideal: lerp(a.ideal, b.ideal),
+  };
+}
 
-const STORAGE_SPEC: Record<StorageId, { score10: number; fpsMul: number; lowMul: number; detail: string }> = {
+const STORAGE_SPEC: Record<StorageId, { score10: number; detail: string }> = {
   hdd: {
     score10: 2.5,
-    fpsMul: 0.91,
-    lowMul: 0.8,
     detail: "HDD (~100 IOPS): долгая загрузка карты (10–25 мин) и статтеры подгрузки баз",
   },
   sata: {
     score10: 7.8,
-    fpsMul: 0.985,
-    lowMul: 0.97,
     detail: "SATA SSD (~70K IOPS): нормальная подгрузка префабов, вход на сервер за 2–4 мин",
   },
   nvme: {
     score10: 9.8,
-    fpsMul: 1,
-    lowMul: 1,
     detail: "NVMe SSD (300K+ IOPS): быстрый прогрев ассетов и минимальные задержки стриминга",
   },
 };
 
-function softMin(a: number, b: number): number {
-  return Math.pow(Math.pow(Math.max(1, a), -4.5) + Math.pow(Math.max(1, b), -4.5), -1 / 4.5);
-}
-
 export function isValidBuildInput(input: Partial<BuildInput> | null | undefined): input is BuildInput {
   if (!input) return false;
   return (
+    typeof input.name === "string" &&
     typeof input.cpuId === "string" &&
     CPUS.some((c) => c.id === input.cpuId) &&
     typeof input.gpuId === "string" &&
@@ -201,32 +211,35 @@ export function isValidBuildInput(input: Partial<BuildInput> | null | undefined)
     typeof input.ramGb === "number" &&
     input.ramGb >= 8 &&
     input.ramGb <= 128 &&
-    typeof input.ramMhz === "number" &&
-    input.ramMhz >= 1600 &&
-    input.ramMhz <= 9600 &&
-    typeof input.ramCl === "number" &&
-    input.ramCl >= 10 &&
-    input.ramCl <= 56 &&
+    isRamValue(input.ramMhz, RAM_MHZ_BOUNDS) &&
+    isRamValue(input.ramCl, RAM_CL_BOUNDS) &&
+    isValidBuildSettings(input, input.cpuId) &&
     (input.storage === "hdd" || input.storage === "sata" || input.storage === "nvme") &&
-    (input.resolution === "1080p" || input.resolution === "1440p" || input.resolution === "4k")
+    getResolutionSize(input) !== null
   );
 }
 
 /**
  * Прозрачный расчёт оценки сборки /10 и ожидаемых диапазонов FPS под Rust.
- * Откалиброван на референсных точках (в т.ч. Ryzen 5 5600X + RTX 5060 + 32GB@3600 CL18:
- * моддед 2x ≈ 130–150 FPS, официал ≈ 90–100 FPS).
+ * FPS: общие диапазоны режима «Комбат» и поправки на нагрузку, память и сервер.
  */
-export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
+export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | null = null, scene: RustScenario = "coast"): BuildEvaluation | null {
   const cpu = getCpu(input.cpuId);
   const gpu = getGpu(input.gpuId);
   if (!cpu || !gpu || !isValidBuildInput(input)) return null;
+  const size = getResolutionSize(input);
+  if (!size) return null;
+  const pixels = size.width * size.height;
+  const resolutionLabel = formatBuildResolution(input);
+  const load = resolutionLoad(pixels);
 
   const isX3d = /X3D/i.test(cpu.name);
   const latencyNs = calcRamLatencyNs(input.ramMhz, input.ramCl);
+  const bios = getBiosProfile(input.biosProfile);
+  const ddr5 = getMemoryType(input) === "DDR5";
 
   // 1) Однопоток + кэш CPU (/10)
-  const cpuScore = round1(clamp(cpu.idx / 10, 1, 10));
+  const cpuScore = round1(clamp((cpu.idx / 10) * (bios?.cpu ?? 1), 1, 10));
   const cpuDetail = isX3d
     ? `Индекс ${cpu.idx}/100 · увеличенный 3D V-Cache отлично держит FPS у больших баз`
     : cpu.idx >= 75
@@ -240,29 +253,29 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
     input.ramGb >= 32 ? 10 : input.ramGb >= 24 ? 9 : input.ramGb >= 16 ? 7.4 : input.ramGb >= 12 ? 4.6 : 2.4;
   // Пропускная способность (2133 -> ~3.5, 3200 -> ~6.8, 3600 -> ~7.8, 6000 -> ~9.6)
   const bwScore = clamp(
-    input.ramMhz >= 4400
-      ? 6.4 + ((input.ramMhz - 4400) / 2200) * 3.6
+    ddr5
+      ? 6.4 + ((input.ramMhz - 4800) / 3200) * 3.6
       : 3.2 + ((input.ramMhz - 2133) / 1867) * 5.2,
     2.5,
     10,
   );
   // Задержка (9 нс -> 10, 10 нс -> 9.0, 12 нс -> 7.0, 16+ нс -> 3.5)
-  const latScore = clamp(10 - Math.max(0, latencyNs - 8.8) * 0.85, 2.5, 10);
-  const ramScore = round1(clamp(capScore * 0.5 + bwScore * 0.25 + latScore * 0.25, 1, 10));
+  const latScore = clamp(10 - Math.max(0, latencyNs - 6.8) * 0.78, 2.5, 10);
+  const ramScore = round1(clamp((capScore * 0.5 + bwScore * 0.25 + latScore * 0.25) * (bios?.ram ?? 1), 1, 10));
   const isJedec =
     (input.ramMhz <= 2400 && input.ramCl >= 17) || (input.ramMhz === 4800 && input.ramCl >= 38);
   const ramDetail = `${input.ramGb} ГБ · ${input.ramMhz} МТ/с CL${input.ramCl} (~${latencyNs} нс)${
-    isJedec ? " — похоже, не включён XMP/EXPO" : ""
+    input.biosProfile === "stock" ? " · режим без XMP" : !bios && isJedec ? " · проверьте XMP/EXPO" : ""
   }`;
 
   // 3) Тир GPU в выбранном разрешении (/10)
-  const effectiveGpu = gpu.idx * RES_GPU_SCALE[input.resolution];
+  const effectiveGpu = gpu.idx * load.gpu;
   // effectiveGpu 58 (RTX 5060 @ 1080p) -> ~7.6; 80+ -> 9.2..10; 28 -> 4.6
   const gpuScore = round1(clamp(Math.pow(effectiveGpu / 88, 0.72) * 10, 1, 10));
-  const gpuDetail = `${gpu.name} с учётом ${input.resolution === "4k" ? "4K" : input.resolution} (эфф. индекс ${Math.round(effectiveGpu)})`;
+  const gpuDetail = `${gpu.name} с учётом ${resolutionLabel} (эфф. индекс ${Math.round(effectiveGpu)})`;
 
   // 4) Запас VRAM (/10)
-  const vt = RES_VRAM_TARGET[input.resolution];
+  const vt = load;
   let vramRaw: number;
   if (gpu.vram >= vt.ideal) {
     vramRaw = 9.2 + clamp((gpu.vram - vt.ideal) / 12, 0, 0.8);
@@ -276,10 +289,10 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
   const vramScore = round1(clamp(vramRaw, 1, 10));
   const vramDetail =
     gpu.vram >= vt.ideal
-      ? `${gpu.vram} ГБ — полный запас под высокие текстуры и скины в ${input.resolution}`
+      ? `${gpu.vram} ГБ — полный запас под высокие текстуры и скины в ${resolutionLabel}`
       : gpu.vram >= vt.comfy
-        ? `${gpu.vram} ГБ — достаточно для средних/высоких текстур в ${input.resolution}`
-        : `${gpu.vram} ГБ — впритык для ${input.resolution}, снижайте качество текстур до 1–2`;
+        ? `${gpu.vram} ГБ — достаточно для средних/высоких текстур в ${resolutionLabel}`
+        : `${gpu.vram} ГБ — впритык для ${resolutionLabel}, снижайте качество текстур до 1–2`;
 
   // 5) Накопитель (/10)
   const st = STORAGE_SPEC[input.storage];
@@ -314,59 +327,11 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
     ),
   );
 
-  // Оценка FPS (моддед 2x и официал high-pop)
-  // Множитель скорости памяти: 3600 CL18 (10ns, bw ~7.8) = 1.00; JEDEC 2133 = ~0.85; DDR5-6000 CL30 = ~1.05
-  const ramSpeedMul = clamp(0.84 + (bwScore * 0.5 + latScore * 0.5) * 0.019, 0.82, 1.06);
-  // Для X3D чувствительность к частоте RAM вдвое ниже благодаря огромному L3-кэшу
-  const cpuRamMul = isX3d ? 1 + (ramSpeedMul - 1) * 0.45 : ramSpeedMul;
-  const ramCapMul =
-    input.ramGb >= 32 ? 1 : input.ramGb >= 24 ? 0.985 : input.ramGb >= 16 ? 0.95 : input.ramGb >= 12 ? 0.82 : 0.64;
-  const vramMul = gpu.vram < vt.min ? 0.85 : 1;
-
-  // Калибровка: 5600X (idx=62) + RTX 5060 (eff=58) + 32GB@3600 CL18 -> моддед 130–150 FPS, официал 90–100 FPS
-  const cpuModded = cpu.idx * 2.36 * cpuRamMul;
-  const gpuModded = effectiveGpu * 3.65 * vramMul;
-  const moddedCenter = softMin(cpuModded, gpuModded) * ramCapMul * st.fpsMul;
-
-  // На официале (350–500 pop) нагрузка на CPU выше (~0.66x, у X3D ~0.74x), на GPU почти та же (~0.90x)
-  const cpuOfficial = cpuModded * (isX3d ? 0.74 : 0.66);
-  const gpuOfficial = gpuModded * 0.9;
-  const officialCenter = softMin(cpuOfficial, gpuOfficial) * ramCapMul * st.fpsMul;
-
-  const lowBaseRatio =
-    (input.ramGb >= 32 ? 0.67 : input.ramGb >= 16 ? 0.61 : 0.44) *
-    st.lowMul *
-    (isX3d ? 1.06 : 1) *
-    (isJedec ? 0.92 : 1);
-
-  const makeRange = (center: number, spread: number): FpsRangeEstimate => {
-    const min = Math.max(15, Math.round((center * (1 - spread)) / 2) * 2);
-    const max = Math.max(min + 6, Math.round((center * (1 + spread)) / 2) * 2);
-    const low1 = Math.max(10, Math.round(center * clamp(lowBaseRatio, 0.3, 0.76)));
-    return { min, max, low1 };
-  };
-
-  const fpsModded = makeRange(moddedCenter, 0.072);
-  const fpsOfficial = makeRange(officialCenter, 0.055);
-
-  // Ориентир по 3 пресетам графики (смешанный сервер ~250 онл.)
-  const presetFactors: Record<PresetId, { c: number; g: number }> = {
-    competitive: { c: 1.0, g: 1.0 },
-    balanced: { c: 0.92, g: 0.76 },
-    quality: { c: 0.83, g: 0.54 },
-  };
-  const fpsByPreset = {} as Record<PresetId, { avg: number; low: number }>;
-  for (const pid of ["competitive", "balanced", "quality"] as PresetId[]) {
-    const pf = presetFactors[pid];
-    const vPen = pid !== "competitive" && gpu.vram < vt.comfy ? 0.86 : 1;
-    const avg = Math.max(
-      15,
-      Math.round(softMin(cpuModded * 0.86 * pf.c, gpuModded * pf.g * vPen) * ramCapMul * st.fpsMul),
-    );
-    fpsByPreset[pid] = {
-      avg,
-      low: Math.max(10, Math.round(avg * clamp(lowBaseRatio, 0.3, 0.76))),
-    };
+  const { modded: fpsModded, official: fpsOfficial, cpuModded, cpuOfficial, gpuModded, gpuOfficial } = calibratedFps(input, cpu, gpu, pixels, mode, scene);
+  const fpsByPreset = {} as BuildEvaluation["fpsByPreset"];
+  for (const id of ["competitive", "balanced", "quality"] as const) {
+    const { modded } = calibratedFps(input, cpu, gpu, pixels, id, scene);
+    fpsByPreset[id] = { avg: Math.round(avgFps(modded)), low: modded.low1 };
   }
 
   // Узкое место
@@ -375,9 +340,10 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
   else if (cpuOfficial < gpuOfficial * 0.82) bottleneck = "cpu";
   else if (gpuModded < cpuModded * 0.85) bottleneck = "gpu";
 
+  const baselineOfficialMax = calibratedFps(input, cpu, gpu, pixels, "competitive").official.max;
   let recommendedPreset: PresetId = "quality";
-  if (fpsOfficial.max < 95 || gpu.vram < vt.comfy) recommendedPreset = "competitive";
-  else if (fpsOfficial.max < 140 || gpu.vram < vt.ideal) recommendedPreset = "balanced";
+  if (baselineOfficialMax < 95 || gpu.vram < vt.comfy) recommendedPreset = "competitive";
+  else if (baselineOfficialMax < 140 || gpu.vram < vt.ideal) recommendedPreset = "balanced";
 
   const vendor: GpuVendor = gpu.vendor === "nvidia" ? "nvidia" : gpu.vendor === "amd" ? "amd" : "all";
 
@@ -387,20 +353,20 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
   let verdictColor = "#ff6961";
   if (score10 >= 8.7) {
     verdictLabel = "Флагман под Rust";
-    verdictSummary = "Высокий запас под 144–240 Гц даже на плотных официалах и в крупных рейдах.";
-    verdictColor = "#30d158";
+    verdictSummary = "Высокий запас по железу. На плотных серверах и в рейдах ориентируйтесь на FPS и 1% low выбранного сценария.";
+    verdictColor = "#ffc38b";
   } else if (score10 >= 7.5) {
     verdictLabel = "Отличный баланс";
-    verdictSummary = "Ровный frametime и 100+ FPS на большинстве серверов. Твики отполируют 1% low.";
-    verdictColor = "#64d2ff";
+    verdictSummary = "Сбалансированные комплектующие. Стабильность проверьте по 1% low в вашей сцене.";
+    verdictColor = "#f58a3e";
   } else if (score10 >= 6.2) {
     verdictLabel = "Уверенный оптимум";
     verdictSummary = "Комфортный PvP на соревновательных и сбалансированных настройках с грамотным gc.buffer.";
-    verdictColor = "#ffd60a";
+    verdictColor = "#e2824a";
   } else if (score10 >= 4.8) {
     verdictLabel = "Играбельно с твиками";
     verdictSummary = "Ставка на пресет «Максимум FPS», авто-подкачку и правильную настройку ОЗУ/SSD.";
-    verdictColor = "#ff9f0a";
+    verdictColor = "#ff8a3d";
   }
 
   // Персональные рекомендации твиков с причиной
@@ -412,10 +378,10 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
   if (input.storage === "hdd") {
     push("ssd-trim-free-space", "Игра на HDD — перенос Rust на SSD уберёт главные фризы подгрузки и сократит вход в 4–5 раз.");
   }
-  if (isJedec || latencyNs > 11.2) {
+  if (input.biosProfile === "stock" || (!bios && isJedec) || latencyNs > 11.2) {
     push(
       "xmp-expo-timings",
-      `Память ${input.ramMhz} МТ/с CL${input.ramCl} (~${latencyNs} нс): включение XMP/EXPO и двухканала даст +10–20% к 1% low.`,
+      `Память ${input.ramMhz} МТ/с CL${input.ramCl} (~${latencyNs} нс): сверьте режим двухканала и совместимый профиль памяти. Эффект проверьте по 1% low.`,
     );
   }
   if (input.ramGb >= 12) {
@@ -446,7 +412,7 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
   push("launch-options", "Чистый -window-mode exclusive без нерабочих флагов из Arma.", "medium");
   push("restore-point", "Создайте точку восстановления перед системными правками.", "medium");
 
-  // Аналитические заметки
+  // Диагностика узких мест
   const notes: string[] = [];
   if (bottleneck === "ram") {
     notes.push(
@@ -458,11 +424,11 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
     );
   } else if (bottleneck === "gpu") {
     notes.push(
-      `В ${input.resolution === "4k" ? "4K" : input.resolution} основной упор — ${gpu.name}. Пресет графики и DLSS/FSR «Качество» дадут прямой прирост +20–35% FPS.`,
+      `В ${resolutionLabel} основной упор — ${gpu.name}. Сравните пресеты графики или проверьте масштаб рендера на той же сцене.`,
     );
   } else {
     notes.push(
-      `Сбалансированная связка: на моддед 2x нагрузка распределена ровно, на официале 350+ онлайна плавно смещается на ${cpu.name}.`,
+      `Сбалансированная связка: на MODDED 2X нагрузка распределена ровно, на OFFICIAL HIGH POP с 350+ онлайна плавно смещается на ${cpu.name}.`,
     );
   }
   if (isJedec) {
@@ -470,9 +436,9 @@ export function evaluateBuild10(input: BuildInput): BuildEvaluation | null {
       `Задержка RAM ~${latencyNs} нс выглядит как базовый JEDEC. Проверьте в BIOS профиль XMP / DOCP / EXPO и слоты A2+B2.`,
     );
   }
-  if (gpu.vram <= 8 && input.resolution !== "1080p") {
+  if (gpu.vram < vt.comfy && pixels > RES_LOAD_POINTS[0].pixels) {
     notes.push(
-      `${gpu.vram} ГБ VRAM маловато для ${input.resolution}: держите Graphics Quality 2–3, чтобы избежать статтеров переполнения буфера.`,
+      `${gpu.vram} ГБ VRAM — ограниченный запас в ${resolutionLabel}. Проверьте более низкое качество текстур на том же маршруте.`,
     );
   }
 
@@ -508,7 +474,7 @@ export const QUICK_SAMPLE_BUILDS: { label: string; input: BuildInput }[] = [
       gpuId: "geforce-rtx-5060",
       ramGb: 32,
       ramMhz: 3600,
-      ramCl: 18,
+      ramCl: 16,
       storage: "nvme",
       resolution: "1080p",
     },

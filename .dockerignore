@@ -1,0 +1,10 @@
+.git
+node_modules
+.next
+out
+*.tsbuildinfo
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example

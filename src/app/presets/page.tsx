@@ -5,9 +5,9 @@ import { HARDWARE_PRESETS } from "@/lib/models/preset";
 import { TWEAKS_LITE } from "@/lib/tweaks";
 
 export const metadata: Metadata = {
-  title: "Пресеты железа и замеры FPS в Rust",
+  title: "Пресеты железа и ориентиры FPS в Rust",
   description:
-    "Референсные конфигурации ПК под Rust (включая Ryzen 5 5600X + RTX 5060 + 32GB@3600: моддед 2x 130–150 FPS, официал 90–100 FPS) с готовыми настройками client.cfg и сравнением.",
+    `${HARDWARE_PRESETS.length} конфигурации от 1080p до 4K, ориентиры FPS для MODDED 2X и OFFICIAL, готовые настройки client.cfg и сравнение.`,
 };
 
 export default function PresetsPage() {
@@ -16,9 +16,9 @@ export default function PresetsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Пресеты железа"
-        title="Готовые конфиги с замерами и client.cfg"
-        text="Реалистичные связки от бюджетного 1080p до 9800X3D (включая эталон Ryzen 5 5600X + RTX 5060 + 32GB@3600). Скопируйте настройки в один клик или сравните до трёх сборок между собой."
+        eyebrow="Пресеты"
+        title="43 сборки для Rust"
+        text="Сравните до трёх конфигураций. Выберите режим графики, 4:3 или своё разрешение, чтобы пересчитать FPS, 1% low и время кадра."
       />
       <PresetsExplorer presets={HARDWARE_PRESETS} tweakTitles={tweakTitles} />
     </>

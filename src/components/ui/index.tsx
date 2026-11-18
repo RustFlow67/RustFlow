@@ -8,7 +8,6 @@ import {
   type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
 } from "react";
 
 /* ------------------------------ Card ------------------------------ */
@@ -165,61 +164,6 @@ export function Input({
 
 /* ----------------------------- Select ----------------------------- */
 
-export function Select({
-  label,
-  hideLabel = false,
-  hint,
-  error,
-  options,
-  fieldSize = "md",
-  className = "",
-  id: customId,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & {
-  label: string;
-  hideLabel?: boolean;
-  hint?: string;
-  error?: string;
-  options: readonly { value: string | number; label: string }[];
-  fieldSize?: "sm" | "md";
-}) {
-  const autoId = useId();
-  const id = customId ?? autoId;
-  const msgId = `${id}-msg`;
-
-  return (
-    <div className="min-w-0">
-      <label
-        htmlFor={id}
-        className={hideLabel ? "sr-only" : "mb-1.5 block text-[13px] font-semibold text-ink-2"}
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        aria-invalid={error ? "true" : undefined}
-        aria-describedby={error || hint ? msgId : undefined}
-        className={`field ${fieldSize === "sm" ? "field-sm" : ""} ${className}`.trim()}
-        {...rest}
-      >
-        {options.map((opt) => (
-          <option key={String(opt.value)} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {error ? (
-        <p id={msgId} role="alert" className="mt-1.5 text-[12.5px] font-medium text-danger">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={msgId} className="mt-1.5 text-[12px] text-ink-3">
-          {hint}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 /* ------------------------------ Badge ----------------------------- */
 

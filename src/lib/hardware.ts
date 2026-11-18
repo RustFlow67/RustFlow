@@ -1,5 +1,3 @@
-import type { GpuVendor, PresetId } from "./tweaks/meta";
-
 /**
  * PC rating model for Rust.
  *
@@ -110,14 +108,19 @@ export const CPUS: Cpu[] = [
     ["FX-8350", 14],
   ]),
   ...cpus("Intel Core", [
+    ["Core i9-14900KS", 93],
     ["Core i9-14900K", 92],
     ["Core i9-13900K", 90],
     ["Core i7-14700K", 88],
+    ["Core i7-14700KF", 88],
     ["Core i7-13700K", 86],
+    ["Core i7-13700KF", 86],
     ["Core Ultra 9 285K", 86],
     ["Core Ultra 7 265K", 84],
     ["Core i5-14600K", 83],
+    ["Core i5-14600KF", 83],
     ["Core i5-13600K", 81],
+    ["Core i5-13600KF", 81],
     ["Core Ultra 5 245K", 80],
     ["Core i9-12900K", 78],
     ["Core i7-12700K", 75],
@@ -180,6 +183,7 @@ export const GPUS: Gpu[] = [
     ["GeForce RTX 4070 Super", 80, 12],
     ["GeForce RTX 4070", 70, 12],
     ["GeForce RTX 4060 Ti", 56, 8],
+    ["GeForce RTX 4060 Ti 16GB", 56, 16],
     ["GeForce RTX 4060", 48, 8],
     ["GeForce RTX 3090 Ti", 94, 24],
     ["GeForce RTX 3090", 86, 24],
@@ -279,217 +283,6 @@ const GPU_BY_ID = new Map(GPUS.map((g) => [g.id, g]));
 
 export const getCpu = (id: string) => CPU_BY_ID.get(id);
 export const getGpu = (id: string) => GPU_BY_ID.get(id);
-
-export const TIERS: Record<TierId, { label: string; summary: string; color: string }> = {
-  S: {
-    label: "Флагман",
-    summary: "Запас по всем компонентам. Можно играть с красивой картинкой и высоким FPS.",
-    color: "#30d158",
-  },
-  A: {
-    label: "Отлично",
-    summary: "Комфортная игра на высоких кадрах. Твики добавят стабильности в рейдах.",
-    color: "#64d2ff",
-  },
-  B: {
-    label: "Хорошо",
-    summary: "Играть комфортно на сбалансированных настройках. Оптимизация даст заметный эффект.",
-    color: "#ffd60a",
-  },
-  C: {
-    label: "Играбельно",
-    summary: "Нужны минимальные настройки графики и полная настройка системы.",
-    color: "#ff9f0a",
-  },
-  D: {
-    label: "Тяжело",
-    summary: "Rust запустится, но комфортной игры не будет без обновления железа.",
-    color: "#ff453a",
-  },
-};
-
-export interface EvalInput {
-  cpuId: string;
-  gpuId: string;
-  ram: number;
-  storage: StorageId;
-  resolution: ResolutionId;
-}
-
-export interface FpsEstimate {
-  avg: number;
-  low: number;
-}
-
-export interface EvalResult {
-  score: number;
-  tier: TierId;
-  parts: { cpu: number; gpu: number; ram: number; storage: number };
-  fps: Record<PresetId, FpsEstimate>;
-  bottleneck: Bottleneck;
-  preset: PresetId;
-  vendor: GpuVendor;
-  tweaks: string[];
-  notes: string[];
-  cpuName: string;
-  gpuName: string;
-}
-
-const RES_FACTOR: Record<ResolutionId, number> = { "1080p": 1, "1440p": 0.7, "4k": 0.42 };
-
-const STORAGE: Record<StorageId, { factor: number; low: number; score: number }> = {
-  hdd: { factor: 0.92, low: -0.1, score: 35 },
-  sata: { factor: 0.985, low: -0.01, score: 85 },
-  nvme: { factor: 1, low: 0, score: 100 },
-};
-
-const PRESET_MUL: Record<PresetId, { cpu: number; gpu: number }> = {
-  competitive: { cpu: 1.1, gpu: 1.35 },
-  balanced: { cpu: 1, gpu: 1 },
-  quality: { cpu: 0.9, gpu: 0.7 },
-};
-
-function ramProfile(ram: number): { factor: number; low: number; score: number } {
-  if (ram >= 32) return { factor: 1, low: 0.68, score: 100 };
-  if (ram >= 24) return { factor: 0.985, low: 0.65, score: 90 };
-  if (ram >= 16) return { factor: 0.95, low: 0.6, score: 78 };
-  if (ram >= 12) return { factor: 0.82, low: 0.46, score: 50 };
-  return { factor: 0.62, low: 0.34, score: 30 };
-}
-
-const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
-
-/** Smooth minimum: behaves like min() but blends near the crossover point. */
-const softMin = (a: number, b: number) => Math.pow(Math.pow(a, -4) + Math.pow(b, -4), -0.25);
-
-export function isValidInput(input: EvalInput): boolean {
-  return (
-    CPU_BY_ID.has(input.cpuId) &&
-    GPU_BY_ID.has(input.gpuId) &&
-    (RAM_OPTIONS as readonly number[]).includes(input.ram) &&
-    input.storage in STORAGE &&
-    input.resolution in RES_FACTOR
-  );
-}
-
-export function evaluate(input: EvalInput): EvalResult | null {
-  const cpu = CPU_BY_ID.get(input.cpuId);
-  const gpu = GPU_BY_ID.get(input.gpuId);
-  if (!cpu || !gpu || !isValidInput(input)) return null;
-
-  const ram = ramProfile(input.ram);
-  const storage = STORAGE[input.storage];
-  const cpuFps = cpu.idx * 1.9;
-  const gpuFps = gpu.idx * 3 * RES_FACTOR[input.resolution];
-  const x3d = /X3D/i.test(cpu.name);
-  const lowVram = gpu.vram <= 4;
-
-  const fps = {} as Record<PresetId, FpsEstimate>;
-  for (const preset of Object.keys(PRESET_MUL) as PresetId[]) {
-    const mul = PRESET_MUL[preset];
-    const vramPenalty = lowVram && preset !== "competitive" ? 0.82 : 1;
-    const raw = softMin(cpuFps * mul.cpu, gpuFps * mul.gpu * vramPenalty);
-    const avg = raw * ram.factor * storage.factor;
-    const lowRatio = clamp(ram.low + storage.low + (x3d ? 0.04 : 0), 0.25, 0.75);
-    fps[preset] = { avg: Math.max(1, Math.round(avg)), low: Math.max(1, Math.round(avg * lowRatio)) };
-  }
-
-  const parts = {
-    cpu: clamp(Math.round(cpu.idx), 1, 100),
-    gpu: clamp(Math.round(gpuFps / 2), 1, 100),
-    ram: ram.score,
-    storage: storage.score,
-  };
-
-  const score = clamp(
-    Math.round(
-      Math.exp(
-        0.38 * Math.log(parts.cpu) +
-          0.3 * Math.log(parts.gpu) +
-          0.22 * Math.log(parts.ram) +
-          0.1 * Math.log(parts.storage),
-      ),
-    ),
-    1,
-    100,
-  );
-
-  const tier: TierId = score >= 85 ? "S" : score >= 70 ? "A" : score >= 55 ? "B" : score >= 40 ? "C" : "D";
-
-  let bottleneck: Bottleneck = "balanced";
-  if (input.ram < 16) bottleneck = "ram";
-  else if (cpuFps < gpuFps * 0.8) bottleneck = "cpu";
-  else if (gpuFps < cpuFps * 0.8) bottleneck = "gpu";
-
-  let preset: PresetId = "quality";
-  if (fps.balanced.avg < 75) preset = "competitive";
-  else if (fps.balanced.avg < 135 || lowVram) preset = "balanced";
-
-  const vendor: GpuVendor = gpu.vendor === "nvidia" ? "nvidia" : gpu.vendor === "amd" ? "amd" : "all";
-  const panel = vendor === "nvidia" ? "nvidia-panel" : vendor === "amd" ? "amd-adrenalin" : null;
-
-  const list: string[] = ["restore-point", "hardware-checklist", `preset-${preset}`];
-  if (input.ram >= 12) list.push("gc-buffer");
-  if (input.ram <= 16) list.push("pagefile-auto", "background-apps");
-  if (bottleneck === "gpu") {
-    if (panel) list.push(panel);
-    list.push("hags", "game-mode-dvr", "ultimate-power-plan");
-  } else {
-    list.push("ultimate-power-plan", "game-mode-dvr", "rust-priority");
-    if (panel) list.push(panel);
-  }
-  if (gpu.idx <= 16) list.push("visual-effects", "fso-gpu-pref");
-  if (input.storage === "hdd") list.push("steam-checklist");
-  list.push("launch-options");
-  const tweaks = Array.from(new Set(list)).slice(0, 10);
-
-  const notes: string[] = [];
-  if (bottleneck === "ram") {
-    notes.push(
-      `Оперативной памяти ${input.ram} ГБ — меньше рекомендуемых 16 ГБ. Rust будет выгружаться в файл подкачки, отсюда фризы. Апгрейд памяти даст больше, чем любой твик.`,
-    );
-  } else if (bottleneck === "cpu") {
-    notes.push(
-      "FPS ограничивает процессор: Rust нагружает один-два потока. Снижение графики почти не добавит кадров — помогут пресет с меньшей дальностью прорисовки, план электропитания и быстрая память.",
-    );
-  } else if (bottleneck === "gpu") {
-    notes.push(
-      "FPS ограничивает видеокарта. Здесь настройки графики работают лучше всего: пресет, DLSS или FSR и меньшее разрешение дадут ощутимый прирост.",
-    );
-  } else {
-    notes.push("Процессор и видеокарта подобраны ровно: явного узкого места нет.");
-  }
-  if (input.storage === "hdd") {
-    notes.push(
-      "Игра на HDD: загрузка в мир занимает минуты, а текстуры подгружаются рывками. Перенос Rust на SSD — самое заметное улучшение за свои деньги.",
-    );
-  }
-  if (lowVram) {
-    notes.push(
-      `У видеокарты ${gpu.vram} ГБ видеопамяти — этого мало для высоких текстур. Используйте пресет «Максимум FPS» или «Баланс».`,
-    );
-  }
-  if (x3d) {
-    notes.push("Процессор с 3D V-Cache — лучший тип процессора для Rust: большой кэш заметно поднимает минимальный FPS.");
-  }
-  if (input.ram >= 32 && bottleneck !== "ram") {
-    notes.push("32 ГБ и больше позволяют поставить gc.buffer 4096 — пауз сборщика мусора станет меньше всего.");
-  }
-
-  return {
-    score,
-    tier,
-    parts,
-    fps,
-    bottleneck,
-    preset,
-    vendor,
-    tweaks,
-    notes,
-    cpuName: cpu.name,
-    gpuName: gpu.name,
-  };
-}
 
 /** Tries to match a WebGL renderer string to a GPU from the list. */
 export function detectGpu(renderer: string): Gpu | null {

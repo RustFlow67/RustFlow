@@ -1,5 +1,6 @@
 "use client";
 
+import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import { Check, ChevronDown, Copy, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
@@ -62,13 +63,13 @@ export default function CodeBlock({
           {copied ? "Скопировано" : "Копировать"}
         </button>
       </div>
-      <div className="acc-body">
+      <OriginDisclosure open={open}>
         {note && <p className="px-4 pb-3 text-[13px] leading-relaxed text-ink-2">{note}</p>}
         <div className="hairline" />
         <pre className="code max-h-[420px] overflow-auto px-4 py-4" tabIndex={0}>
           {content}
         </pre>
-      </div>
+      </OriginDisclosure>
     </div>
   );
 }

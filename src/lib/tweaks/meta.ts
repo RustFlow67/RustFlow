@@ -1,56 +1,4 @@
-import type { CategoryId, FileKind, Restart, Risk } from "./types";
-
-export interface CategoryMeta {
-  id: CategoryId;
-  title: string;
-  description: string;
-  /** Two gradient stops for the icon tile. */
-  from: string;
-  to: string;
-}
-
-export const CATEGORIES: CategoryMeta[] = [
-  {
-    id: "prep",
-    title: "Подготовка",
-    description: "Точка восстановления, чистка кэшей, RAM XMP/EXPO, SSD и чек-лист железа.",
-    from: "#8e8e93",
-    to: "#48484a",
-  },
-  {
-    id: "windows",
-    title: "Windows",
-    description: "Электропитание, игровой режим, планировщик, файл подкачки и фоновые процессы.",
-    from: "#0a84ff",
-    to: "#5e5ce6",
-  },
-  {
-    id: "gpu",
-    title: "Видеокарта",
-    description: "Чек-листы для панели NVIDIA и AMD Adrenalin под Rust.",
-    from: "#30d158",
-    to: "#00a67d",
-  },
-  {
-    id: "game",
-    title: "Rust",
-    description: "Пресеты графики, gc.buffer, параметры запуска, бинды и Steam.",
-    from: "#ff9f0a",
-    to: "#ff453a",
-  },
-  {
-    id: "network",
-    title: "Сеть",
-    description: "Сброс сетевого стека и отключение энергосбережения адаптера.",
-    from: "#64d2ff",
-    to: "#0a84ff",
-  },
-];
-
-export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c])) as Record<
-  CategoryId,
-  CategoryMeta
->;
+import type { FileKind, Restart, Risk } from "./types";
 
 export const RISK_META: Record<Risk, { label: string; hint: string }> = {
   safe: { label: "Безопасно", hint: "Штатные настройки, легко откатить" },
@@ -117,30 +65,8 @@ export const PHASES: Phase[] = [
   },
 ];
 
-export type ProfileId = "safe" | "recommended" | "max";
 export type PresetId = "competitive" | "balanced" | "quality";
 export type GpuVendor = "nvidia" | "amd" | "all";
-
-export const PROFILES: { id: ProfileId; title: string; description: string; risks: Risk[] }[] = [
-  {
-    id: "safe",
-    title: "Безопасный",
-    description: "Только штатные настройки без побочных эффектов.",
-    risks: ["safe"],
-  },
-  {
-    id: "recommended",
-    title: "Рекомендуемый",
-    description: "Безопасные и проверенные умеренные твики — оптимальный выбор.",
-    risks: ["safe", "moderate"],
-  },
-  {
-    id: "max",
-    title: "Максимум",
-    description: "Включает компромиссные твики (например HVCI). Вредные анти-твики исключены.",
-    risks: ["safe", "moderate", "advanced"],
-  },
-];
 
 export const PRESETS: { id: PresetId; slug: string; title: string; description: string }[] = [
   {
@@ -162,28 +88,6 @@ export const PRESETS: { id: PresetId; slug: string; title: string; description: 
     description: "Высокая детализация для мощных видеокарт.",
   },
 ];
-
-const PRESET_SLUGS = new Set(PRESETS.map((p) => p.slug));
-
-export interface Selection {
-  profile: ProfileId;
-  preset: PresetId;
-  gpu: GpuVendor;
-}
-
-/** Решает, входит ли твик в пакет полной настройки (мифы и вредные исключаются всегда). */
-export function inSelection(
-  t: { slug: string; risk: Risk; excludeFromPack?: boolean },
-  sel: Selection,
-): boolean {
-  if (t.excludeFromPack) return false;
-  const profile = PROFILES.find((p) => p.id === sel.profile) ?? PROFILES[1];
-  if (!profile.risks.includes(t.risk)) return false;
-  if (PRESET_SLUGS.has(t.slug)) return t.slug === `preset-${sel.preset}`;
-  if (t.slug === "nvidia-panel") return sel.gpu !== "amd";
-  if (t.slug === "amd-adrenalin") return sel.gpu !== "nvidia";
-  return true;
-}
 
 export function plural(n: number, forms: [string, string, string]): string {
   const a = Math.abs(n) % 100;

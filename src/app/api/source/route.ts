@@ -1,3 +1,4 @@
+import { apiUrl } from "@/lib/api-base";
 import type { NextRequest } from "next/server";
 import {
   buildSourceZip,
@@ -71,9 +72,9 @@ export async function GET(req: NextRequest) {
   return Response.json({
     ok: true,
     downloads: {
-      full: "/api/source?download=full",
-      site: "/api/source?download=site",
-      appKit: "/api/source?download=app-kit",
+      full: `${apiUrl("source")}?download=full`,
+      site: `${apiUrl("source")}?download=site`,
+      appKit: `${apiUrl("source")}?download=app-kit`,
     },
     binaryAssets: assets,
     binaryAssetsTotalBytes: assets.reduce((sum, a) => sum + a.size, 0),

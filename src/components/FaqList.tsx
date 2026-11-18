@@ -1,6 +1,8 @@
 "use client";
 
-import { ChevronDown, Search, SearchX } from "lucide-react";
+import OriginDisclosure from "@/components/fx/OriginDisclosure";
+import { ArrowUpRight, ChevronDown, Search, SearchX } from "lucide-react";
+import Link from "@/components/RouteLink";
 import { useMemo, useState, type CSSProperties } from "react";
 import Segmented from "@/components/Segmented";
 import { Button, EmptyState, Input } from "@/components/ui";
@@ -29,7 +31,7 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
           label="Поиск по вопросам FAQ"
           hideLabel
           type="search"
-          placeholder="Поиск: EAC, бан, разгон, Defender, gc.buffer, пинг…"
+          placeholder="Поиск: HAGS, gc.buffer, Done, драйверы…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onClear={() => setQuery("")}
@@ -92,13 +94,16 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
                     </span>
                   </button>
                 </h3>
-                <div className="acc-body">
+                <OriginDisclosure open={isOpen}>
                   <div className="space-y-3 px-5 pb-6 text-[15px] leading-relaxed text-ink-2 sm:px-6">
                     {item.a.map((paragraph, j) => (
                       <p key={j}>{paragraph}</p>
                     ))}
+                    {item.href && <Link href={item.href} className="inline-flex items-center gap-1.5 font-semibold text-accent-hi underline underline-offset-4">
+                      К записи в базе знаний <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>}
                   </div>
-                </div>
+                </OriginDisclosure>
               </li>
             );
           })}

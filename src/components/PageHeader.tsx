@@ -15,14 +15,14 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="hero-scrim mb-8 max-w-3xl sm:mb-10">
-      <p className="eyebrow">{eyebrow}</p>
-      <h1 className="headline mt-2.5 text-[clamp(1.9rem,5vw,3.2rem)]">
-        <span className="text-glass">{title}</span>
-      </h1>
-      {text && (
-        <p className="mt-3.5 max-w-2xl text-[16px] leading-relaxed text-ink-2 sm:text-[17px]">{text}</p>
-      )}
+    <header className="glass liquid-optics liquid-glass-card section-title mb-6 px-4 py-5 sm:mb-8 sm:px-7 sm:py-6">
+      <div className="rf-page-content">
+        <p className="eyebrow">{eyebrow}</p>
+        <h1 className="headline mt-2.5 text-[clamp(1.35rem,4.5vw,2.7rem)]">
+          <span className="text-glass">{title}</span>
+        </h1>
+        {text && <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-2 sm:text-base">{text}</p>}
+      </div>
       {children}
     </header>
   );
@@ -40,7 +40,7 @@ export function SectionHead({
   center?: boolean;
 }) {
   return (
-    <div className={`mb-7 max-w-2xl ${center ? "mx-auto text-center" : ""}`} data-reveal>
+    <div className={`mb-7 max-w-2xl ${center ? "mx-auto text-center" : ""}`}>
       <p className="eyebrow">{eyebrow}</p>
       <h2 className="headline mt-2.5 text-[clamp(1.6rem,3.6vw,2.4rem)]">
         <span className="text-glass">{title}</span>
