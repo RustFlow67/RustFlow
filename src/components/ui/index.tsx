@@ -35,7 +35,7 @@ export function Card({
 }) {
   const hover = interactive ? (variant === "tile" ? "tile-hover" : "glass-hover") : "";
   return (
-    <div className={`${CARD_CLASS[variant]} ${hover} ${className}`.trim()} {...rest}>
+    <div data-rf-card="" className={`${CARD_CLASS[variant]} ${hover} ${className}`.trim()} {...rest}>
       {children}
     </div>
   );

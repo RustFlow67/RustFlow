@@ -49,7 +49,7 @@ export const viewport: Viewport = {
 const BOOT = `(function(){var d=document.documentElement,m=window.matchMedia;var t='system',r='auto',l=null;try{t=localStorage.getItem('rustflow:theme')||t;r=localStorage.getItem('rustflow:motion')||r;l=localStorage.getItem('rustflow:lite')}catch(e){}var theme=t==='dark'||t==='light'?t:(m&&m('(prefers-color-scheme: light)').matches?'light':'dark');d.setAttribute('data-theme',theme);d.style.colorScheme=theme;d.setAttribute('data-motion',r==='reduced'||(r!=='full'&&m&&m('(prefers-reduced-motion: reduce)').matches)?'reduced':'full');if(l==='1'||(l!=='0'&&(navigator.connection&&navigator.connection.saveData||navigator.deviceMemory&&navigator.deviceMemory<=2)))d.setAttribute('data-lite','');})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="ru" suppressHydrationWarning>
+  return <html lang="ru" data-motion="full" suppressHydrationWarning>
     <head>
       <link rel="preload" href="/fonts/unbounded-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       <link rel="preload" href="/fonts/unbounded-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />

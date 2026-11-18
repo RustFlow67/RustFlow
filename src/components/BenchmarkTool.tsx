@@ -7,10 +7,8 @@ import {
   Calculator,
   Cpu,
   Gauge,
-  Info,
   Lightbulb,
   Monitor,
-  ScanLine,
   Target,
 } from "lucide-react";
 import Link from "@/components/RouteLink";
@@ -31,7 +29,6 @@ import { publishAssistantBuild } from "@/lib/assistant/context";
 import {
   BOTTLENECK_LABEL,
   CPUS,
-  detectGpu,
   GPUS,
   getGpu,
   RAM_OPTIONS,
@@ -148,7 +145,6 @@ function BenchmarkForm({ tweakIndex, presetInput, initialMode = "competitive", e
     customResolution: { ...RESOLUTION_SIZES["1080p"], ...input.customResolution, [axis]: value },
   });
 
-  const [detectNotes, setDetectNotes] = useState<string[] | null>(null);
   const [showWeights, setShowWeights] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -159,34 +155,6 @@ function BenchmarkForm({ tweakIndex, presetInput, initialMode = "competitive", e
   const activeBuild = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
   const ramValid = isRamValue(ramMhz, RAM_MHZ_BOUNDS) && isRamValue(ramCl, RAM_CL_BOUNDS);
   const tuning = { monitorHz: input.monitorHz ?? DEFAULT_MONITOR_HZ, connection: input.connection ?? DEFAULT_CONNECTION };
-
-  function handleAutoDetect() {
-    const notes: string[] = [];
-    try {
-      const canvas = document.createElement("canvas");
-      const gl = (canvas.getContext("webgl") ??
-        canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-      const ext = gl?.getExtension("WEBGL_debug_renderer_info");
-      const renderer = gl && ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) ?? "") : "";
-      const gpu = renderer ? detectGpu(renderer) : null;
-      if (gpu) {
-        setGpuId(gpu.id);
-        notes.push(`GPU определён по WebGL: ${gpu.name}.`);
-      } else if (renderer) {
-        notes.push(`WebGL сообщил «${renderer.slice(0, 72)}» — выберите ближайшую видеокарту из списка.`);
-      } else {
-        notes.push("Браузер скрывает точную модель GPU — выберите видеокарту вручную.");
-      }
-    } catch {
-      notes.push("WebGL недоступен — выберите видеокарту вручную.");
-    }
-    const threads = navigator.hardwareConcurrency;
-    if (threads) {
-      notes.push(`Потоков CPU: ${threads}. Модель CPU, частоту и тайминги RAM браузер не видит — укажите вручную.`);
-    }
-    setDetectNotes(notes);
-    toast({ title: "Автопроверка выполнена", description: "Проверьте CPU и параметры RAM.", tone: "info" });
-  }
 
   async function handleSaveBuild(asNew = false) {
     if (!evaluation || !user || saving) return;
@@ -219,24 +187,7 @@ function BenchmarkForm({ tweakIndex, presetInput, initialMode = "competitive", e
           className="glass glass-blur liquid-glass-card build-config-layout relative z-20 scroll-mt-[calc(var(--header-size)+12px)] p-5 sm:p-7"
           aria-label="Параметры вашей сборки ПК"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <h2 className="rf-page-content text-xl font-bold tracking-tight">Конфигурация ПК</h2>
-            <Button variant="secondary" size="sm" onClick={handleAutoDetect}>
-              <ScanLine aria-hidden="true" />
-              Определить GPU
-            </Button>
-          </div>
-
-          {detectNotes && (
-            <ul className="well pop-in mt-4 space-y-1.5 p-3.5 text-[12.5px] leading-relaxed text-ink-2" aria-live="polite">
-              {detectNotes.map((n, i) => (
-                <li key={i} className="flex gap-2">
-                  <Info className="mt-0.5 h-4 w-4 flex-none text-accent-hi" aria-hidden="true" />
-                  <span>{n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2 className="text-xl font-bold tracking-tight">Конфигурация ПК</h2>
 
           <div className="build-fields mt-5 grid min-w-0 gap-4">
             <Input

@@ -32,7 +32,7 @@
   min-width: 0;
   padding: clamp(1rem, 3vw, 1.8rem);
   background: radial-gradient(ellipse at 0 0, color-mix(in srgb, var(--addon-accent) 9%, transparent), transparent 65%), var(--addon-bg);
-  transition: none;
+  transition: var(--press-release);
 }
 /* Keep the specular rim out of the text area, including on hover. */
 .panel::after { inset: 0 0 auto; height: 8px; }
@@ -194,7 +194,7 @@
 .compactRadar .chart { border: 0; border-radius: 0; background: none; }
 .compactRadar .chartText { font-size: 19px; font-weight: 650; }
 .compactRadar .chartTick { font-size: 17px; }
-.radarVertex > circle { transition: cx 400ms cubic-bezier(.22,1,.36,1), cy 400ms cubic-bezier(.22,1,.36,1); }
+.radarVertex > circle { transition: transform 400ms cubic-bezier(.22,1,.36,1); }
 .radarVertex { cursor: help; outline: none; }
 .radarDot { fill: var(--addon-accent); stroke: var(--addon-bg); stroke-width: 2.5; }
 .radarHint { display: none; pointer-events: none; }

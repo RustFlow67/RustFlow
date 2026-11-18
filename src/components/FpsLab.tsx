@@ -387,7 +387,7 @@ export default function FpsLab() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setThemeChoice(b.value)}
-                  className={`flex h-9 items-center justify-center gap-1.5 rounded-full text-[12px] font-bold transition-transform active:scale-95 ${
+                  className={`flex h-9 items-center justify-center gap-1.5 rounded-full text-[12px] font-bold transition-transform ${
                     active ? "btn-primary" : "bg-black/20 text-ink-2 hover:text-ink"
                   }`}
                   style={active ? undefined : { boxShadow: "inset 0 0 0 1px var(--border-subtle)" }}
@@ -413,7 +413,7 @@ export default function FpsLab() {
                 tone: settings.stress ? "info" : "warning",
               });
             }}
-            className={`flex h-10 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-bold transition-transform active:scale-95 ${
+            className={`flex h-10 items-center justify-center gap-1.5 rounded-full text-[12.5px] font-bold transition-transform ${
               settings.stress ? "btn-danger" : "btn-primary"
             }`}
           >

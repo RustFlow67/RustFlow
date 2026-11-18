@@ -150,7 +150,7 @@ export default function Nav() {
         <DockTabs pathname={pathname} chatOpen={chatOpen} chatTrigger={chatTrigger} toggleChat={(opener) => chatOpen ? closeChat() : showChat(opener)} />
       </nav>
 
-      <AiAssistant open={chatOpen} onClose={closeChat} />
+      <AiAssistant open={chatOpen} onClose={closeChat} opener={chatOpener} />
     </>
   );
 }

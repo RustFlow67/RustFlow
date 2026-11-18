@@ -14,7 +14,6 @@ const ENTRIES: CommandEntry[] = [
   { href: "/tools#quiz", title: "Миф или правда", kind: "Инструмент", keywords: "квиз викторина" },
   { href: "/tools#level", title: "Уровень оптимизатора", kind: "Инструмент", keywords: "достижения опыт XP" },
   { href: "/guide", title: "База знаний", kind: "Страница" },
-  { href: "/benchmark#share", title: "Ссылка на сборку", kind: "Инструмент", keywords: "импорт поделиться" },
   ...TWEAKS_LITE.filter((t) => !isSupersededTweak(t.slug)).map((tweak): CommandEntry => ({
     href: tweakerHref(tweak.slug), title: tweak.title, kind: "Твик", keywords: tweak.tagline,
   })),

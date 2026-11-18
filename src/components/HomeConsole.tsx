@@ -69,7 +69,7 @@ export default function HomeConsole() {
           const typing = i === ROWS - 1 && !sliding && !reduced;
           return <li key={step + i} data-typing={typing ? "" : undefined} data-next={i === ROWS ? "" : undefined}
             style={{ "--chars": command.length, "--type-time": `${command.length * CHAR_MS}ms` } as CSSProperties}>
-            <div className="terminal-command"><span className="terminal-prompt">›</span><code className="terminal-type">{command}</code>
+            <div className="terminal-command"><span className="terminal-prompt">›</span><code className="terminal-type"><span>{command}</span></code>
               {typing && <span className="terminal-caret">▋</span>}</div>
             <p>{note}</p>
           </li>;

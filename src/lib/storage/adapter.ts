@@ -6,6 +6,7 @@ import {
   type UserBuild,
 } from "@/lib/models/build";
 import { LOCAL_OWNER_ID, makeId, nowIso, SCHEMA_VERSION } from "@/lib/models/common";
+import { SAMPLE_LOGS, TEST_PROTOCOL_STEPS, type BenchmarkLog, type NewBenchmarkLog } from "@/lib/models/log";
 import type { UserTweakRecord } from "@/lib/models/tweak";
 import { readTweakerPreferences, type TweakerPreferences } from "@/lib/tweaker";
 import { createExtensionState, type ExtensionState } from "./extension-state";
@@ -22,6 +23,8 @@ export interface PersistedState {
   activeBuildId: string | null;
   builds: UserBuild[];
   tweaks: Record<string, UserTweakRecord>;
+  logs: BenchmarkLog[];
+  protocolChecks: string[];
   tweaker: TweakerPreferences | null;
 }
 
@@ -35,6 +38,8 @@ export interface ExportBundle {
   myBuild: UserBuild | null;
   builds: UserBuild[];
   appliedTweaks: UserTweakRecord[];
+  logs?: BenchmarkLog[];
+  protocolChecks?: string[];
   tweaker: TweakerPreferences | null;
 }
 
@@ -59,7 +64,19 @@ export interface StorageAdapter {
 
   // Tweaks (applied + before/after FPS)
   setTweakApplied(slug: string, applied: boolean): UserTweakRecord;
+  setTweakFps(slug: string, fpsBefore: number | null, fpsAfter: number | null, note?: string): UserTweakRecord;
+  resetTweakProgress(): void;
 
+  // Logs (benchmark journal)
+  addLog(entry: NewBenchmarkLog): BenchmarkLog;
+  updateLog(id: string, patch: Partial<NewBenchmarkLog>): BenchmarkLog | null;
+  deleteLog(id: string): void;
+  clearSampleLogs(): void;
+  clearAllLogs(): void;
+  restoreSampleLogs(): void;
+  restoreLogs(entries: BenchmarkLog[]): void;
+
+  setProtocolChecks(ids: string[]): void;
   updateTweaker(prefs: TweakerPreferences): void;
 
   // JSON Export / Import / Reset
@@ -76,15 +93,58 @@ function defaultState(): PersistedState {
     activeBuildId: null,
     builds: [],
     tweaks: {},
+    logs: SAMPLE_LOGS.map((entry) => ({ ...entry })),
+    protocolChecks: [],
     tweaker: null,
   };
 }
 
 function sanitizeFps(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
+  if (typeof v !== "number" && typeof v !== "string") return null;
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0 || n > 2000) return null;
   return Math.round(n * 10) / 10;
+}
+
+function readJournalLogs(raw: unknown, ownerId: string): BenchmarkLog[] {
+  const validLogs: BenchmarkLog[] = [];
+  if (Array.isArray(raw)) {
+    for (const item of raw.slice(0, 200)) {
+      if (!item || typeof item !== "object") continue;
+      const l = item as Partial<BenchmarkLog>;
+      const bAvg = sanitizeFps(l.beforeAvg);
+      const aAvg = sanitizeFps(l.afterAvg);
+      const bLow = sanitizeFps(l.beforeLow1);
+      const aLow = sanitizeFps(l.afterLow1);
+      if (!bAvg || !aAvg || !bLow || !aLow) continue;
+      const bFt = sanitizeFps(l.beforeFrametime) ?? Math.round((1000 / bAvg) * 10) / 10;
+      const aFt = sanitizeFps(l.afterFrametime) ?? Math.round((1000 / aAvg) * 10) / 10;
+      const ts = nowIso();
+      validLogs.push({
+        id: typeof l.id === "string" && l.id ? l.id.slice(0, 64) : makeId("log"),
+        ownerId,
+        createdAt: typeof l.createdAt === "string" ? l.createdAt : ts,
+        updatedAt: typeof l.updatedAt === "string" ? l.updatedAt : ts,
+        title: typeof l.title === "string" && l.title.trim() ? l.title.trim().slice(0, 120) : "Замер",
+        tweakSlug: typeof l.tweakSlug === "string" && l.tweakSlug ? l.tweakSlug.slice(0, 64) : null,
+        serverKind: l.serverKind === "modded" || l.serverKind === "staging" ? l.serverKind : "official",
+        scene: typeof l.scene === "string" ? l.scene.trim().slice(0, 160) : "Сцена не указана",
+        beforeAvg: bAvg,
+        afterAvg: aAvg,
+        beforeLow1: bLow,
+        afterLow1: aLow,
+        beforeFrametime: bFt,
+        afterFrametime: aFt,
+        notes: typeof l.notes === "string" ? l.notes.slice(0, 260) : "",
+        isSample: Boolean(l.isSample),
+      });
+    }
+  }
+  return validLogs;
+}
+
+function readChecks(value: unknown) {
+  return TEST_PROTOCOL_STEPS.filter(({ id }) => Array.isArray(value) && value.includes(id)).map(({ id }) => id);
 }
 
 function buildRecordFromInput(input: BuildInput, ownerId: string, existing?: UserBuild): UserBuild | null {
@@ -224,7 +284,7 @@ class LocalStorageAdapter implements StorageAdapter {
         this.persist(migrated, false);
         return migrated;
       }
-      const parsed = JSON.parse(raw) as Partial<PersistedState> & { setup?: unknown };
+      const parsed = JSON.parse(raw) as Partial<PersistedState> & { setup?: { protocolChecks?: unknown }; samplesDismissed?: boolean };
       const ownerId =
         typeof parsed.ownerId === "string" && parsed.ownerId.trim() ? parsed.ownerId : LOCAL_OWNER_ID;
       // Old or partially written entries must not break the profile or calculator.
@@ -240,6 +300,8 @@ class LocalStorageAdapter implements StorageAdapter {
         activeBuildId: typeof parsed.activeBuildId === "string" && ids.has(parsed.activeBuildId) ? parsed.activeBuildId : builds[0]?.id ?? null,
         builds,
         tweaks: parsed.tweaks && typeof parsed.tweaks === "object" ? parsed.tweaks : {},
+        logs: readJournalLogs(parsed.logs ?? (parsed.samplesDismissed ? [] : SAMPLE_LOGS), ownerId),
+        protocolChecks: readChecks(parsed.protocolChecks ?? parsed.setup?.protocolChecks),
         tweaker: readTweakerPreferences(parsed.tweaker ?? parsed.setup),
       };
       this.cache = state;
@@ -323,6 +385,66 @@ class LocalStorageAdapter implements StorageAdapter {
     return updated;
   }
 
+  setTweakFps(slug: string, fpsBefore: number | null, fpsAfter: number | null, note?: string): UserTweakRecord {
+    const state = this.getState();
+    const prev = this.getOrCreateTweak(state, slug);
+    const updated: UserTweakRecord = {
+      ...prev,
+      fpsBefore: sanitizeFps(fpsBefore),
+      fpsAfter: sanitizeFps(fpsAfter),
+      note: note !== undefined ? note.slice(0, 200) : prev.note,
+      updatedAt: nowIso(),
+    };
+    this.persist({
+      ...state,
+      tweaks: { ...state.tweaks, [slug]: updated },
+    });
+    return updated;
+  }
+
+  resetTweakProgress(): void {
+    const state = this.getState();
+    this.persist({ ...state, tweaks: {} });
+  }
+
+  addLog(entry: NewBenchmarkLog): BenchmarkLog {
+    const state = this.getState();
+    const ts = nowIso();
+    const record = { ...entry, id: makeId("log"), ownerId: state.ownerId, createdAt: ts, updatedAt: ts, isSample: false };
+    this.persist({ ...state, logs: [record, ...state.logs].slice(0, 200) });
+    return record;
+  }
+
+  updateLog(id: string, patch: Partial<NewBenchmarkLog>): BenchmarkLog | null {
+    const state = this.getState(), prev = state.logs.find((entry) => entry.id === id);
+    if (!prev) return null;
+    const updated = { ...prev, ...patch, updatedAt: nowIso(), isSample: false };
+    this.persist({ ...state, logs: state.logs.map((entry) => entry.id === id ? updated : entry) });
+    return updated;
+  }
+
+  deleteLog(id: string) {
+    const state = this.getState();
+    this.persist({ ...state, logs: state.logs.filter((entry) => entry.id !== id) });
+  }
+
+  clearSampleLogs() {
+    const state = this.getState();
+    this.persist({ ...state, logs: state.logs.filter((entry) => !entry.isSample) });
+  }
+
+  clearAllLogs() { this.persist({ ...this.getState(), logs: [] }); }
+
+  restoreSampleLogs() { this.restoreLogs(SAMPLE_LOGS); }
+
+  restoreLogs(entries: BenchmarkLog[]) {
+    const state = this.getState(), ids = new Set(state.logs.map((entry) => entry.id));
+    const restored = entries.filter((entry) => !ids.has(entry.id)).map((entry) => ({ ...entry, ownerId: state.ownerId }));
+    this.persist({ ...state, logs: [...restored, ...state.logs].slice(0, 200) });
+  }
+
+  setProtocolChecks(ids: string[]) { this.persist({ ...this.getState(), protocolChecks: readChecks(ids) }); }
+
   updateTweaker(prefs: TweakerPreferences): void {
     this.persist({ ...this.getState(), tweaker: readTweakerPreferences(prefs) });
   }
@@ -343,6 +465,8 @@ class LocalStorageAdapter implements StorageAdapter {
       myBuild,
       builds: state.builds,
       appliedTweaks,
+      logs: state.logs,
+      protocolChecks: state.protocolChecks,
       tweaker: state.tweaker,
     };
   }
@@ -423,8 +547,11 @@ class LocalStorageAdapter implements StorageAdapter {
     }
 
     const tweaker = readTweakerPreferences(parsed.tweaker ?? parsed.setup);
-    if (validBuilds.length === 0 && validTweaks.length === 0 && !tweaker) {
-      return { ok: false, error: "В файле не найдено корректных сборок, отметок или настроек Твикера." };
+    const logs = Array.isArray(parsed.logs) ? readJournalLogs(parsed.logs, ownerId) : undefined;
+    const rawChecks = parsed.protocolChecks ?? (parsed.setup as { protocolChecks?: unknown } | null)?.protocolChecks;
+    const protocolChecks = Array.isArray(rawChecks) ? readChecks(rawChecks) : undefined;
+    if (!validBuilds.length && !validTweaks.length && !logs?.length && !protocolChecks?.length && !tweaker) {
+      return { ok: false, error: "В файле не найдено корректных сборок, замеров, отметок или настроек Твикера." };
     }
 
     const activeId =
@@ -442,6 +569,8 @@ class LocalStorageAdapter implements StorageAdapter {
       myBuild,
       builds: validBuilds,
       appliedTweaks: validTweaks,
+      logs,
+      protocolChecks,
       tweaker,
     };
 
@@ -472,6 +601,8 @@ class LocalStorageAdapter implements StorageAdapter {
         activeBuildId: bundle.activeBuildId,
         builds: bundle.builds.map((b) => ({ ...b, ownerId })),
         tweaks: tweaksMap,
+        logs: bundle.logs?.map((entry) => ({ ...entry, ownerId })) ?? current.logs,
+        protocolChecks: bundle.protocolChecks ?? current.protocolChecks,
         tweaker: bundle.tweaker,
       });
       return;
@@ -492,6 +623,8 @@ class LocalStorageAdapter implements StorageAdapter {
       builds,
       activeBuildId: bundle.activeBuildId ?? current.activeBuildId ?? builds[0]?.id ?? null,
       tweaks: mergedTweaks,
+      logs: Array.from(new Map([...current.logs, ...(bundle.logs ?? [])].map((entry) => [entry.id, { ...entry, ownerId }])).values()).slice(0, 200),
+      protocolChecks: Array.from(new Set([...current.protocolChecks, ...(bundle.protocolChecks ?? [])])),
       tweaker: bundle.tweaker ?? current.tweaker,
     });
   }

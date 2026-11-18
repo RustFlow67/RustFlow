@@ -8,7 +8,7 @@ const CARDS = [
   {
     icon: Sparkles,
     title: "Блик по кромке",
-    text: "Спекуляр проходит по стеклу. Наведение наклоняет карточку — это тот же data-tilt, что уже крутит библиотеку.",
+    text: "При наведении карточка чуть поднимается, а на кромке стекла появляется блик.",
   },
   {
     icon: Magnet,
@@ -42,8 +42,7 @@ export default function MotionShowcase() {
         {CARDS.map((card) => (
           <RevealItem
             key={card.title}
-            className="glass glass-hover tilt-3d relative p-5"
-            data-tilt=""
+            className="glass glass-hover relative p-5"
           >
             <span className="rf-edge-glint" aria-hidden="true" />
             <card.icon className="h-5 w-5 text-accent-hi" aria-hidden="true" />

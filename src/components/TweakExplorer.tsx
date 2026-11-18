@@ -2,10 +2,11 @@
 
 import { FileJson, RotateCcw, Search, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { triggerBackupModal } from "@/components/Nav";
+import { openPlayerProfile } from "@/components/auth/ProfileGate";
+import LiquidSelect from "@/components/LiquidSelect";
 import Segmented from "@/components/Segmented";
 import TweakCard from "@/components/TweakCard";
-import { Button, EmptyState, Input, Select, Skeleton } from "@/components/ui";
+import { Button, EmptyState, Input, Skeleton } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -193,19 +194,19 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
             onClear={() => setQuery("")}
             icon={<Search className="h-4 w-4" />}
           />
-          <Select
+          <LiquidSelect
             label="Фильтр по приросту"
             hideLabel
             options={GAIN_OPTIONS}
             value={gain}
-            onChange={(e) => setGain(e.target.value as GainFilter)}
+            onChange={setGain}
           />
-          <Select
+          <LiquidSelect
             label="Сортировка твиков"
             hideLabel
             options={SORT_OPTIONS}
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortId)}
+            onChange={setSort}
           />
         </div>
 
@@ -230,7 +231,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
                   aria-pressed={active}
                   title={TWEAK_RISK_META[level].hint}
                   onClick={() => toggleRisk(level)}
-                  className={`chip chip-${level} !h-9 !px-3.5 transition-transform duration-200 active:scale-95 ${
+                  className={`chip chip-${level} !h-9 !px-3.5 transition-transform duration-200 ${
                     active ? "" : "opacity-45"
                   }`}
                 >
@@ -269,7 +270,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
               Сбросить фильтры
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={triggerBackupModal}>
+          <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
             <FileJson className="text-accent-hi" aria-hidden="true" />
             JSON
           </Button>

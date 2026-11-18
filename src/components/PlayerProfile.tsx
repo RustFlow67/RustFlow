@@ -150,7 +150,7 @@ export default function PlayerProfile() {
             <Upload aria-hidden="true" /> Импорт JSON
           </button>
         </div>
-        <p className="text-xs text-ink-3">В JSON входят копии сборок и отметки этого браузера, но не данные входа.</p>
+        <p className="text-xs text-ink-3">В JSON входят локальные сборки, журнал замеров, отметки и настройки Твикера, но не данные входа.</p>
         <Button size="sm" variant="ghost" loading={busy === "logout"} disabled={Boolean(busy)} className="mt-3 w-full"
           onClick={() => void run("logout", async () => { await signOut(); setBackup(null); setMode("login"); })}><LogOut aria-hidden="true" /> Выйти из аккаунта</Button>
       </div> : <>

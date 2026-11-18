@@ -162,6 +162,7 @@
   --icon-spring: cubic-bezier(.22, 1.15, .36, 1);
   --icon-time: 300ms;
   --liquid-spring: cubic-bezier(.22, 1.15, .36, 1);
+  --ios-open: cubic-bezier(0.22, 1.12, 0.36, 1);
   --ui-time: 240ms;
   --ui-transition: transform var(--ui-time) var(--ease-out), opacity var(--ui-time) var(--ease-out);
   --press-release: transform var(--ui-time) var(--ease-out);
@@ -245,11 +246,11 @@
     scroll-behavior: auto;
     -webkit-text-size-adjust: 100%;
     overflow-x: clip;
-    transition: background-color 0.5s var(--ease-out);
   }
 
   body {
     min-height: 100dvh;
+    isolation: isolate; /* Keep the negative wallpaper above the document canvas. */
     background: transparent;
     padding-bottom: var(--notice-bottom);
     color: var(--color-ink);
@@ -358,8 +359,8 @@
     inset 24px -12px 41px rgb(43 10 5 / .57), inset -18px 24px 33px rgb(58 18 12 / .50),
     inset 0 1px 2px rgb(255 230 200 / .40), 0 24px 52px -10px rgb(12 5 3 / .54);
   --lens-gloss: rgb(255 235 201 / .58);
-  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh;
-  z-index: 0; isolation: isolate; overflow: hidden; pointer-events: none;
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  z-index: -1; isolation: isolate; overflow: hidden; pointer-events: none;
   background:
     radial-gradient(ellipse at 84% -8%, rgb(140 45 25 / .31), transparent 56%),
     radial-gradient(ellipse at 7% 91%, rgb(140 45 25 / .23), transparent 61%),
@@ -447,7 +448,7 @@
   48% { transform: translate3d(calc(var(--dx) * .29), calc(var(--dy) * .63), 0) rotate(calc(var(--angle) + var(--swing) * .35)) skewX(var(--bend)) scale(.91, 1.075); }
   100% { transform: translate3d(var(--dx), var(--dy), 0) rotate(calc(var(--angle) + var(--swing))) skewX(calc(var(--bend) * -.6)) scale(1.07, .91); }
 }
-html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-caret, .terminal-lines, .terminal-lines p) { animation-play-state: paused; }
+html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-type > span, .terminal-caret, .terminal-lines, .terminal-lines p, [data-dock-glyph], [data-dock-glyph] [data-part]) { animation-play-state: paused; }
 
 :root {
   --glass-body: linear-gradient(145deg, rgb(255 231 203 / .11), rgb(67 30 19 / .14) 53%, rgb(140 45 25 / .15));
@@ -496,7 +497,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     backface-visibility: hidden;
     -webkit-backdrop-filter: blur(22px) saturate(165%);
     backdrop-filter: blur(22px) saturate(165%);
-    transition: var(--press-release), border-color 250ms var(--ease-out), background-color 250ms var(--ease-out);
+    transition: var(--press-release);
   }
   .glass.liquid-optics { background-image: var(--glass-title); }
   .glass.liquid-glass-card {
@@ -504,12 +505,9 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     --r: var(--liquid-base-radius);
     background-image: radial-gradient(ellipse at 19% 0%, var(--glass-hi-soft), transparent 55%), var(--glass-body);
     box-shadow: inset 2px 3px 10px var(--glass-hi-soft), inset -3px -4px 13px rgb(153 55 28 / .12), var(--glass-lift);
-    transition: var(--press-release), border-radius 340ms var(--liquid-spring), border-color 250ms var(--ease-out), background-color 250ms var(--ease-out);
+    transition: var(--press-release);
   }
   .glass.liquid-glass-card.liquid-optics { --glass-body: var(--glass-title); }
-  @media (hover: hover) and (pointer: fine) {
-    .glass.liquid-glass-card:hover { --r: 22px 30px 24px 28px; }
-  }
   .glass-accent { --glass-tint: var(--surface-glass-accent); }
   .glass-danger { --glass-tint: var(--surface-glass-danger); }
   .glass-thick { --glass-tint: var(--surface-solid-fallback); }
@@ -517,26 +515,24 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   :is(.btn:not(.glass), .nav-item, .segmented-item, .profile-option)::before {
     content: ""; position: absolute; inset: -1px; z-index: -1; pointer-events: none; border-radius: inherit;
     opacity: 0;
-    background: radial-gradient(173px circle at var(--mx, 50%) var(--my, 0%), rgb(255 191 137 / .19), rgb(255 150 86 / .055) 46%, transparent 76%);
+    background: radial-gradient(173px circle at 50% 0%, rgb(255 191 137 / .19), rgb(255 150 86 / .055) 46%, transparent 76%);
     transition: opacity 180ms var(--ease-out);
   }
   @media (hover: hover) and (pointer: fine) {
-    :is(.glass, .modal-panel, .popover, .tile)[data-glint]:where(:hover)::after,
-    :is(.btn:not(.glass), .nav-item, .segmented-item, .profile-option)[data-glint]:where(:hover)::before { opacity: 1; }
-    :is(.glass-hover, article.glass, .tile-hover, [data-tilt]):hover {
-      transform: perspective(1000px) translate3d(0,-4px,0);
-    }
-    :is(.glass-hover, article.glass, .tile-hover, [data-tilt])[data-rf-tilt]:hover {
-      transform: perspective(1000px) translate3d(0,-4px,0) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
-    }
+    :is(.glass, .modal-panel, .popover, .tile):where(:hover)::after,
+    :is(.btn:not(.glass), .nav-item, .segmented-item, .profile-option):where(:hover)::before { opacity: 1; }
   }
-  /* A brighter, cursor-local glint at the rim, not a second painted frame. */
+  /* Keep both highlights prepainted: only opacity changes under the pointer. */
   @supports (mask-composite: exclude) {
-    :is(.glass, .modal-panel)[data-glint]:where(:hover)::before {
+    :is(.glass, .modal-panel)::before {
       content: ""; position: absolute; inset: -1px; padding: 1px; border-radius: inherit; pointer-events: none;
-      background: radial-gradient(126px circle at var(--mx, 50%) var(--my, 0%), rgb(255 210 170 / .57), transparent 78%);
+      background: radial-gradient(126px circle at 50% 0%, rgb(255 210 170 / .57), transparent 78%);
       mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
       mask-composite: exclude;
+      opacity: 0; transition: opacity 180ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      :is(.glass, .modal-panel):where(:hover)::before { opacity: 1; }
     }
   }
 
@@ -563,7 +559,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     padding: clamp(8px, 2.6vw, 1rem); overflow: clip auto;
     background-color: rgb(11 9 8 / .38);
   }
-  .modal-backdrop:not([data-open]) { visibility: hidden; pointer-events: none; }
+  .modal-backdrop:not([data-open]) { pointer-events: none; }
   :root[data-theme="light"] .modal-backdrop { background-color: rgb(60 44 31 / .23); }
   .modal-panel {
     position: relative; isolation: isolate; width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--glass-rim);
@@ -580,7 +576,18 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   @starting-style {
     .rf-popup-motion[data-open] { opacity: .55; transform: translate3d(0, 6px, 0) scale(.985); }
   }
+  .rf-anchored-popup {
+    opacity: 0;
+    transform: translate(var(--popup-x, 0px), var(--popup-y, 8px)) scale(var(--popup-scale, .94));
+    transition: none;
+  }
+  .rf-anchored-popup[data-ready] {
+    transition: transform 360ms var(--ios-open), opacity 360ms var(--ios-open);
+  }
+  .rf-anchored-popup[data-shown] { opacity: 1; transform: none; }
+  .profile-backdrop:not([data-open]) { opacity: 0; }
   .profile-backdrop {
+    transition: opacity 360ms var(--ios-open);
     place-items: start end;
     padding: calc(var(--header-size) + 2px) var(--chrome-right) max(14px, env(safe-area-inset-bottom, 0px)) var(--chrome-left);
   }
@@ -668,10 +675,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     font-size: 14.5px;
     text-align: left;
     color: var(--color-ink-2);
-    transition:
-      var(--press-release),
-      background-color 0.25s var(--ease-out),
-      color 0.25s var(--ease-out);
+    transition: var(--press-release);
   }
 
   .option:hover,
@@ -693,9 +697,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
       inset 0 1px 3px rgb(0 0 0 / 0.28),
       inset 0 0 0 1px var(--border-subtle),
       0 1px 0 rgb(255 255 255 / 0.06);
-    transition:
-      background-color 0.5s var(--ease-out),
-      box-shadow 0.5s var(--ease-out);
+    transition: var(--ui-transition);
   }
 
   :root[data-theme="light"] :is(.well, .segmented, .tile, .chip-command) {
@@ -712,7 +714,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     box-shadow:
       inset 0 1px 0 var(--glass-hi-soft),
       inset 0 0 0 1px var(--border-subtle);
-    transition: var(--press-release), background-color .3s var(--ease-out);
+    transition: var(--press-release);
   }
 
   /* ---------------------------- Buttons ---------------------------- */
@@ -744,13 +746,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
       inset 0 -1px 0 rgb(255 255 255 / 0.08),
       inset 0 0 0 1px rgb(255 255 255 / 0.09),
       0 10px 26px -10px var(--glass-shadow);
-    transition:
-      var(--press-release),
-      border-radius 300ms var(--liquid-spring),
-      opacity 0.25s var(--ease-out),
-      background-color 0.4s var(--ease-out),
-      color 0.4s var(--ease-out),
-      box-shadow 0.4s var(--ease-out);
+    transition: var(--press-release), opacity 0.25s var(--ease-out);
   }
 
   .btn.liquid-glass-btn { border-radius: 28px 22px 30px 24px; }
@@ -762,10 +758,6 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   }
   .btn svg { width: 17px; height: 17px; flex: none; }
 
-  @media (hover: hover) and (pointer: fine) {
-    .btn:hover:not(:disabled, [aria-disabled="true"], .theme-toggle) { transform: translate3d(0,-3px,0) scale(1.02); border-radius: 20px 26px 21px 24px; }
-    .btn.liquid-glass-btn:hover:not(:disabled, [aria-disabled="true"]) { border-radius: 22px 30px 24px 28px; }
-  }
 
   .btn:disabled,
   .btn[aria-disabled="true"] {
@@ -855,9 +847,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     box-shadow:
       inset 0 0 0 1px var(--border-subtle),
       inset 0 1px 0 var(--glass-hi-soft);
-    transition:
-      background-color 0.4s var(--ease-out),
-      color 0.4s var(--ease-out);
+    transition: var(--ui-transition);
   }
 
   .chip svg {
@@ -952,9 +942,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     box-shadow:
       inset 0 1px 2px rgb(0 0 0 / 0.35),
       inset 0 0 0 1px var(--border-subtle);
-    transition:
-      transform 0.35s var(--spring),
-      background-color 0.35s var(--ease-out);
+    transition: transform 0.35s var(--spring);
   }
 
   .switch[aria-checked="true"] {
@@ -1047,7 +1035,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     background: linear-gradient(145deg, rgb(255 189 125 / .29), rgb(224 90 43 / .13));
     box-shadow: inset 0 1px 1.5px rgb(255 240 221 / .49), inset 0 -1px 2px rgb(140 45 25 / .25),
       inset 0 0 0 1px rgb(255 138 61 / .34);
-    transition: transform 350ms var(--liquid-spring), width 350ms var(--liquid-spring), height 350ms var(--liquid-spring), opacity 180ms var(--ease-out);
+    transition: transform 350ms var(--liquid-spring), opacity 180ms var(--ease-out);
   }
   .lens[data-positioned] { opacity: 1; }
   .segmented {
@@ -1061,7 +1049,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     align-items: center; justify-content: center; gap: .35rem; min-height: 38px;
     padding: .25rem .75rem; border-radius: 18px; font-size: 13.5px; font-weight: 650;
     white-space: nowrap; color: var(--ink-2);
-    transition: var(--press-release), color 250ms var(--ease-out), background-color 250ms var(--ease-out);
+    transition: var(--press-release);
   }
   .segmented-item:hover { background-color: rgb(255 138 61 / .08); }
   .segmented-item[aria-checked="true"] { color: var(--accent-hi); }
@@ -1107,9 +1095,6 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     .nav-brand-mark { width: 30px; height: 30px; }
     .profile-trigger { padding-inline: 8px; }
   }
-  @media (hover: hover) and (pointer: fine) {
-    :is(.nav-brand, .profile-trigger):hover { transform: translate3d(0,-3px,0); }
-  }
   .theme-toggle.glass {
     width: var(--capsule-size); padding: 0; color: var(--accent-hi);
     background: var(--glass-body), var(--bar-tint); box-shadow: var(--glass-lift);
@@ -1124,7 +1109,6 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   .nav-item svg { width: 23px; height: 23px; flex: none; }
   .nav-item:is(:hover, [aria-current="page"], [aria-expanded="true"]) { color: var(--ink); }
   .nav-item:is([aria-current="page"], [aria-expanded="true"]) svg { color: var(--accent-hi); }
-  @media (hover: hover) and (pointer: fine) { .nav-item:hover { transform: translate3d(0,-3px,0); } }
   .tabbar-bottom {
     position: fixed; right: var(--dock-right); bottom: var(--dock-bottom); left: var(--dock-left);
     z-index: 85; width: min(892px, calc(100% - var(--dock-left) - var(--dock-right)));
@@ -1136,7 +1120,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
     position: absolute; left: 0; top: 0; opacity: 0; border-radius: var(--radius-pill); pointer-events: none;
     background: rgba(255,138,61,.22);
     box-shadow: inset 0 1px 1.5px rgba(255,255,255,.55), inset 0 -1px 2px rgb(238 137 80 / .26), 0 7px 16px -10px var(--glass-shadow);
-    transition: transform .32s var(--ios-open), width .32s var(--ios-open), height .32s var(--ios-open), opacity .16s var(--ease-out);
+    transition: transform .32s var(--ios-open), opacity .16s var(--ease-out);
   }
   .dock-lens { transition: var(--ui-transition); }
   :is(.dock-lens,.guide-lens)[data-positioned] { opacity: 1; }
@@ -1198,10 +1182,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
       inset 0 1px 3px rgb(0 0 0 / 0.3),
       inset 0 0 0 1px var(--border-subtle),
       0 1px 0 rgb(255 255 255 / 0.06);
-    transition:
-      background-color 0.4s var(--ease-out),
-      color 0.4s var(--ease-out),
-      box-shadow 0.3s var(--ease-out);
+    transition: var(--ui-transition);
   }
 
   :root[data-theme="light"] .field:not([aria-invalid="true"]) {
@@ -1461,22 +1442,6 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   .spin-slow {
     animation: spin 1s linear infinite;
   }
-
-  .scan {
-    animation: scan 1.4s var(--ease-io) infinite;
-  }
-
-  /* 3D tilt cards (JS-driven custom props, spring easing) */
-  .tilt-3d {
-    transform:
-      perspective(1100px)
-      rotateX(var(--tilt-x, 0deg))
-      rotateY(var(--tilt-y, 0deg))
-      translate3d(0, var(--tilt-lift, 0px), 0);
-    transition: transform 0.5s var(--spring-soft);
-    transform-style: preserve-3d;
-  }
-
 }
 
 /* Theme-aware light shims: hard-coded white/black utilities adapt to porcelain */
@@ -1523,7 +1488,6 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
 
 @keyframes dot-pulse { 50% { opacity: .4; } }
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes scan { to { background-position: 200% 0; } }
 
 @media (max-width: 520px) {
   :root { --dock-height: 58px; --dock-rows: 2; }
@@ -1531,10 +1495,13 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
 /* Fixed chrome and the wallpaper are never inside this entry transition. */
 .rf-main, .rf-footer-wrap { position: relative; z-index: 1; background: transparent; }
 .rf-main { padding-top: var(--content-inset); }
-.rf-main .rf-page-content { opacity: 1; transform: none; transition: var(--ui-transition); }
-@starting-style {
-  .rf-main .rf-page-content { opacity: .7; transform: translate3d(0, 6px, 0); }
+.rf-page-enter { animation: pageEnter 300ms var(--ease-out); }
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(12px) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
+.rf-result-value { animation: valueChange 200ms var(--ease-out); }
+@keyframes valueChange { from { opacity: .55; } }
 .rf-enter-text { animation: text-arrive 220ms cubic-bezier(.22,1,.36,1) backwards; }
 @keyframes text-arrive {
   from { opacity: 0; transform: translateY(6px); }
@@ -1593,12 +1560,17 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
   font: 600 clamp(.68rem, 2.72vw, .83rem)/1.45 var(--font-mono); letter-spacing: 0; font-variant-ligatures: none;
 }
 .terminal-prompt { flex: none; width: 15px; }
+.terminal-type > span { display: block; }
 .terminal-type { display: block; flex: none; width: calc(var(--chars) * 1ch); overflow: hidden; }
 .terminal-lines :where([data-typing]) .terminal-type { animation: terminal-type var(--type-time) steps(var(--chars), end) both; }
-.terminal-caret { padding-left: 1px; color: var(--accent-hi); animation: terminal-blink 850ms steps(1, end) infinite; }
+.terminal-lines :where([data-typing]) .terminal-type > span { animation: terminal-text var(--type-time) steps(var(--chars), end) both; }
+.terminal-caret { padding-left: 1px; color: var(--accent-hi); animation: terminal-cursor var(--type-time) steps(var(--chars), end) both, terminal-blink 850ms steps(1, end) infinite; }
 .terminal-lines p { padding-left: 15px; margin-top: 1px; font-size: .77rem; line-height: 1.32; color: var(--ink-2); }
 .terminal-lines :where([data-typing]) p { animation: terminal-note 160ms var(--ease-out) var(--type-time) backwards; }
-@keyframes terminal-type { from { width: 0; } }
+/* Opposing transforms reveal one character at a time without animating layout. */
+@keyframes terminal-type { from { transform: translateX(-100%); } }
+@keyframes terminal-text { from { transform: translateX(100%); } }
+@keyframes terminal-cursor { from { transform: translateX(calc(-1ch * var(--chars))); } }
 @keyframes terminal-note { from { opacity: 0; } }
 @keyframes terminal-blink { 50% { opacity: 0; } }
 @keyframes terminal-shift { to { transform: translate3d(0,calc(-1 * var(--row-size)),0); } }
@@ -1614,7 +1586,7 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
 .guide-toc-link[aria-current], .guide-toc-link:hover { color: var(--ink); }
 .guide-lens {
   right: 0; border-radius: 19px;
-  transition: transform 340ms var(--liquid-spring), height 340ms var(--liquid-spring), opacity 180ms var(--ease-out);
+  transition: transform 340ms var(--liquid-spring), opacity 180ms var(--ease-out);
 }
 @media (max-width: 1023px) { .guide-contents { position: relative; top: auto; } }
 
@@ -1668,8 +1640,8 @@ html[data-rfx-paused] :is(.glass-blob, .ambient-glow, .terminal-type, .terminal-
 
 /* Portal-based select-only combobox. The popup never clips inside glass. */
 .liquid-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
-.liquid-select-trigger svg { width: 16px; height: 16px; flex: none; color: var(--accent-hi); transition: rotate 220ms var(--liquid-spring); }
-.liquid-select-trigger[data-open] svg { rotate: 180deg; }
+.liquid-select-trigger svg { width: 16px; height: 16px; flex: none; color: var(--accent-hi); transition: transform 220ms var(--liquid-spring); }
+.liquid-select-trigger[data-open] svg { --icon-base: 180deg; }
 .liquid-select-panel {
   position: fixed; z-index: 125; overflow: auto; overscroll-behavior: contain; padding: 6px;
   border-radius: 21px; -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%);
@@ -1703,32 +1675,51 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 :is(button, a[href], summary):active:not(:disabled, [aria-disabled="true"]) { --icon-awake: .55; }
 :is(.glass, .tile, button, a[href], summary) svg.lucide:not(.theme-icon, .spin-slow, [data-dock-glyph]),
 :is(.google-mark, .profile-trigger .profile-avatar, .theme-toggle-track) {
-  translate: 0 calc(-1.5px * var(--icon-awake, 0));
-  scale: calc(1 + .06 * var(--icon-awake, 0));
-  transition: translate var(--icon-time) var(--icon-spring), scale var(--icon-time) var(--icon-spring), rotate var(--icon-time) var(--icon-spring);
+  transform: translateY(calc(-1.5px * var(--icon-awake, 0)))
+    scale(calc(1 + var(--icon-grow, .06) * var(--icon-awake, 0)))
+    rotate(calc(var(--icon-base, 0deg) + var(--icon-turn, 0deg) * var(--icon-awake, 0)));
+  transition: transform var(--icon-time) var(--icon-spring);
 }
-.theme-toggle-track { rotate: calc(60deg * var(--icon-awake)); }
-.profile-trigger :is(svg.lucide, .profile-avatar) { rotate: calc(-8deg * var(--icon-awake)); }
-.nav-brand-mark svg { scale: calc(1 + .15 * var(--icon-awake)); rotate: calc(-6deg * var(--icon-awake)); }
-[data-dock-glyph], [data-dock-glyph] [data-part] { transition: var(--press-release); }
-[data-dock-glyph="home"] { transform: translateY(calc(-2px * var(--icon-awake))) scale(calc(1 + .08 * var(--icon-awake))); }
-[data-dock-glyph="book"] [data-part="left"] { transform-origin: 12px 18px; transform: rotate(calc(-13deg * var(--icon-awake))) translateX(calc(-.3px * var(--icon-awake))); }
-[data-dock-glyph="book"] [data-part="right"] { transform-origin: 12px 18px; transform: rotate(calc(13deg * var(--icon-awake))) translateX(calc(.3px * var(--icon-awake))); }
-[data-dock-glyph="gauge"] [data-part="needle"] { transform-origin: 12px 15.2px; transform: rotate(calc(28deg * var(--icon-awake))); }
-[data-dock-glyph="gear"] { transform: rotate(calc(45deg * var(--icon-awake))); }
-[data-dock-glyph="sliders"] [data-part="knob-a"] { transform: translateX(calc(4px * var(--icon-awake))); }
-[data-dock-glyph="sliders"] [data-part="knob-b"] { transform: translateX(calc(-4px * var(--icon-awake))); }
-[data-dock-glyph="sliders"] [data-part="knob-c"] { transform: translateX(calc(3px * var(--icon-awake))); }
-[data-dock-glyph="shield"] { transform: translateY(calc(-2px * var(--icon-awake))) scale(calc(1 + .1 * var(--icon-awake))); }
-[data-dock-glyph="chat"] { transform: translateY(calc(-2px * var(--icon-awake))) rotate(calc(-6deg * var(--icon-awake))); }
+.theme-toggle-track { --icon-turn: 60deg; }
+.profile-trigger :is(svg.lucide, .profile-avatar) { --icon-turn: -8deg; }
+.nav-brand-mark svg { --icon-grow: .15; --icon-turn: -6deg; }
+/* Hover/focus previews a glyph; a selected (or pressed) tab commits the larger turn. */
+.nav-item { --dock-on: 0; --needle-angle: 0deg; --gear-angle: 0deg; }
+.nav-item:is(:focus-visible, :active, [aria-current="page"], [aria-expanded="true"]) {
+  --dock-on: 1; --needle-angle: 35deg; --gear-angle: 60deg; --dot-motion: dockWave; --shield-motion: shieldPulse;
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover { --dock-on: 1; --needle-angle: 35deg; --gear-angle: 60deg; --dot-motion: dockWave; --shield-motion: shieldPulse; }
+}
+.nav-item:is(:active, [aria-current="page"]) { --needle-angle: 55deg; --gear-angle: 120deg; }
+[data-dock-glyph], [data-dock-glyph] [data-part] { transition: transform 300ms var(--ios-open); }
+[data-dock-glyph="home"] [data-part="roof"] { transform: translateY(calc(-2px * var(--dock-on))); }
+[data-dock-glyph="book"] [data-part="left"] { transform-origin: 12px 18px; transform: rotate(calc(-6deg * var(--dock-on))); }
+[data-dock-glyph="book"] [data-part="right"] { transform-origin: 12px 18px; transform: rotate(calc(6deg * var(--dock-on))); }
+[data-dock-glyph="gauge"] [data-part="needle"] { transform-origin: 12px 15.2px; transform: rotate(var(--needle-angle)); }
+[data-dock-glyph="gear"] { transform-origin: center; transform: rotate(var(--gear-angle)); }
+[data-dock-glyph="sliders"] [data-part="knob-a"] { transform: translateX(calc(5px * var(--dock-on))); }
+[data-dock-glyph="sliders"] [data-part="knob-b"] { transform: translateX(calc(-6px * var(--dock-on))); }
+[data-dock-glyph="sliders"] [data-part="knob-c"] { transform: translateX(calc(4px * var(--dock-on))); }
+[data-dock-glyph="shield"] { animation: var(--shield-motion, none) 400ms var(--ios-open); }
+[data-dock-glyph="chat"] [data-part="dot"] { animation: var(--dot-motion, none) 960ms ease-in-out infinite; }
+[data-dock-glyph="chat"] circle:nth-of-type(2) { animation-delay: 110ms; }
+[data-dock-glyph="chat"] circle:nth-of-type(3) { animation-delay: 220ms; }
+@keyframes shieldPulse { 45% { transform: translateY(-2px) scale(1.06); } }
+@keyframes dockWave { 0%, 45%, 100% { transform: translateY(0); } 22% { transform: translateY(-2.5px); } }
 
-/* Press only the innermost control/surface, not the card around a button or field. */
-:is(button, summary, input:is([type="button"], [type="submit"], [type="reset"]), [role="button"], [role="tab"], a:is(.glass, .btn, .nav-item, .guide-toc-link)):active:not(:disabled, [aria-disabled="true"]),
-:is(.glass, .tile):active:not(button, a, .tabbar-bottom, .rf-popup-motion):not(:has(:is(button, a, input, label, select, textarea, summary, .glass, .tile):active)) {
-  transform: scale(.96);
-  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+/* Lift the control, not the panel that contains the control. Never move fixed chrome. */
+@media (hover: hover) and (pointer: fine) {
+  :where(button, .btn, .nav-item, .nav-brand, summary, [role="button"], [role="tab"], .guide-toc-link):hover:not(:active, :disabled, [aria-disabled="true"]),
+  :where(.glass, .tile, article.well, [data-rf-card]):not(nav, .nav-pill, .rf-anchored-popup):hover:not(:active):not(:has(:is(button, a, input, label, select, textarea, summary, .glass, .tile):hover)) {
+    transform: translateY(-2px);
+  }
 }
-.btn-primary:active:not(:disabled, [aria-disabled="true"]) { transform: translate3d(0,1px,0) scale(.97); }
+:is(button, summary, input:is([type="button"], [type="submit"], [type="reset"]), [role="button"], [role="tab"], a:is(.glass, .btn, .nav-item, .guide-toc-link)):active:not(:disabled, [aria-disabled="true"]),
+:is(.glass, .tile, article.well, [data-rf-card]):active:not(button, a, .tabbar-bottom, .rf-popup-motion, .rf-anchored-popup):not(:has(:is(button, a, input, label, select, textarea, summary, .glass, .tile):active)) {
+  transform: scale(.97);
+  transition: transform 140ms var(--ease-out);
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :is(.glass, .modal-panel, .toast-card, .popover) { background-color: var(--surface-solid-fallback); }
 }
@@ -1736,15 +1727,14 @@ html[data-lite] :is(.glass,.modal-panel,.btn,.toast-card,.popover,.profile-optio
   -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 html[data-lite] :is(.nav-capsules .nav-pill, .tabbar-bottom, .profile-panel) { background-color: var(--surface-solid-fallback); }
-html:is([data-motion="reduced"],[data-lite]) :is(.glass-blob, .ambient-glow, .terminal-lines, .terminal-type, .terminal-lines p, .rf-page-content, [data-dock-glyph]) { animation: none; }
+html:is([data-motion="reduced"],[data-lite]) :is(.glass-blob, .ambient-glow, .terminal-lines, .terminal-type, .terminal-type > span, .terminal-lines p, .rf-result-value, .rf-page-enter, [data-dock-glyph], [data-dock-glyph] [data-part]) { animation: none; }
 html:is([data-motion="reduced"],[data-lite]) .terminal-caret { display: none; }
 html:is([data-motion="reduced"],[data-lite],[data-rfx-paused]) .wallpaper-parallax { transform: none; transition: none; }
 html:is([data-motion="reduced"],[data-lite]) :is(.glass-blob, .ambient-glow) { will-change: auto; }
-html:is([data-motion="reduced"],[data-lite]) .glass.liquid-glass-card:hover { --r: var(--liquid-base-radius); }
-html:is([data-motion="reduced"],[data-lite]) :is(.rf-main .rf-page-content, .rf-popup-motion, .dock-lens, .nav-item, [data-dock-glyph], [data-dock-glyph] [data-part], .liquid-select-panel) { transition: none; }
-html:is([data-motion="reduced"],[data-lite]) :is(.glass-hover, article.glass, .tile-hover, [data-tilt]):hover:not(:active) { transform: translateZ(0); }
-html:is([data-motion="reduced"],[data-lite],[data-rfx-paused]) [data-glint]::before,
-html:is([data-motion="reduced"],[data-lite],[data-rfx-paused]) [data-glint]::after { opacity: 0; }
+html:is([data-motion="reduced"],[data-lite]) :is(.rf-anchored-popup, .profile-backdrop, .rf-popup-motion, .dock-lens, .nav-item, [data-dock-glyph], [data-dock-glyph] [data-part], .liquid-select-panel) { transition: none; }
+html:is([data-motion="reduced"],[data-lite]) :is(.glass-hover, article.glass, .tile-hover):hover:not(:active) { transform: translateZ(0); }
+html:is([data-motion="reduced"],[data-lite],[data-rfx-paused]) :is(.glass, .btn, .nav-item, .segmented-item, .profile-option, .modal-panel)::before,
+html:is([data-motion="reduced"],[data-lite],[data-rfx-paused]) :is(.glass, .modal-panel, .popover, .tile)::after { opacity: 0; }
 html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-motion="reduced"] *::after {
   animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0ms !important; animation-delay: 0ms !important; scroll-behavior: auto !important;
 }

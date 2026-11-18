@@ -1,16 +1,20 @@
-import { Home, MessageCircle, Settings, ShieldAlert } from "lucide-react";
+import { MessageCircle, Settings, ShieldAlert } from "lucide-react";
 
 export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield" | "chat";
 
 /** Move the page, needle, or knob itself instead of rotating the whole glyph. */
 export default function DockIcon({ glyph }: { glyph: DockGlyph }) {
   const attrs = { "data-dock-glyph": glyph, "aria-hidden": true } as const;
-  if (glyph === "home") return <Home {...attrs} />;
   if (glyph === "gear") return <Settings {...attrs} />;
   if (glyph === "shield") return <ShieldAlert {...attrs} />;
-  if (glyph === "chat") return <MessageCircle {...attrs} />;
+  if (glyph === "chat") return <MessageCircle {...attrs}>
+    {[8, 12, 16].map((x) => <circle key={x} data-part="dot" cx={x} cy="12" r="1.15" fill="currentColor" stroke="none" />)}
+  </MessageCircle>;
   return <svg {...attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {glyph === "book" ? <>
+    {glyph === "home" ? <>
+      <path data-part="roof" d="m2.5 10.5 8.2-7.1a2 2 0 0 1 2.6 0l8.2 7.1" />
+      <path d="M4.5 10v9.5a1.5 1.5 0 0 0 1.5 1.5h4v-7h4v7h4a1.5 1.5 0 0 0 1.5-1.5V10" />
+    </> : glyph === "book" ? <>
       <path data-part="left" d="M11.95 6.3C9.5 4.1 6 4 3.2 5.15v13.6c3-.91 6.5-.74 8.75 1.26Z" />
       <path data-part="right" d="M12.05 6.3c2.45-2.2 5.95-2.3 8.75-1.15v13.6c-3-.91-6.5-.74-8.75 1.26Z" />
     </> : glyph === "gauge" ? <>
