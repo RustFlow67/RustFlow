@@ -1,15 +1,9 @@
-import type { Metadata } from "next";
 import BenchmarkTool from "@/components/BenchmarkTool";
 import { getGraphicsProfile } from "@/lib/graphics-profiles";
 import { presetBuildInput } from "@/lib/addons/build-tools";
 import { HARDWARE_PRESETS } from "@/lib/models/preset";
 import { getResolutionSize, type BuildResolution } from "@/lib/models/build-resolution";
 
-export const metadata: Metadata = {
-  title: "Сборка",
-  description:
-    "Взвешенная оценка сборки под Rust: однопоток CPU, частота и задержка RAM, случайное чтение SSD, тир GPU и запас VRAM, оценка FPS для MODDED 2X и OFFICIAL HIGH POP и персональные твики.",
-};
 
 export default async function BenchmarkPage({
   searchParams,
