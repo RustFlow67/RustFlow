@@ -1,9 +1,13 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger } from "./fx/usePopupMotion";
+
 import { FileJson, RotateCcw, Search, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import LiquidSelect from "@/components/LiquidSelect";
+import { useLiquidLens } from "./fx/useLiquidLens";
 import Segmented from "@/components/Segmented";
 import TweakCard from "@/components/TweakCard";
 import { Button, EmptyState, Input, Skeleton } from "@/components/ui";
@@ -43,15 +47,15 @@ const HASH_ALIAS: Record<string, TweakGroupId> = {
 };
 
 const GAIN_OPTIONS = [
-  { value: "all", label: "Прирост: любой" },
-  { value: "mid", label: "Ощутимый (≥ 5%)" },
-  { value: "high", label: "Высокий (≥ 12%)" },
+  { value: "all", label: "Влияние на FPS: любое" },
+  { value: "mid", label: "Средний потенциал и выше" },
+  { value: "high", label: "Высокий потенциал" },
   { value: "applied", label: "Только применённые" },
 ] as const;
 
 const SORT_OPTIONS = [
   { value: "recommended", label: "Сортировка: по порядку" },
-  { value: "gain-desc", label: "По приросту FPS (убыв.)" },
+  { value: "gain-desc", label: "По потенциалу среднего FPS" },
   { value: "safe-first", label: "Сначала безопасные" },
   { value: "my-delta", label: "По моему замеру Δ%" },
   { value: "title", label: "По названию (А–Я)" },
@@ -67,6 +71,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
   const [evidence, setEvidence] = useState<EvidenceFilter>("all");
   const [gain, setGain] = useState<GainFilter>("all");
   const [sort, setSort] = useState<SortId>("recommended");
+  const opener = usePopupTrigger();
   const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
@@ -91,8 +96,8 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
       if (group !== "all" && t.group !== group) return false;
       if (!risks.has(t.riskLevel)) return false;
       if (evidence !== "all" && t.evidence !== evidence) return false;
-      if (gain === "mid" && t.gainPct < 5) return false;
-      if (gain === "high" && t.gainPct < 12) return false;
+      if (gain === "mid" && t.impact.fps < 2) return false;
+      if (gain === "high" && t.impact.fps < 3) return false;
       if (gain === "applied" && !userMap[t.slug]?.applied) return false;
       if (tokens.length > 0) {
         const hay = `${t.title} ${t.tagline} ${t.what} ${t.fileName} ${t.gainLabel}`.toLowerCase();
@@ -103,18 +108,18 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
 
     const sorted = [...list];
     if (sort === "gain-desc") {
-      sorted.sort((a, b) => b.gainPct - a.gainPct || a.order - b.order);
+      sorted.sort((a, b) => b.impact.fps - a.impact.fps || a.order - b.order);
     } else if (sort === "safe-first") {
       sorted.sort(
         (a, b) =>
           TWEAK_RISK_META[a.riskLevel].order - TWEAK_RISK_META[b.riskLevel].order ||
-          b.gainPct - a.gainPct,
+          b.impact.fps - a.impact.fps,
       );
     } else if (sort === "my-delta") {
       sorted.sort((a, b) => {
         const da = calcUserTweakDelta(userMap[a.slug])?.pct ?? -9999;
         const db = calcUserTweakDelta(userMap[b.slug])?.pct ?? -9999;
-        return db - da || b.gainPct - a.gainPct;
+        return db - da || b.impact.fps - a.impact.fps;
       });
     } else if (sort === "title") {
       sorted.sort((a, b) => a.title.localeCompare(b.title, "ru"));
@@ -131,6 +136,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
     );
   }
 
+  const { list: riskRail, lens: riskLens } = useLiquidLens(RISK_LEVELS.findIndex(level => risks.has(level)), RISK_LEVELS.length, { continuous: true });
   function toggleRisk(level: TweakRiskLevel) {
     setRisks((prev) => {
       const next = new Set(prev);
@@ -164,6 +170,9 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
       label: `${EVIDENCE_META.measured.label} · ${tweaks.filter((t) => t.evidence === "measured").length}`,
     },
     {
+      value:"conditional", label:EVIDENCE_META.conditional.label,
+    },
+    {
       value: "myth",
       label: `${EVIDENCE_META.myth.label} · ${tweaks.filter((t) => t.evidence === "myth").length}`,
     },
@@ -179,7 +188,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
   return (
     <div>
       {/* Единственная blur-панель страницы — панель поиска и фильтров */}
-      <section
+      <LiquidGlass as="section"
         className="glass glass-blur relative z-10 mb-6 space-y-4 p-4 sm:p-5"
         aria-label="Поиск, фильтры и сортировка твиков"
       >
@@ -221,12 +230,13 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
 
         {/* Риск + Верификация (Замерено / Миф) */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Уровень риска">
+          <div ref={riskRail} className="liquid-filter-list flex flex-wrap items-center gap-2" role="group" aria-label="Уровень риска">
+            <LiquidGlass as="span" shape="pill" ref={riskLens} className="lens liquid-lens" aria-hidden="true" />
             {RISK_LEVELS.map((level) => {
               const active = risks.has(level);
               return (
                 <button
-                  key={level}
+                  key={level} data-liquid-item=""
                   type="button"
                   aria-pressed={active}
                   title={TWEAK_RISK_META[level].hint}
@@ -246,10 +256,10 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
             options={evidenceTabs}
             value={evidence}
             onChange={setEvidence}
-            ariaLabel="Фильтр по проверке (замерено или миф)"
+            ariaLabel="Статус подтверждения эффекта"
           />
         </div>
-      </section>
+      </LiquidGlass>
 
       {/* Сводная строка + действия */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-1 text-sm">
@@ -275,7 +285,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
             JSON
           </Button>
           {hydrated && appliedCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirmReset(true)}>
+            <Button variant="ghost" size="sm" onClick={e => {opener.capture(e.currentTarget); setConfirmReset(true);}}>
               <RotateCcw aria-hidden="true" />
               Сбросить отметки
             </Button>
@@ -303,7 +313,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
           hint={
             gain === "applied"
               ? "Вы ещё не отметили ни одного твика переключателем «Применено». Сбросьте фильтр и начните с безопасных твиков RAM/SSD и настроек Rust."
-              : "Попробуйте другой поисковый запрос, включите все уровни риска или переключите статус «Замерено / Миф»."
+              : "Попробуйте другой поисковый запрос, включите все уровни риска или переключите статус подтверждения эффекта."
           }
           action={
             <Button variant="primary" onClick={resetFilters}>
@@ -313,7 +323,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
         />
       )}
 
-      <ConfirmDialog
+      <ConfirmDialog {...opener.origin}
         open={confirmReset}
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {

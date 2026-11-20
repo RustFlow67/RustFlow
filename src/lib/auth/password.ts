@@ -52,7 +52,7 @@ export async function passwordSignIn(request: NextRequest, mode: PasswordMode) {
   limit(request, mode);
   active++;
   try {
-    const columns = { id: accounts.id, name: accounts.displayName, avatar: accounts.avatarUrl, build: accounts.activeBuild };
+    const columns = { id: accounts.id, registeredAt: accounts.createdAt, name: accounts.displayName, avatar: accounts.avatarUrl, build: accounts.activeBuild };
     let user;
     if (mode === "register") {
       const passwordHash = await hashPassword(password, 11);
@@ -67,9 +67,9 @@ export async function passwordSignIn(request: NextRequest, mode: PasswordMode) {
         : await verifyPassword(password, isBcryptDigest(digest) ? digest : DUMMY_HASH);
       if (!valid || !record || !digest || (!legacy && !isBcryptDigest(digest))) throw new AuthError(401, "Неверный логин или пароль.");
       if (legacy) await db.update(accounts).set({ passwordHash: await hashPassword(password, 11) }).where(eq(accounts.id, record.id));
-      user = { id: record.id, name: record.name, avatar: record.avatar, build: record.build };
+      user = { id: record.id, registeredAt: record.registeredAt, name: record.name, avatar: record.avatar, build: record.build };
     }
-    return await issueSession(request, authJson(await sessionView({ ...user, kind: "cloud" }, origin), mode === "register" ? 201 : 200), origin, user.id);
+    return await issueSession(request, authJson(await sessionView({ ...user, registeredAt: user.registeredAt.toISOString(), kind: "cloud" }, origin), mode === "register" ? 201 : 200), origin, user.id);
   } finally {
     active--;
   }

@@ -1,7 +1,8 @@
 "use client";
 
 import { Magnet, Sparkles, Waves } from "lucide-react";
-import ScrollReveal, { RevealItem } from "@/components/fx/ScrollReveal";
+import LiquidGlass from "../LiquidGlass";
+import ScrollReveal from "@/components/fx/ScrollReveal";
 import VariableWeight from "@/components/fx/VariableWeight";
 
 const CARDS = [
@@ -40,17 +41,16 @@ export default function MotionShowcase() {
       </ScrollReveal>
       <ScrollReveal stagger className="mt-6 grid gap-4 md:grid-cols-3">
         {CARDS.map((card) => (
-          <RevealItem
+          <LiquidGlass data-reveal=""
             key={card.title}
             className="glass glass-hover relative p-5"
           >
-            <span className="rf-edge-glint" aria-hidden="true" />
             <card.icon className="h-5 w-5 text-accent-hi" aria-hidden="true" />
             <h3 className="mt-3 text-base font-bold text-ink">
               <VariableWeight>{card.title}</VariableWeight>
             </h3>
             <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">{card.text}</p>
-          </RevealItem>
+          </LiquidGlass>
         ))}
       </ScrollReveal>
       <div className="mt-4">

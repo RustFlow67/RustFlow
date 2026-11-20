@@ -1,3 +1,4 @@
+import LiquidGlass from "@/components/LiquidGlass";
 import type { CSSProperties, ReactNode } from "react";
 
 export const delay = (n: number) => ({ "--d": n }) as CSSProperties;
@@ -15,7 +16,7 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <header className="glass liquid-optics liquid-glass-card section-title mb-6 px-4 py-5 sm:mb-8 sm:px-7 sm:py-6">
+    <LiquidGlass as="header" className="glass liquid-optics liquid-glass-card section-title mb-6 px-4 py-5 sm:mb-8 sm:px-7 sm:py-6">
       <div className="rf-page-content">
         <p className="eyebrow">{eyebrow}</p>
         <h1 className="headline mt-2.5 text-[clamp(1.35rem,4.5vw,2.7rem)]">
@@ -24,7 +25,7 @@ export function PageHeader({
         {text && <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-2 sm:text-base">{text}</p>}
       </div>
       {children}
-    </header>
+    </LiquidGlass>
   );
 }
 

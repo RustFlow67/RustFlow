@@ -1,3 +1,5 @@
+import { defaultMemoryKit, requiredMemory } from "@/lib/models/build-settings";
+import { readPlaySettings } from "@/lib/models/play-settings";
 import { toRecentItem } from "@/lib/benchmark-view";
 import { RAM_OPTIONS, type StorageId, type TierId } from "@/lib/hardware";
 import { evaluateBuild10, type BuildInput, type BreakdownKey } from "@/lib/models/build";
@@ -19,16 +21,22 @@ export async function POST(request: Request) {
   }
 
   // The score is always recomputed on the server from hardware ids.
+  const play = readPlaySettings(key => payload?.[key]);
+  if (!play) return Response.json({ error: "Некорректные параметры игры" }, { status: 400 });
+  const kit = defaultMemoryKit(requiredMemory(String(payload?.cpuId)) ?? (payload?.memoryType === "DDR5" ? "DDR5" : "DDR4"));
   const input = {
+    ...play, graphicsProfile: payload?.graphicsProfile as BuildInput["graphicsProfile"],
     cpuId: String(payload?.cpuId ?? ""),
     gpuId: String(payload?.gpuId ?? ""),
     ram: Number(payload?.ram),
     storage: String(payload?.storage ?? "") as StorageId,
+    nvmeGen: payload?.nvmeGen as BuildInput["nvmeGen"], diskCache: payload?.diskCache as BuildInput["diskCache"], diskFill: payload?.diskFill as BuildInput["diskFill"],
     resolution: String(payload?.resolution ?? "") as BuildInput["resolution"],
     customResolution: payload?.customResolution as BuildInput["customResolution"],
-    ramMhz: Number(payload?.ramMhz ?? 3600),
-    ramCl: Number(payload?.ramCl ?? 16),
+    ramMhz: (payload?.ramMhz ?? kit.ramMhz) as number,
+    ramCl: (payload?.ramCl ?? kit.ramCl) as number,
     memoryType: payload?.memoryType as BuildInput["memoryType"],
+    windowsVersion: payload?.windowsVersion as BuildInput["windowsVersion"],
     biosProfile: payload?.biosProfile as BuildInput["biosProfile"],
     monitorHz: payload?.monitorHz as BuildInput["monitorHz"],
     connection: payload?.connection as BuildInput["connection"],

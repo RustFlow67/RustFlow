@@ -1,4 +1,5 @@
 import "server-only";
+import { readSavedBuild } from "@/lib/models/saved-build";
 
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, lte } from "drizzle-orm";
@@ -86,14 +87,15 @@ function sessionHash(request: NextRequest, origin: URL) {
 export async function accountFor(request: NextRequest, origin: URL | null) {
   const token = origin && sessionHash(request, origin);
   if (!token) return null;
-  const [row] = await getDb().select({ id: accounts.id, name: accounts.displayName, avatar: accounts.avatarUrl, build: accounts.activeBuild })
+  const [row] = await getDb().select({ id: accounts.id, registeredAt: accounts.createdAt, name: accounts.displayName, avatar: accounts.avatarUrl, build: accounts.activeBuild })
     .from(accountSessions).innerJoin(accounts, eq(accountSessions.accountId, accounts.id))
     .where(and(eq(accountSessions.tokenHash, token), gt(accountSessions.expiresAt, new Date()))).limit(1);
-  return row ? { ...row, kind: "cloud" as const } : null;
+  return row ? { ...row, registeredAt: row.registeredAt.toISOString(), kind: "cloud" as const } : null;
 }
 
 export async function sessionView(user: PlayerAccount | null, origin: URL | null): Promise<SessionView> {
-  return { user, admin: await isAdminSession(), googleEnabled: Boolean(googleSettings(origin)), secureOrigin: Boolean(origin) };
+  const passwordEnabled = Boolean(origin && process.env.DATABASE_URL?.trim());
+  return { user:user ? {...user,build:readSavedBuild(user.build)} : null, admin: await isAdminSession(), passwordEnabled, googleEnabled: passwordEnabled && Boolean(googleSettings(origin)), secureOrigin: Boolean(origin) };
 }
 
 export function putCookie(response: NextResponse, name: string, value: string, origin: URL, maxAge: number, partitioned = false) {

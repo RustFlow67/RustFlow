@@ -54,7 +54,7 @@ export default function VoteButton({
       <Heart
         key={burst}
         className={liked ? "pop-in" : ""}
-        style={liked ? { fill: "#ff5c6c", color: "#ff5c6c" } : undefined}
+        style={liked ? { fill: "var(--accent)", color: "var(--accent)" } : undefined}
         aria-hidden="true"
       />
       <span>{liked ? "Помогло" : "Мне помогло"}</span>

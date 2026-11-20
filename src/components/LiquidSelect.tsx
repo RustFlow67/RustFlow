@@ -1,7 +1,9 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLiquidLens } from "./fx/useLiquidLens";
 import { createPortal } from "react-dom";
 
 export interface LiquidOption<T extends string | number> { value: T; label: string }
@@ -17,6 +19,7 @@ export default function LiquidSelect<T extends string | number>({ label, hideLab
   const typed = useRef({ text: "", time: 0 });
   const selected = options.findIndex((o) => o.value === value);
   const cursor = Math.max(0, Math.min(options.length - 1, active));
+  const { lens } = useLiquidLens(cursor, options.length, { enabled: open, hostRef: panel, continuous: true });
   const show = () => { setActive(Math.max(0, selected)); setOpen(true); };
   const close = () => setOpen(false);
 
@@ -116,13 +119,14 @@ export default function LiquidSelect<T extends string | number>({ label, hideLab
       <span className="truncate">{options[selected]?.label ?? String(value)}</span><ChevronDown aria-hidden="true" />
     </button>
     {hint && <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-3">{hint}</p>}
-    {open && createPortal(<div ref={panel} id={`${id}-list`} role="listbox" aria-labelledby={`${id}-label`}
+    {open && createPortal(<LiquidGlass ref={panel} id={`${id}-list`} role="listbox" aria-labelledby={`${id}-label`}
       className="popover liquid-select-panel" data-open="">
-      {options.map((option, i) => <div key={option.value} id={`${id}-${i}`} role="option" aria-selected={value === option.value}
+      <LiquidGlass as="span" shape="pill" className="lens liquid-lens" ref={lens} aria-hidden="true" />
+      {options.map((option, i) => <div key={option.value} id={`${id}-${i}`} role="option" data-liquid-item="" aria-selected={value === option.value}
         className="option liquid-select-option" data-active={cursor === i ? "" : undefined}
         onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option)}>
         <span>{option.label}</span>{value === option.value && <Check aria-hidden="true" className="h-4 w-4 flex-none text-accent-hi" />}
       </div>)}
-    </div>, document.body)}
+    </LiquidGlass>, document.body)}
   </div>;
 }

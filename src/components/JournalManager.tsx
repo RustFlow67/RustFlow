@@ -1,5 +1,8 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger } from "./fx/usePopupMotion";
+
 import {
   Activity,
   Check,
@@ -17,6 +20,7 @@ import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import LiquidSelect from "@/components/LiquidSelect";
 import Segmented from "@/components/Segmented";
 import { Badge, Button, EmptyState, Input, Skeleton } from "@/components/ui";
+import BoundedNumber from "./ui/BoundedNumber";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -78,6 +82,7 @@ export default function JournalManager({
   const { toast } = useToast();
 
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("all");
+  const opener = usePopupTrigger();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -142,14 +147,16 @@ export default function JournalManager({
     storage.setProtocolChecks(Array.from(next));
   }
 
-  function openCreate() {
+  function openCreate(from: HTMLButtonElement) {
+    opener.capture(from);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setFormError(null);
     setModalOpen(true);
   }
 
-  function openEdit(log: BenchmarkLog) {
+  function openEdit(log: BenchmarkLog, from: HTMLButtonElement) {
+    opener.capture(from);
     setEditingId(log.id);
     setForm({
       title: log.title,
@@ -202,8 +209,8 @@ export default function JournalManager({
     if (
       !Number.isFinite(bAvg) ||
       !Number.isFinite(aAvg) ||
-      bAvg <= 0 ||
-      aAvg <= 0 ||
+      bAvg < 1 ||
+      aAvg < 1 ||
       bAvg > 1500 ||
       aAvg > 1500
     ) {
@@ -213,8 +220,8 @@ export default function JournalManager({
     if (
       !Number.isFinite(bLow) ||
       !Number.isFinite(aLow) ||
-      bLow <= 0 ||
-      aLow <= 0 ||
+      bLow < 1 ||
+      aLow < 1 ||
       bLow > 1500 ||
       aLow > 1500
     ) {
@@ -271,10 +278,10 @@ export default function JournalManager({
   return (
     <div className="space-y-6">
       {/* Сводка + действия (единственная blur-поверхность страницы) */}
-      <section className="glass glass-blur p-5 sm:p-7" aria-label="Сводка журнала замеров">
+      <LiquidGlass as="section" className="glass glass-blur p-5 sm:p-7" aria-label="Сводка журнала замеров">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button variant="primary" size="lg" onClick={openCreate}>
+            <Button variant="primary" size="lg" onClick={e => openCreate(e.currentTarget)}>
               <Plus aria-hidden="true" />
               Добавить замер до/после
             </Button>
@@ -297,7 +304,7 @@ export default function JournalManager({
               </Button>
             )}
             {hydrated && logs.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setConfirmClearAll(true)}>
+              <Button variant="ghost" size="sm" onClick={e => {opener.capture(e.currentTarget); setConfirmClearAll(true);}}>
                 <RotateCcw aria-hidden="true" />
                 Очистить журнал
               </Button>
@@ -309,11 +316,11 @@ export default function JournalManager({
           <Skeleton className="mt-5 h-24 w-full" />
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="tile p-4">
+            <LiquidGlass className="tile p-4">
               <span className="text-[12px] text-ink-3">Записей в журнале</span>
               <p className="mt-1 text-2xl font-extrabold tabular-nums">{summary.count}</p>
-            </div>
-            <div className="tile p-4">
+            </LiquidGlass>
+            <LiquidGlass className="tile p-4">
               <span className="text-[12px] text-ink-3">Средняя Δ Avg FPS</span>
               <p
                 className={`mt-1 text-2xl font-extrabold tabular-nums ${
@@ -322,8 +329,8 @@ export default function JournalManager({
               >
                 {summary.avgGain > 0 ? `+${summary.avgGain}%` : `${summary.avgGain}%`}
               </p>
-            </div>
-            <div className="tile p-4">
+            </LiquidGlass>
+            <LiquidGlass className="tile p-4">
               <span className="text-[12px] text-ink-3">Средняя Δ 1% low</span>
               <p
                 className={`mt-1 text-2xl font-extrabold tabular-nums ${
@@ -332,19 +339,19 @@ export default function JournalManager({
               >
                 {summary.low1Gain > 0 ? `+${summary.low1Gain}%` : `${summary.low1Gain}%`}
               </p>
-            </div>
-            <div className="tile p-4">
+            </LiquidGlass>
+            <LiquidGlass className="tile p-4">
               <span className="text-[12px] text-ink-3">Лучший результат</span>
               <p className="mt-1 truncate text-sm font-bold text-ink" title={summary.bestTitle}>
                 {summary.bestTitle}
               </p>
-            </div>
+            </LiquidGlass>
           </div>
         )}
-      </section>
+      </LiquidGlass>
 
       {/* Протокол честного замера */}
-      <section className="glass p-5 sm:p-7" aria-label="Протокол тестирования">
+      <LiquidGlass as="section" className="glass p-5 sm:p-7" aria-label="Протокол тестирования">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
@@ -364,7 +371,7 @@ export default function JournalManager({
           {TEST_PROTOCOL_STEPS.map((step) => {
             const done = checkedSteps.has(step.id);
             return (
-              <li key={step.id} className="tile flex items-start gap-3 p-3.5">
+              <LiquidGlass as="li" key={step.id} className="tile flex items-start gap-3 p-3.5">
                 <button
                   type="button"
                   role="checkbox"
@@ -379,11 +386,11 @@ export default function JournalManager({
                   <p className="text-[13.5px] font-bold leading-snug text-ink">{step.title}</p>
                   <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{step.detail}</p>
                 </div>
-              </li>
+              </LiquidGlass>
             );
           })}
         </ul>
-      </section>
+      </LiquidGlass>
 
       {/* Фильтр и таблица замеров до/после */}
       <section className="space-y-4" aria-label="Таблица замеров до и после">
@@ -420,7 +427,7 @@ export default function JournalManager({
             action={
               logs.length === 0 ? (
                 <>
-                  <Button variant="primary" onClick={openCreate}>
+                  <Button variant="primary" onClick={e => openCreate(e.currentTarget)}>
                     <Plus aria-hidden="true" />
                     Добавить первый замер
                   </Button>
@@ -444,7 +451,7 @@ export default function JournalManager({
         ) : (
           <>
             {/* Таблица для широких экранов */}
-            <div className="glass hidden overflow-x-auto p-4 lg:block">
+            <LiquidGlass className="glass hidden overflow-x-auto p-4 lg:block">
               <table className="w-full border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b border-white/12 text-[12px] uppercase tracking-wider text-ink-3">
@@ -525,7 +532,7 @@ export default function JournalManager({
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => openEdit(log)}
+                              onClick={e => openEdit(log, e.currentTarget)}
                               aria-label={`Редактировать «${log.title}»`}
                               className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-ink-2 hover:bg-white/20 hover:text-white"
                             >
@@ -533,7 +540,7 @@ export default function JournalManager({
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteTarget(log)}
+                              onClick={e => {opener.capture(e.currentTarget); setDeleteTarget(log);}}
                               aria-label={`Удалить «${log.title}»`}
                               className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-ink-2 hover:bg-danger/25 hover:text-danger"
                             >
@@ -546,7 +553,7 @@ export default function JournalManager({
                   })}
                 </tbody>
               </table>
-            </div>
+            </LiquidGlass>
 
             {/* Мобильные карточки (320px+) */}
             <div className="grid gap-3 lg:hidden">
@@ -555,7 +562,7 @@ export default function JournalManager({
                 const lowFmt = fmtPct(delta.low1Pct);
                 const ftFmt = fmtPct(delta.frametimePct, true);
                 return (
-                  <article key={log.id} className="glass p-4">
+                  <LiquidGlass as="article" key={log.id} className="glass p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
                         {delta.verdict === "positive" ? (
@@ -574,7 +581,7 @@ export default function JournalManager({
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => openEdit(log)}
+                          onClick={e => openEdit(log, e.currentTarget)}
                           aria-label={`Редактировать «${log.title}»`}
                           className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-ink-2"
                         >
@@ -582,7 +589,7 @@ export default function JournalManager({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDeleteTarget(log)}
+                          onClick={e => {opener.capture(e.currentTarget); setDeleteTarget(log);}}
                           aria-label={`Удалить «${log.title}»`}
                           className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-ink-2"
                         >
@@ -597,33 +604,33 @@ export default function JournalManager({
                     </p>
 
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[12px] tabular-nums">
-                      <div className="well p-2.5">
+                      <LiquidGlass className="well p-2.5">
                         <span className="block text-[11px] text-ink-3">Avg FPS</span>
                         <strong className="block text-ink">
                           {log.beforeAvg}→{log.afterAvg}
                         </strong>
                         <span className={`font-bold ${avgFmt.color}`}>{avgFmt.text}</span>
-                      </div>
-                      <div className="well p-2.5">
+                      </LiquidGlass>
+                      <LiquidGlass className="well p-2.5">
                         <span className="block text-[11px] text-ink-3">1% low</span>
                         <strong className="block text-ink">
                           {log.beforeLow1}→{log.afterLow1}
                         </strong>
                         <span className={`font-bold ${lowFmt.color}`}>{lowFmt.text}</span>
-                      </div>
-                      <div className="well p-2.5">
+                      </LiquidGlass>
+                      <LiquidGlass className="well p-2.5">
                         <span className="block text-[11px] text-ink-3">Кадр, мс</span>
                         <strong className="block text-ink">
                           {log.beforeFrametime}→{log.afterFrametime}
                         </strong>
                         <span className={`font-bold ${ftFmt.color}`}>{ftFmt.text}</span>
-                      </div>
+                      </LiquidGlass>
                     </div>
 
                     {log.notes && (
                       <p className="mt-2.5 text-[12.5px] leading-relaxed text-ink-2">{log.notes}</p>
                     )}
-                  </article>
+                  </LiquidGlass>
                 );
               })}
             </div>
@@ -632,7 +639,7 @@ export default function JournalManager({
       </section>
 
       {/* Модалка добавления/редактирования замера */}
-      <Modal
+      <Modal {...opener.origin}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingId ? "Редактировать замер" : "Новый замер до / после"}
@@ -678,65 +685,59 @@ export default function JournalManager({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
+            <BoundedNumber
               label="Avg FPS до"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={1}
               max={1500}
               placeholder="90"
               value={form.beforeAvg}
-              onChange={(e) => setForm((p) => ({ ...p, beforeAvg: e.target.value }))}
+              onValue={v => setForm(p => ({...p, beforeAvg:v}))}
             />
-            <Input
+            <BoundedNumber
               label="Avg FPS после"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={1}
               max={1500}
               placeholder="104"
               value={form.afterAvg}
-              onChange={(e) => setForm((p) => ({ ...p, afterAvg: e.target.value }))}
+              onValue={v => setForm(p => ({...p, afterAvg:v}))}
             />
-            <Input
+            <BoundedNumber
               label="1% low до"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={1}
               max={1500}
               placeholder="58"
               value={form.beforeLow1}
-              onChange={(e) => setForm((p) => ({ ...p, beforeLow1: e.target.value }))}
+              onValue={v => setForm(p => ({...p, beforeLow1:v}))}
             />
-            <Input
+            <BoundedNumber
               label="1% low после"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={1}
               max={1500}
               placeholder="72"
               value={form.afterLow1}
-              onChange={(e) => setForm((p) => ({ ...p, afterLow1: e.target.value }))}
+              onValue={v => setForm(p => ({...p, afterLow1:v}))}
             />
-            <Input
+            <BoundedNumber
               label="Frametime до (мс)"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={0.5}
-              max={500}
+              max={1000}
               placeholder="11.1"
               value={form.beforeFrametime}
-              onChange={(e) => setForm((p) => ({ ...p, beforeFrametime: e.target.value }))}
+              onValue={v => setForm(p => ({...p, beforeFrametime:v}))}
             />
-            <Input
+            <BoundedNumber
               label="Frametime после (мс)"
-              type="number"
-              step="0.1"
+              decimals={1} optional
               min={0.5}
-              max={500}
+              max={1000}
               placeholder="9.6"
               value={form.afterFrametime}
-              onChange={(e) => setForm((p) => ({ ...p, afterFrametime: e.target.value }))}
+              onValue={v => setForm(p => ({...p, afterFrametime:v}))}
             />
           </div>
 
@@ -787,7 +788,7 @@ export default function JournalManager({
         </form>
       </Modal>
 
-      <ConfirmDialog
+      <ConfirmDialog {...opener.origin}
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
@@ -818,7 +819,7 @@ export default function JournalManager({
         confirmLabel="Удалить"
       />
 
-      <ConfirmDialog
+      <ConfirmDialog {...opener.origin}
         open={confirmClearAll}
         onClose={() => setConfirmClearAll(false)}
         onConfirm={() => {

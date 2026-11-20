@@ -27,10 +27,8 @@ export interface Tweak {
   group?: TweakGroupId;
   /** Трёхуровневый риск: safe (безопасно), caution (осторожно), harmful (вредно — анти-твик). */
   riskLevel?: TweakRiskLevel;
-  /** Верификация эффекта: measured (замерено) или myth (миф/плацебо). */
+  /** Верификация эффекта: measured (замерено), conditional (по ситуации), myth (миф/плацебо). */
   evidence?: EvidenceStatus;
-  /** Типовой ожидаемый прирост (%) для фильтрации и сортировки (0 для плацебо, <0 для вредных). */
-  gainPct?: number;
   /** Короткая честная подпись ожидаемого эффекта. */
   gainLabel?: string;
   /** Исключить из мастера полной настройки и ZIP-пакета (для мифов и вредных анти-твиков). */
@@ -44,6 +42,7 @@ export interface Tweak {
   restart: Restart;
   time: string;
   os: string;
+  windowsVersion?:import("../models/build-settings").WindowsVersion;
   featured?: boolean;
   /** What exactly the file changes. */
   what: string;
@@ -61,6 +60,7 @@ export interface Tweak {
 
 /** Client-safe summary without full script bodies. */
 export interface TweakLite {
+  windowsVersion?:Tweak["windowsVersion"];
   slug: string;
   title: string;
   tagline: string;
@@ -69,7 +69,6 @@ export interface TweakLite {
   group: TweakGroupId;
   riskLevel: TweakRiskLevel;
   evidence: EvidenceStatus;
-  gainPct: number;
   gainLabel: string;
   excludeFromPack: boolean;
   phase: number;

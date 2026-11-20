@@ -16,7 +16,7 @@ export type TweakGroupId =
   | "launch-options";
 
 export type TweakRiskLevel = "safe" | "caution" | "harmful";
-export type EvidenceStatus = "measured" | "myth";
+export type EvidenceStatus = "measured" | "conditional" | "myth";
 
 export interface TweakGroupMeta {
   id: TweakGroupId;
@@ -74,7 +74,7 @@ export const TWEAK_RISK_META: Record<
 > = {
   safe: {
     label: "Безопасно",
-    hint: "Штатная настройка, обратима в один шаг, без риска для ОС и EAC",
+    hint: "Штатная настройка или проверка. Не требует вмешательства в клиент игры; сохраните исходное состояние.",
     order: 1,
   },
   caution: {
@@ -90,6 +90,7 @@ export const TWEAK_RISK_META: Record<
 };
 
 export const EVIDENCE_META: Record<EvidenceStatus, { label: string; hint: string }> = {
+  conditional: {label:"По ситуации",hint:"Штатная настройка или проверка. Величина эффекта на этом ПК не измерена."},
   measured: {
     label: "Замерено",
     hint: "Подтверждено документацией движка/ОС и повторяемым эффектом на FPS, 1% low или стабильности",

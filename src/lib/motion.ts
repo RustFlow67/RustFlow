@@ -128,5 +128,5 @@ export function useMotion(): {
 
 export function getMotionReduced(): boolean {
   if (typeof document === "undefined") return false;
-  return document.documentElement.getAttribute("data-motion") === "reduced";
+  return document.documentElement.matches('[data-motion="reduced"], [data-engine-motion="instant"]');
 }

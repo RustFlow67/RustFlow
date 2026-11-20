@@ -1,9 +1,9 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import {
   ArrowRight,
-  Check,
-  Copy,
+  Download,
   Cpu,
   Eye,
   GitCompareArrows,
@@ -15,7 +15,9 @@ import {
   X,
 } from "lucide-react";
 import Link from "@/components/RouteLink";
-import { useMemo, useState } from "react";
+import { startTransition, useEffect,useLayoutEffect,useRef, useMemo, useState } from "react";
+import AdaptiveActions from "./AdaptiveActions";
+import { IS_DESKTOP_APP } from "@/lib/config";
 import CodeBlock from "@/components/CodeBlock";
 import { PresetRadar } from "@/components/addons/BuildRadar";
 import LiquidSelect from "@/components/LiquidSelect";
@@ -25,6 +27,7 @@ import GraphicsPicker from "@/components/GraphicsPicker";
 import { FavoriteButton, useFavorites } from "@/components/addons/Favorites";
 import Segmented from "@/components/Segmented";
 import { Badge, Button, EmptyState, Input, Meter } from "@/components/ui";
+import { usePopupState } from "@/components/fx/usePopupMotion";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { getCpu, getGpu } from "@/lib/hardware";
@@ -37,7 +40,13 @@ import {
   type PresetResolution,
   type PresetTier,
 } from "@/lib/models/preset";
-import { formatBuildResolution, isResolutionDimension, MAX_PRESET_HEIGHT, type BuildResolution } from "@/lib/models/build-resolution";
+import { consumePreset } from "./fx/presetHandoff";
+import BoundedNumber from "./ui/BoundedNumber";
+import { usePopularity } from "./catalog/usePopularity";
+import { hardwareDistance, matches, tokens } from "@/lib/catalog/ranking";
+import { useSystemPlan } from "./catalog/SystemPlan";
+import { gcBudget } from "@/lib/models/play-settings";
+import { formatBuildResolution, type BuildResolution } from "@/lib/models/build-resolution";
 import { presetCalculatorHref, projectPreset, type PresetView } from "@/lib/models/preset-projection";
 import { getGraphicsProfile, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import { tweakerHref } from "@/lib/tweaker";
@@ -47,11 +56,13 @@ import { plural } from "@/lib/tweaks/meta";
 type ResFilter = "all" | PresetResolution | "1440x1080" | "custom";
 type TierFilter = "all" | PresetTier;
 type MinFpsFilter = "all" | "90" | "115";
-type PresetSort = "featured" | "modded-desc" | "official-desc" | "low1-desc" | "price-asc" | "score-desc";
+type PresetSort = "popular" | "match" | "favorite" | "modded-desc" | "official-desc" | "low1-desc" | "price-asc" | "score-desc";
 
 const SORT_OPTIONS = [
-  { value: "featured", label: "Сортировка: эталонные" },
-  { value: "modded-desc", label: `${PRESET_SERVER.modded}: FPS ↓` },
+  { value: "popular", label: "Сначала популярные у игроков" },
+  { value: "match", label: "Лучше всего под мою сборку" },
+  { value: "favorite", label: "Сначала избранные" },
+  { value: "modded-desc", label: "По максимальному FPS" },
   { value: "official-desc", label: `${PRESET_SERVER.official}: FPS ↓` },
   { value: "low1-desc", label: `${PRESET_SERVER.official}: 1% low ↓` },
   { value: "score-desc", label: "По запасу железа" },
@@ -81,82 +92,106 @@ const classLabel = (p: HardwarePreset) => p.tier === "flagship" ? "Флагма�
 const byPrice = (a: HardwarePreset, b: HardwarePreset) =>
   PRESET_TIER_ORDER.indexOf(a.tier) - PRESET_TIER_ORDER.indexOf(b.tier) || a.priceOrder - b.priceOrder;
 
+// Web: download the displayed cfg without clipboard permission or a Blob URL.
+function CfgDownload({preset}:{preset:PresetView}) {
+  return <AdaptiveActions action={{kind:"cfg",cfg:preset.cfgText}}><a className="btn btn-sm btn-primary" download="client.cfg" href={`data:text/plain;charset=utf-8,${encodeURIComponent(preset.cfgText + "\n")}`}>
+    <Download aria-hidden="true"/> Скачать client.cfg</a></AdaptiveActions>;
+}
+
 const SERVERS = [
   { label: PRESET_SERVER.modded, range: "fpsModded", low: "low1Modded", ms: "frametimeModdedMs", tone: "text-accent-hi" },
   { label: PRESET_SERVER.official, range: "fpsOfficial", low: "low1Official", ms: "frametimeOfficialMs", tone: "text-accent-hi" },
 ] as const;
 
+/** Keep complete HTML on direct visits. On dock navigation, mount the first
+ * cards immediately and fill the offscreen controls in interruptible batches. */
+function useCardBudget(total: number, hydrated: boolean) {
+  const [count, setCount] = useState(() => !hydrated || window.location.hash ? total : 4);
+  useEffect(() => {
+    if (count >= total) return;
+    const more = () => startTransition(() => setCount(n => Math.min(total, n + 12)));
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(more, { timeout: 160 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(more, 16);
+    return () => window.clearTimeout(id);
+  }, [count, total]);
+  return count;
+}
+
 export default function PresetsExplorer({
   presets,
-  tweakTitles,
+  tweakTitles, initial,
 }: {
-  presets: HardwarePreset[];
+  initial?:string; presets: HardwarePreset[];
   tweakTitles: Record<string, string>;
 }) {
   const { state, hydrated } = useRustFlowStore();
+  const cardBudget = useCardBudget(presets.length, hydrated);
   const { toast } = useToast();
 
   const [query, setQuery] = useState("");
-  const [res, setRes] = useState<ResFilter>("all");
+  const [res, setRes] = useState<ResFilter>(presets.find(p=>p.id===initial)?.resolution??"all");
   const [tier, setTier] = useState<TierFilter>("all");
   const [minFps, setMinFps] = useState<MinFpsFilter>("all");
-  const [sort, setSort] = useState<PresetSort>("featured");
+  const [sort, setSort] = useState<PresetSort>("popular");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const { preset: favorites } = useFavorites();
 
   const [globalMode, setGlobalMode] = useState<GraphicsProfileId>("competitive");
   const [cardModes, setCardModes] = useState<Record<string, GraphicsProfileId>>({});
-  const [dimensions, setDimensions] = useState({ width: "1728", height: "1080" });
-  const width = Number(dimensions.width);
-  const height = Number(dimensions.height);
-  const validWidth = isResolutionDimension(width);
-  const validHeight = isResolutionDimension(height, "height") && height <= MAX_PRESET_HEIGHT;
-  // Keep the results stable while the user types an incomplete size.
-  const [lastValid, setLastValid] = useState(DEFAULT_SIZE);
-  const activeWidth = validWidth && validHeight ? width : lastValid.width;
-  const activeHeight = validWidth && validHeight ? height : lastValid.height;
-  function setSize(value: typeof dimensions) {
-    setDimensions(value);
-    const width = Number(value.width);
-    const height = Number(value.height);
-    if (isResolutionDimension(width) && isResolutionDimension(height, "height") && height <= MAX_PRESET_HEIGHT) setLastValid({ width, height });
-  }
-  const target = useMemo<BuildResolution | undefined>(() => res === "1440x1080" ? { resolution: res }
-    : res === "custom" ? { resolution: res, customResolution: { width: activeWidth, height: activeHeight } } : { resolution: res === "all" ? "1080p" : res },
-  [res, activeWidth, activeHeight]);
+  const [dimensions, setDimensions] = useState(DEFAULT_SIZE);
+  const {width,height}=dimensions;
+  const target = useMemo<BuildResolution>(()=>res==="custom"?{resolution:res,customResolution:dimensions}:{resolution:res==="all"?"1080p":res},[res,dimensions]);
   const views = useMemo(() => presets.map((p) => projectPreset(p, cardModes[p.id] ?? globalMode, target)), [presets, target, cardModes, globalMode]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [includeMyBuild, setIncludeMyBuild] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const detailPreset = views.find((p) => p.id === detailId);
+  const comparison = usePopupState<true>();
+  const detail=usePopupState<string>();
+  const {show:showDetail}=detail;
+  const {counts,record,source}=usePopularity("presets", sort==="popular");
+  const opened=useRef(false);
+  useLayoutEffect(()=>{
+    if(!initial||opened.current)return;
+    const p=presets.find(p=>p.id===initial);if(!p)return;
+    const tile=document.getElementById(`preset-${p.slug}`), tap=consumePreset(p.slug);
+    if(!tile)return;opened.current=true;
+    const button=tile.querySelector<HTMLElement>("button[aria-haspopup='dialog']")??tile;
+    showDetail(p.id,button,tap?{node:button,rect:tap.rect,radius:tap.radius}:undefined);
+    if(tap)record(p.slug);
+  },[initial,presets,showDetail,record]);
+  useEffect(()=>{const open=(e:Event)=>{const {slug,from}=(e as CustomEvent).detail??{};const p=presets.find(p=>p.slug===slug);if(p){setRes(p.resolution);showDetail(p.id,from instanceof HTMLElement?from:null);record(p.slug);}};
+    window.addEventListener("rustflow:matched-preset",open);return ()=>window.removeEventListener("rustflow:matched-preset",open);},[presets,showDetail,record]);
+  const detailPreset = views.find((p) => p.id === detail.value);
 
   const myBuild =
     hydrated && state
       ? (state.builds.find((b) => b.id === state.activeBuildId) ?? state.builds[0] ?? null)
       : null;
 
+  const {plan}=useSystemPlan();
+  const rig=plan?.input;
   const filtered = useMemo(() => {
-    const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const words=tokens(query);
     const list = views.filter((p) => {
       if (res !== "all" && res !== "custom" && res !== "1440x1080" && p.resolution !== res) return false;
       if (onlyFavorites && !favorites.includes(p.slug)) return false;
       if (tier !== "all" && p.tier !== tier) return false;
       if (minFps === "90" && p.fpsOfficial[1] < 90) return false;
       if (minFps === "115" && p.fpsOfficial[0] < 115) return false;
-      if (tokens.length > 0) {
+      if (words.length > 0) {
         const hay = `${p.title} ${p.cpu} ${p.gpu} ${p.ram} ${p.storage} ${p.resolution} ${p.badge} ${PRESET_TIER_LABEL[p.tier]}`.toLowerCase();
-        if (!tokens.every((t) => hay.includes(t))) return false;
+        if (!matches(words,hay)) return false;
       }
       return true;
     });
 
-    if (sort === "featured") {
-      // Keep the original references at the top, with the featured card first.
-      list.sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)));
+    if (sort === "popular" || sort === "favorite" || sort === "match") {
+      list.sort((a,b)=>(sort === "match" && rig ? hardwareDistance(a,rig)-hardwareDistance(b,rig) : sort === "favorite" ? Number(favorites.includes(b.slug))-Number(favorites.includes(a.slug)) : 0)
+        || (counts[b.slug]??0)-(counts[a.slug]??0) || Number(Boolean(b.featured))-Number(Boolean(a.featured)));
     } else if (sort === "modded-desc") {
-      list.sort((a, b) => midFps(b.fpsModded) - midFps(a.fpsModded));
+      list.sort((a, b) => b.fpsModded[1] - a.fpsModded[1] || midFps(b.fpsModded) - midFps(a.fpsModded));
     } else if (sort === "official-desc") {
       list.sort((a, b) => midFps(b.fpsOfficial) - midFps(a.fpsOfficial));
     } else if (sort === "low1-desc") {
@@ -167,7 +202,7 @@ export default function PresetsExplorer({
       list.sort(byPrice);
     }
     return list;
-  }, [views, query, res, tier, minFps, sort, onlyFavorites, favorites]);
+  }, [views, query, res, tier, minFps, sort, onlyFavorites, favorites, counts, rig]);
 
   const comparedPresets = useMemo(
     () =>
@@ -177,33 +212,12 @@ export default function PresetsExplorer({
     [compareIds, views],
   );
 
-  async function copyPresetCfg(p: PresetView) {
-    try {
-      // Copy valid cfg lines only; the test conditions and Steam options are in Details.
-      await navigator.clipboard.writeText(p.cfgText);
-      setCopiedId(p.id);
-      setTimeout(() => setCopiedId((curr) => (curr === p.id ? null : curr)), 1800);
-      toast({
-        title: "Настройки скопированы",
-        description: "При закрытом Rust сохраните копию cfg\\client.cfg, затем замените только эти строки.",
-        tone: "success",
-      });
-    } catch {
-      setDetailId(p.id);
-      toast({
-        title: "Открыто окно настроек",
-        description: "Скопируйте блок client.cfg вручную.",
-        tone: "info",
-      });
-    }
-  }
-
-  function openComparison(id?: string) {
+  function openComparison(from: HTMLElement, id?: string) {
     if (id && !compareIds.includes(id)) {
       if (compareIds.length >= 3) toast({ title: "Максимум 3 пресета", description: "Заменили первый выбранный пресет.", tone: "info" });
       setCompareIds([...compareIds.slice(-2), id]);
     }
-    setCompareOpen(true);
+    comparison.show(true, from);
   }
 
   function resetFilters() {
@@ -211,7 +225,7 @@ export default function PresetsExplorer({
     setRes("all");
     setTier("all");
     setMinFps("all");
-    setSort("featured");
+    setSort("popular");
     setOnlyFavorites(false);
   }
 
@@ -220,11 +234,11 @@ export default function PresetsExplorer({
   return (
     <div className="space-y-6">
       {/* Панель поиска, фильтров и сортировки (1 blur-слой страницы) */}
-      <section
+      <LiquidGlass as="section"
         className="glass glass-blur relative space-y-4 p-4 sm:p-5"
-        aria-label="Поиск, фильтры и сортировка пресетов"
+        id="preset-library" aria-label="Поиск, фильтры и сортировка пресетов"
       >
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_175px_215px_230px]">
+        <div className="preset-filters">
           <Input
             label="Поиск по пресетам железа"
             hideLabel
@@ -235,6 +249,7 @@ export default function PresetsExplorer({
             onClear={() => setQuery("")}
             icon={<Search className="h-4 w-4" />}
           />
+          <LiquidSelect label="Сортировка пресетов" hideLabel options={SORT_OPTIONS} value={sort} onChange={setSort}/>
           <LiquidSelect
             label="Класс сборки"
             hideLabel
@@ -249,15 +264,9 @@ export default function PresetsExplorer({
             value={minFps}
             onChange={setMinFps}
           />
-          <LiquidSelect
-            label="Сортировка пресетов"
-            hideLabel
-            options={SORT_OPTIONS}
-            value={sort}
-            onChange={setSort}
-          />
         </div>
 
+        <p className="catalog-hint">{sort === "popular" ? source : sort === "match" ? rig ? `Сходство с «${rig.name}»: производительность CPU/GPU и объём RAM.` : "Сначала сохраните сборку в калькуляторе. Пока показываем популярные." : sort === "modded-desc" ? "По верхней границе оценки среднего FPS на MODDED 2X при выбранных настройках." : null}</p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Segmented
             ariaLabel="Фильтр по разрешению"
@@ -278,31 +287,28 @@ export default function PresetsExplorer({
             {plural(filtered.length, ["пресет", "пресета", "пресетов"])}
           </p>
         </div>
-        <OriginDisclosure open={res === "custom"}><div className="well grid gap-3 p-3 sm:grid-cols-[minmax(0,300px)_1fr] sm:items-center">
+        <OriginDisclosure open={res === "custom"}><LiquidGlass className="well grid gap-3 p-3 sm:grid-cols-[minmax(0,300px)_1fr] sm:items-center">
           <div className="grid grid-cols-2 gap-2">
-            <Input label="Ширина, px" type="number" min={800} max={7680} step={1} value={dimensions.width}
-              onChange={(e) => setSize({ ...dimensions, width: e.target.value })} error={!validWidth ? "800–7680 px" : undefined} />
-            <Input label="Высота, px" type="number" min={600} max={4320} step={1} value={dimensions.height}
-              onChange={(e) => setSize({ ...dimensions, height: e.target.value })} error={!validHeight ? "600–4320 px" : undefined} />
+            <BoundedNumber label="Ширина, px" min={800} max={7680} value={width} onValue={width=>setDimensions({...dimensions,width:Number(width)})}/>
+            <BoundedNumber label="Высота, px" min={600} max={4320} value={height} onValue={height=>setDimensions({...dimensions,height:Number(height)})}/>
           </div>
           <Segmented value={`${width}x${height}`} onChange={(value) => {
-            const [width, height] = value.split("x"); setSize({ width, height });
+            const [width, height] = value.split("x"); setDimensions({ width:Number(width), height:Number(height) });
           }} options={QUICK_SIZES.map(([w,h]) => ({ value: `${w}x${h}`, label: `${w}×${h}` }))} ariaLabel="Быстрые разрешения" />
-        </div></OriginDisclosure>
+        </LiquidGlass></OriginDisclosure>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="rf-page-content"><h2 className="font-bold">Графика всех сборок</h2><p className="text-xs text-ink-3">{getGraphicsProfile(globalMode)?.short} · режим можно изменить у отдельной карточки.</p></div>
           <div className="flex flex-wrap items-center gap-2">
             {(globalMode !== "competitive" || Object.keys(cardModes).length > 0) && <button type="button" className="link text-xs" onClick={() => { setGlobalMode("competitive"); setCardModes({}); }}>Сбросить графику</button>}
             {(favorites.length > 0 || onlyFavorites) && <Button variant="ghost" size="sm" aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(!onlyFavorites)}>Избранные</Button>}
-            <Button variant="secondary" size="sm" onClick={() => openComparison()} aria-haspopup="dialog"><GitCompareArrows aria-hidden="true" /> Сравнение · {compareIds.length}</Button>
+            <Button variant="secondary" size="sm" onClick={e => openComparison(e.currentTarget)} aria-haspopup="dialog"><GitCompareArrows aria-hidden="true" /> Сравнение · {compareIds.length}</Button>
           </div>
         </div>
         <GraphicsPicker value={globalMode} onChange={(value) => { setGlobalMode(value); setCardModes({}); }} label="Графика всех пресетов" />
         <p className="text-xs leading-relaxed text-ink-3">
-          По умолчанию расчёт для 1080p и «Комбат». Фильтр 1440p/4K показывает сборки этого класса и пересчитывает нагрузку. FPS и 1% low рассчитаны по той же модели, что и в «Сборке».
-          Время кадра ≈ 1000 / середина диапазона FPS. Это оценки, без генерации кадров.
+          Начните с 1080p и «Комбат» или выберите своё разрешение. 1% low показывает скорость в самых медленных кадрах: сравнивайте его, если в бою заметны рывки. Все показатели — расчёт, а не замер.
         </p>
-      </section>
+      </LiquidGlass>
 
       {/* Карточки пресетов */}
       {filtered.length === 0 ? (
@@ -323,11 +329,13 @@ export default function PresetsExplorer({
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {filtered.map((p) => {
+          {filtered.map((p, index) => {
+            if (index >= cardBudget && p.id !== initial) return <LiquidGlass as="article" key={p.id} id={`preset-${p.slug}`} aria-busy="true" className="glass preset-card preset-preview p-4 sm:p-6">
+              <h2 className="text-xl font-bold">{p.title}</h2><p className="mt-3 text-sm text-ink-2">{p.cpu} · {p.gpu}</p>
+            </LiquidGlass>;
             const inCompare = compareIds.includes(p.id);
-            const isCopied = copiedId === p.id;
             return (
-              <article
+              <LiquidGlass as="article"
                 key={p.id}
                 id={`preset-${p.slug}`}
                 style={{ scrollMarginTop: "7rem" }}
@@ -338,6 +346,7 @@ export default function PresetsExplorer({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone="accent">{classLabel(p)}</Badge>
+                    {plan?.best.slug===p.slug && <Badge tone="safe">Рекомендовано для вашей системы</Badge>}
                     <Badge>{p.resolutionLabel}</Badge>
                     <Badge tone="accent">{p.purpose}</Badge>
                   </div>
@@ -374,7 +383,7 @@ export default function PresetsExplorer({
 
                 <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
                   {SERVERS.map((server) => (
-                    <div className="well p-3.5" key={server.label}>
+                    <LiquidGlass className="well p-3.5" key={server.label}>
                       <div className="flex items-baseline justify-between gap-2">
                         <span className={`text-[11.5px] font-bold tracking-wider ${server.tone}`}>
                           {server.label}
@@ -389,14 +398,12 @@ export default function PresetsExplorer({
                       </p>
                       <Meter
                         percent={Math.min(100, (p[server.range][1] / 240) * 100)}
-                        fromColor="#e05a2b"
-                        toColor="#ffc38b"
                         className="mt-2"
                       />
                       <p className="mt-1.5 text-[12px] text-ink-2">
                         1% low: <strong className="font-display tabular-nums text-accent-hi"><AnimatedNumber value={p[server.low]} /></strong> FPS
                       </p>
-                    </div>
+                    </LiquidGlass>
                   ))}
                 </div>
 
@@ -418,27 +425,19 @@ export default function PresetsExplorer({
 
                 {/* Действия */}
                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => copyPresetCfg(p)}
-                    className="flex-1"
-                  >
-                    {isCopied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                    {isCopied ? "Скопировано!" : "Скопировать настройки"}
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setDetailId(p.id)} aria-haspopup="dialog">
+                  <CfgDownload preset={p}/>
+                  <Button island variant="secondary" size="sm" onClick={e => {detail.show(p.id,e.currentTarget);record(p.slug);}} aria-haspopup="dialog">
                     <Eye aria-hidden="true" />
                     Детали
                   </Button>
                   <Button
                     variant={inCompare ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => openComparison(p.id)}
+                    onClick={e => openComparison(e.currentTarget, p.id)}
                     aria-haspopup="dialog"
                     style={
                       inCompare
-                        ? { boxShadow: "inset 0 0 0 1.5px rgb(255 160 98 / 0.7)" }
+                        ? { boxShadow: "var(--lg-bevel), 0 0 8px -4px var(--theme-glow)" }
                         : undefined
                     }
                   >
@@ -449,13 +448,13 @@ export default function PresetsExplorer({
                     {inCompare ? "В сравнении" : "Сравнить"}
                   </Button>
                 </div>
-              </article>
+              </LiquidGlass>
             );
           })}
         </div>
       )}
 
-      <Modal open={compareOpen} onClose={() => setCompareOpen(false)} title="Сравнение конфигураций"
+      <Modal open={comparison.isOpen} closing={comparison.closing} onClose={comparison.dismiss} onExited={comparison.finish} source={comparison.source} returnFocus={comparison.opener} title="Сравнение конфигураций"
         description="До трёх пресетов. Таблица учитывает выбранную графику и разрешение." maxWidth="max-w-5xl">
         <div className="mb-4 flex flex-wrap justify-end gap-2">
           {myBuild && <Button size="sm" variant="secondary" aria-pressed={includeMyBuild} onClick={() => setIncludeMyBuild(!includeMyBuild)}>{includeMyBuild ? "Скрыть мою сборку" : "+ Моя сборка"}</Button>}
@@ -569,7 +568,7 @@ export default function PresetsExplorer({
                   <td className="py-2.5 pr-4 text-ink-3">Графика / gc.buffer</td>
                   {includeMyBuild && myBuild && (
                     <td className="py-2.5 px-3 text-ink-2">
-                      gc.buffer {myBuild.input.ramGb >= 32 ? 4096 : myBuild.input.ramGb >= 16 ? 2048 : 1024}
+                      gc.buffer {gcBudget(myBuild.input.ramGb, myBuild.input).mb}
                     </td>
                   )}
                   {comparedPresets.map((p) => (
@@ -582,66 +581,68 @@ export default function PresetsExplorer({
             </table>
           </div>
           <div className="mt-4"><PresetRadar presets={comparedPresets} myBuild={includeMyBuild ? myBuild : null} /></div>
-        </> : <p className="well p-4 text-sm text-ink-2">Нажмите «Сравнить» на карточке нужной сборки. Затем добавьте ещё одну или две.</p>}
+        </> : <LiquidGlass as="p" className="well p-4 text-sm text-ink-2">Нажмите «Сравнить» на карточке нужной сборки. Затем добавьте ещё одну или две.</LiquidGlass>}
       </Modal>
 
       {/* Модальное окно полных настроек пресета */}
       <Modal
-        open={Boolean(detailPreset)}
-        onClose={() => setDetailId(null)}
+        open={detail.isOpen} closing={detail.closing} source={detail.source} returnFocus={detail.opener}
+        onClose={detail.dismiss} onExited={detail.finish}
         title={detailPreset ? `${detailPreset.title} (${detailPreset.resolutionLabel})` : ""}
         description={detailPreset ? `${PRESET_FPS_SOURCE_LABEL[detailPreset.fpsSource]}. ${detailPreset.testScene}` : undefined}
         maxWidth="max-w-2xl"
       >
         {detailPreset && (
           <div className="space-y-4">
+            {plan?.best.slug===detailPreset.slug && <Badge tone="safe">Рекомендовано для вашей системы</Badge>}
             <div className="grid gap-2 sm:grid-cols-2">
-              {SERVERS.map((server) => <div className="well p-3" key={server.label}>
+              {SERVERS.map((server) => <LiquidGlass className="well p-3" key={server.label}>
                 <p className="text-xs font-bold text-accent-hi">{server.label}</p>
                 <strong className="text-accent-hi"><span className="font-display tabular-nums text-accent-hi"><AnimatedNumber value={detailPreset[server.range][0]} />–<AnimatedNumber value={detailPreset[server.range][1]} /></span> FPS</strong>
                 <p className="text-xs text-ink-2">1% low <span className="font-display tabular-nums text-accent-hi"><AnimatedNumber value={detailPreset[server.low]} /></span> FPS · <AnimatedNumber value={detailPreset[server.ms]} digits={1} /> мс</p>
-              </div>)}
+              </LiquidGlass>)}
             </div>
             <div className="grid grid-cols-2 gap-2.5 text-[13px] sm:grid-cols-3">
-              <div className="tile p-3">
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">Graphics Quality</span>
                 <strong className="text-ink">{detailPreset.settings.graphicsQuality}</strong>
-              </div>
-              <div className="tile p-3">
+              </LiquidGlass>
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">Draw / Тени</span>
                 <strong className="text-ink">
                   {detailPreset.settings.drawDistance} · Quality {detailPreset.settings.shadowQuality}
                 </strong>
-              </div>
-              <div className="tile p-3">
+              </LiquidGlass>
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">Shader / Water</span>
                 <strong className="text-ink">
                   {detailPreset.settings.shaderLevel} · Water {detailPreset.settings.waterQuality}
                 </strong>
-              </div>
-              <div className="tile p-3">
+              </LiquidGlass>
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">Апскейлер / AA</span>
                 <strong className="text-ink">{detailPreset.settings.upscaler}</strong>
-              </div>
-              <div className="tile p-3">
+              </LiquidGlass>
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">Низкая задержка</span>
                 <strong className="text-ink">{detailPreset.settings.reflexOrAntiLag}</strong>
-              </div>
-              <div className="tile p-3">
+              </LiquidGlass>
+              <LiquidGlass className="tile p-3">
                 <span className="block text-[11.5px] text-ink-3">gc.buffer / Gibs</span>
                 <strong className="text-ink">
                   {detailPreset.settings.gcBuffer} · Gibs {detailPreset.settings.maxGibs}
                 </strong>
-              </div>
+              </LiquidGlass>
             </div>
 
-            <p className="well p-3.5 text-[13px] leading-relaxed text-ink-2">
+            <LiquidGlass as="p" className="well p-3.5 text-[13px] leading-relaxed text-ink-2">
               <strong className="text-ink">Драйвер и BIOS:</strong> {detailPreset.driverNote}
-            </p>
+            </LiquidGlass>
 
             <CodeBlock
               title={`client.cfg · ${detailPreset.slug}`}
               content={detailPreset.cfgText}
+              copyable={!IS_DESKTOP_APP}
               note={`Сохраните копию cfg\\client.cfg и замените только эти команды при закрытом Rust. Разрешение и качество текстур выберите в игре. Параметры запуска Steam: ${detailPreset.launchOptions}`}
             />
 
@@ -653,7 +654,7 @@ export default function PresetsExplorer({
                     key={slug}
                     href={tweakerHref(slug)}
                     className="chip hover:bg-white/16 hover:text-white"
-                    onNavigate={() => setDetailId(null)}
+                    onNavigate={detail.dismiss}
                   >
                     {tweakTitles[slug] ?? slug}
                   </Link>
@@ -665,15 +666,12 @@ export default function PresetsExplorer({
               <Link
                 href={presetCalculatorHref(detailPreset)}
                 className="btn btn-sm"
-                onNavigate={() => setDetailId(null)}
+                onNavigate={detail.dismiss}
               >
                 Открыть в разделе «Сборка»
                 <ArrowRight aria-hidden="true" />
               </Link>
-              <Button variant="primary" size="sm" onClick={() => copyPresetCfg(detailPreset)}>
-                <Copy aria-hidden="true" />
-                Скопировать client.cfg
-              </Button>
+              <CfgDownload preset={detailPreset}/>
             </div>
           </div>
         )}

@@ -1,14 +1,16 @@
 "use client";
 
-import OriginDisclosure from "@/components/fx/OriginDisclosure";
+import LiquidGlass from "@/components/LiquidGlass";
+import AccordionBody from "./ui/AccordionBody";
 import { ArrowUpRight, ChevronDown, Search, SearchX } from "lucide-react";
 import Link from "@/components/RouteLink";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useId, useMemo, useState, type CSSProperties } from "react";
 import Segmented from "@/components/Segmented";
 import { Button, EmptyState, Input } from "@/components/ui";
 import type { FaqItem } from "@/lib/content";
 
 export default function FaqList({ items }: { items: FaqItem[] }) {
+  const prefix = useId();
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("Все");
   const [open, setOpen] = useState<string | null>(items[0]?.q ?? null);
@@ -26,7 +28,7 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
 
   return (
     <div>
-      <div className="glass glass-blur relative z-10 mb-5 space-y-3.5 p-4 sm:p-5">
+      <LiquidGlass className="glass glass-blur relative z-10 mb-5 space-y-3.5 p-4 sm:p-5">
         <Input
           label="Поиск по вопросам FAQ"
           hideLabel
@@ -44,7 +46,7 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
           ariaLabel="Тема вопроса"
           className="w-full sm:w-auto"
         />
-      </div>
+      </LiquidGlass>
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -65,10 +67,10 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
         />
       ) : (
         <ul className="space-y-3">
-          {filtered.map((item) => {
+          {filtered.map((item, i) => {
             const isOpen = open === item.q;
             return (
-              <li
+              <LiquidGlass as="li"
                 key={item.q}
                 className="glass"
                 data-open={isOpen ? "" : undefined}
@@ -78,7 +80,7 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
                   <button
                     type="button"
                     className="group flex w-full items-center gap-4 p-5 text-left sm:p-6"
-                    aria-expanded={isOpen}
+                    aria-expanded={isOpen} aria-controls={`${prefix}-${i}`}
                     onClick={() => setOpen(isOpen ? null : item.q)}
                   >
                     <span className="min-w-0 flex-1">
@@ -94,17 +96,17 @@ export default function FaqList({ items }: { items: FaqItem[] }) {
                     </span>
                   </button>
                 </h3>
-                <OriginDisclosure open={isOpen}>
+                <AccordionBody open={isOpen} id={`${prefix}-${i}`}>
                   <div className="space-y-3 px-5 pb-6 text-[15px] leading-relaxed text-ink-2 sm:px-6">
                     {item.a.map((paragraph, j) => (
                       <p key={j}>{paragraph}</p>
                     ))}
                     {item.href && <Link href={item.href} className="inline-flex items-center gap-1.5 font-semibold text-accent-hi underline underline-offset-4">
-                      К записи в базе знаний <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                      К инструкции <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                     </Link>}
                   </div>
-                </OriginDisclosure>
-              </li>
+                </AccordionBody>
+              </LiquidGlass>
             );
           })}
         </ul>

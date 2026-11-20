@@ -32,7 +32,7 @@ export const BUILD_RESOLUTION_OPTIONS: readonly { value: BuildResolutionId; labe
 
 export function isResolutionDimension(value: unknown, axis: "width" | "height" = "width"): value is number {
   return typeof value === "number" && Number.isInteger(value) &&
-    value >= (axis === "height" ? MIN_RESOLUTION_HEIGHT : MIN_RESOLUTION_DIMENSION) && value <= MAX_RESOLUTION_DIMENSION;
+    value >= (axis === "height" ? MIN_RESOLUTION_HEIGHT : MIN_RESOLUTION_DIMENSION) && value <= (axis === "height" ? MAX_PRESET_HEIGHT : MAX_RESOLUTION_DIMENSION);
 }
 
 export function getResolutionSize({ resolution, customResolution }: Partial<BuildResolution>): Readonly<ResolutionSize> | null {
@@ -40,7 +40,7 @@ export function getResolutionSize({ resolution, customResolution }: Partial<Buil
     return isResolutionDimension(customResolution?.width) && isResolutionDimension(customResolution?.height, "height")
       ? customResolution : null;
   }
-  return resolution && Object.hasOwn(RESOLUTION_SIZES, resolution) ? RESOLUTION_SIZES[resolution] : null;
+  return typeof resolution === "string" && Object.hasOwn(RESOLUTION_SIZES, resolution) ? RESOLUTION_SIZES[resolution] : null;
 }
 
 export function formatBuildResolution(input: BuildResolution): string {

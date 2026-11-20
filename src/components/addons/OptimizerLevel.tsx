@@ -6,6 +6,7 @@ import Link from "@/components/RouteLink";
 import { isValidBuildInput } from "@/lib/models/build";
 import { useRustFlowStore } from "@/lib/storage/useStore";
 import { ACHIEVEMENTS, grantAchievements, progressXp, useProgress, XP_PER_LEVEL, type AchievementId } from "@/lib/addons/progress";
+import { Meter } from "../ui";
 import Panel from "./Panel";
 import styles from "./addons.module.css";
 
@@ -37,8 +38,8 @@ export default function OptimizerLevel() {
           <strong className={styles.metric}>Уровень {level}</strong>
           <span className={styles.pill}>{xp} XP · {earnedCount}/{ACHIEVEMENTS.length}</span>
         </div>
-        <progress className={styles.meter} max={XP_PER_LEVEL} value={completed ? XP_PER_LEVEL : remainder}
-          aria-label={completed ? "Все достижения получены" : "Прогресс до следующего уровня"} />
+        <Meter percent={completed ? 100 : 100 * remainder / XP_PER_LEVEL}
+          label={completed ? "Все достижения получены" : "Прогресс до следующего уровня"} />
         <p className={styles.muted}>{completed ? "Все достижения получены." : `Ещё ${XP_PER_LEVEL - remainder} XP до уровня ${level + 1}.`}</p>
       </div>
       <ul className={`${styles.metrics} ${styles.list}`} aria-label="Достижения оптимизатора">

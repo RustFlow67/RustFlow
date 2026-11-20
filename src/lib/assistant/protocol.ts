@@ -1,3 +1,4 @@
+export const ASSISTANT_UNAVAILABLE = "Помощник пока недоступен. В разделе «Сборка» можно подобрать настройки для вашего ПК без чата.";
 export const MAX_QUESTION = 400;
 export const MAX_ANSWER = 8000;
 export const CONTEXT_TURNS = 4;

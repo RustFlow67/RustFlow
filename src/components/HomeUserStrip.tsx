@@ -1,5 +1,6 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { Activity, CheckCircle2, Cpu, FileJson } from "lucide-react";
 import Link from "next/link";
 import { openPlayerProfile } from "@/components/auth/ProfileGate";
@@ -20,8 +21,8 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
   const logsCount = hydrated && state ? state.logs.length : 0;
 
   return (
-    <div className="glass grid gap-2.5 p-3 sm:grid-cols-2 lg:grid-cols-4" data-reveal>
-      <Link href="/benchmark" className="tile tile-hover flex items-center gap-3 p-4">
+    <LiquidGlass className="glass grid gap-2.5 p-3 sm:grid-cols-2 lg:grid-cols-4" data-reveal>
+      <LiquidGlass as={Link} href="/benchmark" className="tile tile-hover flex items-center gap-3 p-4">
         <Cpu className="h-5 w-5 flex-none text-accent-hi" aria-hidden="true" />
         <div className="min-w-0">
           <span className="block text-[12px] text-ink-3">Моя сборка</span>
@@ -31,9 +32,9 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
               : "Оценить ПК /10 →"}
           </strong>
         </div>
-      </Link>
+      </LiquidGlass>
 
-      <Link href="/tweaks" className="tile tile-hover flex items-center gap-3 p-4">
+      <LiquidGlass as={Link} href="/tweaks" className="tile tile-hover flex items-center gap-3 p-4">
         <CheckCircle2 className="h-5 w-5 flex-none text-ok" aria-hidden="true" />
         <div className="min-w-0">
           <span className="block text-[12px] text-ink-3">Применено твиков</span>
@@ -41,10 +42,10 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
             {hydrated ? `${appliedCount} из ${totalActionable}` : `${totalActionable} проверенных`}
           </strong>
         </div>
-      </Link>
+      </LiquidGlass>
 
-      <Link href="/journal" className="tile tile-hover flex items-center gap-3 p-4">
-        <Activity className="h-5 w-5 flex-none text-sky" aria-hidden="true" />
+      <LiquidGlass as={Link} href="/journal" className="tile tile-hover flex items-center gap-3 p-4">
+        <Activity className="h-5 w-5 flex-none text-accent-hi" aria-hidden="true" />
         <div className="min-w-0">
           <span className="block text-[12px] text-ink-3">Журнал до / после</span>
           <strong className="block text-[15px] font-bold tabular-nums text-ink">
@@ -53,9 +54,9 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
               : "Таблица замеров →"}
           </strong>
         </div>
-      </Link>
+      </LiquidGlass>
 
-      <div className="tile flex items-center justify-between gap-2 p-3.5">
+      <LiquidGlass className="tile flex items-center justify-between gap-2 p-3.5">
         <div className="min-w-0 pl-1">
           <span className="block text-[12px] text-ink-3">Профиль в браузере</span>
           <strong className="block truncate text-[14px] font-bold text-ink">Экспорт / импорт</strong>
@@ -64,7 +65,7 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
           <FileJson className="text-accent-hi" aria-hidden="true" />
           JSON
         </Button>
-      </div>
-    </div>
+      </LiquidGlass>
+    </LiquidGlass>
   );
 }

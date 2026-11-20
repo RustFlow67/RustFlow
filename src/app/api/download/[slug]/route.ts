@@ -1,20 +1,31 @@
 import type { NextRequest } from "next/server";
-import { getTweak } from "@/lib/tweaks";
+import { registryBackup } from "@/lib/tweaks/registry-backup";
+import { getTweak, encodeFile } from "@/lib/tweaks";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   const { slug } = await context.params;
   const tweak = getTweak(slug);
-  const isRevert = request.nextUrl.searchParams.get("v") === "revert";
-  const file = tweak ? (isRevert ? tweak.revert : tweak.file) : undefined;
+  const variant = request.nextUrl.searchParams.get("v");
+  const snapshot =
+    tweak && (variant === "snapshot" || variant === "restore-snapshot") ? registryBackup(tweak) : null;
+  const file =
+    variant === null
+      ? tweak?.file
+      : variant === "revert"
+        ? tweak?.revert
+        : variant === "snapshot"
+          ? snapshot?.save
+          : variant === "restore-snapshot"
+            ? snapshot?.restore
+            : null;
 
   if (!tweak || !file) {
     return Response.json({ error: "Файл не найден" }, { status: 404 });
   }
 
-  const normalized = file.content.replace(/\r?\n/g, "\r\n");
-  const body = new TextEncoder().encode(normalized);
+  const body = encodeFile(file);
 
   return new Response(body, {
     headers: {
@@ -25,4 +36,3 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
     },
   });
 }
-

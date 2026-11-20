@@ -2,17 +2,11 @@ import { getGraphicsProfile, type GraphicsProfileId } from "@/lib/graphics-profi
 import type { Cpu, Gpu } from "@/lib/hardware";
 import type { BuildInput, FpsRangeEstimate } from "./build";
 import { getBiosProfile, getMemoryType } from "./build-settings";
+import { driveEstimate } from "./drive";
 import { clamp, round1 } from "./common";
 
-// Raid and wipe apply similar pressure to both FPS ceilings so GPU-bound builds
-// also lose roughly 37–40% relative to the same settings on the coast.
-export const SCENARIOS = [
-  { value: "coast", label: "Фарм / Берег", cpu: 1, gpu: 1, low: 1, hint: "Открытая местность, сбор ресурсов и небольшие постройки." },
-  { value: "raid", label: "Замес / Рейд с ракетами", cpu: .627, gpu: .63, low: 1, hint: "Эффекты и разрушения снижают FPS и 1% low примерно на 37% относительно Берега." },
-  { value: "base", label: "Клановый мейн 500+ объектов", cpu: .76, gpu: .90, low: .88, hint: "Сотни сущностей и много вызовов отрисовки вокруг базы." },
-  { value: "wipe", label: "День вайпа 400+ онлайн", cpu: .602, gpu: .60, low: 1, hint: "Высокий онлайн и подгрузка сущностей: примерно на 40% ниже Берега." },
-] as const;
-export type RustScenario = typeof SCENARIOS[number]["value"];
+import { backgroundBudget, gcBudget, PLAY_OPTIONS, supportedLatency, type RustScenario } from "./play-settings";
+export type { RustScenario } from "./play-settings";
 
 /** Estimated centers for 1080p Combat, no upscaling or frame generation.
  *  The user-supplied benchmark bands define the anchors, not measured records. */
@@ -35,9 +29,9 @@ function cpuTargets(cpu: Cpu) {
   return a.map((v, i) => v + (b[i] - v) * t);
 }
 
-export function calibratedFps(input: BuildInput, cpu: Cpu, gpu: Gpu, pixels: number, mode: GraphicsProfileId | null, scenario: RustScenario = "coast", textureLimit?: number) {
-  const profile = getGraphicsProfile(mode) ?? getGraphicsProfile("competitive")!;
-  const scene = SCENARIOS.find((item) => item.value === scenario) ?? SCENARIOS[0];
+export function calibratedFps(input: BuildInput, cpu: Cpu, gpu: Gpu, pixels: number, mode: GraphicsProfileId | null, scenario: RustScenario = input.scenario ?? "coast", textureLimit?: number) {
+  const profile = getGraphicsProfile(mode ?? input.graphicsProfile) ?? getGraphicsProfile("competitive")!;
+  const scene = PLAY_OPTIONS.scenario.find(item => item.value === scenario) ?? PLAY_OPTIONS.scenario[0];
   const [, baseModded, baseOfficial, lowModded, lowOfficial] = cpuTargets(cpu);
   const ddr5 = getMemoryType(input) === "DDR5";
   const bios = getBiosProfile(input.biosProfile);
@@ -46,29 +40,38 @@ export function calibratedFps(input: BuildInput, cpu: Cpu, gpu: Gpu, pixels: num
   const speed = clamp(1 + .09 * Math.log2(input.ramMhz / (ddr5 ? 6000 : 3600)) + .095 * Math.log2(baselineLatency / memLatency), .81, 1.08);
   const cpuRam = 1 + (speed - 1) * (cpu.id.includes("x3d") ? .43 : .78);
   const lowRam = 1 + (speed - 1) * .46;
-  const capacity = input.ramGb >= 32 ? 1 : input.ramGb >= 24 ? .994 : input.ramGb >= 16 ? .98 : input.ramGb >= 12 ? .88 : .72;
-  const lowCapacity = input.ramGb >= 32 ? 1 : input.ramGb >= 24 ? .984 : input.ramGb >= 16 ? .94 : input.ramGb >= 12 ? .72 : .53;
-  const storage = input.storage === "hdd" ? .96 : input.storage === "sata" ? .995 : 1;
-  const storageLow = input.storage === "hdd" ? .80 : input.storage === "sata" ? .986 : 1;
+  // Workload estimates, not measured gains. Background jobs compete for memory
+  // and main-thread time. Too small a GC buffer collects often; too big pages out.
+  const bg = backgroundBudget(input), gc = gcBudget(input.ramGb, input);
+  const contention = bg.cpuCost * (1.25 - cpu.idx / 200);
+  const mismatch = Math.abs(Math.log2(gc.mb / gc.auto));
+  const latency = supportedLatency(input.latencyMode, gpu.vendor);
+  // A shorter render queue is a latency trade-off, not free frames.
+  const queue = latency === "on" ? .98 : latency === "boost" ? .992 : 1;
+  const render = input.renderStyle;
+  const capacity = gc.available >= 32 ? 1 : gc.available >= 24 ? .994 : gc.available >= 16 ? .98 : gc.available >= 12 ? .88 : .72;
+  const lowCapacity = gc.available >= 32 ? 1 : gc.available >= 24 ? .984 : gc.available >= 16 ? .94 : gc.available >= 12 ? .72 : .53;
+  // Disk I/O changes streaming tails, not steady-state render throughput.
+  const storageLow = driveEstimate(input).lowMultiplier;
   const area = pixels / (1920 * 1080);
   const vramNeeded = (profile.shadows > 0 ? 6 : 4) + Math.max(0, Math.log2(area)) * 2;
   const pressure = clamp((vramNeeded - gpu.vram) / vramNeeded, 0, .65) * (textureLimit === 3 ? .24 : 1);
-  const gpuCap = (43 + gpu.idx * 2.04) * clamp(Math.pow(area, -.58), .24, 1.45) * profile.gpu * scene.gpu * (1 - pressure * .34);
-  const cpuMul = cpuRam * (bios?.cpu ?? 1) * (bios?.ram ?? 1) * profile.cpu * scene.cpu;
+  const gpuCap = (43 + gpu.idx * 2.04) * clamp(Math.pow(area, -.58), .24, 1.45) * profile.gpu * (render === "esports" ? 1.055 : render === "clear" ? .91 : 1) * scene.gpu * (1 - pressure * .34);
+  const cpuMul = cpuRam * (bios?.cpu ?? 1) * (bios?.ram ?? 1) * profile.cpu * (render === "esports" ? 1.025 : render === "clear" ? .975 : 1) * scene.cpu * (1 - contention);
   const cpuModded = baseModded * cpuMul;
   const cpuOfficial = baseOfficial * cpuMul;
 
   function range(cpuCap: number, gpuCap: number, lowAnchor: number, spread: number): FpsRangeEstimate {
-    const center = Math.min(cpuCap, gpuCap) * capacity * storage;
+    const center = Math.min(cpuCap, gpuCap) * capacity * queue * (1 - mismatch * .018);
     const min = Math.max(1, Math.round(center * (1 - spread)));
     const max = Math.max(min + 1, Math.round(center * (1 + spread)));
-    const low = Math.min(center * .77, lowAnchor * cpuMul * Math.min(1, gpuCap / cpuCap)) * lowCapacity * lowRam * storageLow * scene.low * (bios?.low ?? 1) * (1 - pressure * .41);
+    const low = Math.min(center * .77, lowAnchor * cpuMul * Math.min(1, gpuCap / cpuCap)) * (1 - mismatch * .055) * queue * (1 - contention * .5) * lowCapacity * lowRam * storageLow * scene.low * (bios?.low ?? 1) * (1 - pressure * .41);
     const low1 = Math.max(1, Math.min(min, Math.round(low)));
     return { min, max, low1 };
   }
   return {
     modded: range(cpuModded, gpuCap, lowModded, .072), official: range(cpuOfficial, gpuCap * .93, lowOfficial, .066),
-    cpuModded, cpuOfficial, gpuModded: gpuCap, gpuOfficial: gpuCap * .93,
+    vramPressure: pressure, cpuModded, cpuOfficial, gpuModded: gpuCap, gpuOfficial: gpuCap * .93,
   };
 }
 

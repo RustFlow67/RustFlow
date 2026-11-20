@@ -1,5 +1,6 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { RefreshCw, X } from "lucide-react";
 import {
   useId,
@@ -35,9 +36,9 @@ export function Card({
 }) {
   const hover = interactive ? (variant === "tile" ? "tile-hover" : "glass-hover") : "";
   return (
-    <div data-rf-card="" className={`${CARD_CLASS[variant]} ${hover} ${className}`.trim()} {...rest}>
+    <LiquidGlass data-rf-card="" className={`${CARD_CLASS[variant]} ${hover} ${className}`.trim()} {...rest}>
       {children}
-    </div>
+    </LiquidGlass>
   );
 }
 
@@ -54,11 +55,13 @@ export function Button({
   className = "",
   children,
   type = "button",
+  island,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
+  island?: boolean;
 }) {
   const vClass =
     variant === "primary"
@@ -72,7 +75,7 @@ export function Button({
     size === "sm" ? "btn-sm" : size === "lg" ? "btn-lg" : size === "icon" ? "btn-icon" : "";
 
   return (
-    <button
+    <LiquidGlass as="button" shape={size === "icon" ? "round" : "pill"} island={island}
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
@@ -81,7 +84,7 @@ export function Button({
     >
       {loading && <RefreshCw className="spin-slow" aria-hidden="true" />}
       {children}
-    </button>
+    </LiquidGlass>
   );
 }
 
@@ -123,7 +126,7 @@ export function Input({
       <div className="relative">
         {icon && (
           <span
-            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3"
+            className="pointer-events-none absolute z-1 left-3.5 top-1/2 -translate-y-1/2 text-ink-3"
             aria-hidden="true"
           >
             {icon}
@@ -216,7 +219,7 @@ export function Switch({
   disabled = false,
 }: {
   checked: boolean;
-  onChange: (next: boolean) => void;
+  onChange: (next: boolean, from: HTMLButtonElement) => void;
   label: string;
   disabled?: boolean;
 }) {
@@ -228,7 +231,7 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       className="switch"
-      onClick={() => onChange(!checked)}
+      onClick={e => onChange(!checked, e.currentTarget)}
     >
       <span className="switch-thumb" aria-hidden="true" />
     </button>
@@ -240,22 +243,16 @@ export function Switch({
 /** Индикатор прогресса на чистом transform: scaleX (0..100%). */
 export function Meter({
   percent,
-  fromColor,
-  toColor,
   label,
   className = "",
 }: {
   percent: number;
-  fromColor?: string;
-  toColor?: string;
   label?: string;
   className?: string;
 }) {
   const clamped = Math.min(100, Math.max(0, percent));
   const style: CSSProperties = {
     "--scale": String(clamped / 100),
-    ...(fromColor ? { "--m1": fromColor } : {}),
-    ...(toColor ? { "--m2": toColor } : {}),
   } as CSSProperties;
 
   return (
@@ -292,13 +289,13 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="glass pop-in mx-auto max-w-lg p-7 text-center sm:p-9">
+    <LiquidGlass className="glass pop-in mx-auto max-w-lg p-7 text-center sm:p-9">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white/10 text-ink-2">
         {icon}
       </div>
       <h3 className="mt-4 text-lg font-bold tracking-tight text-ink">{title}</h3>
       <p className="mt-2 text-sm leading-relaxed text-ink-2">{hint}</p>
       {action && <div className="mt-6 flex flex-wrap justify-center gap-2.5">{action}</div>}
-    </div>
+    </LiquidGlass>
   );
 }

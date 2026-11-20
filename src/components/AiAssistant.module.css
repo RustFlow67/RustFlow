@@ -1,28 +1,17 @@
 .dock {
-  --assistant-right: max(14px, env(safe-area-inset-right, 0px));
-  --assistant-height: 100dvh;
-  --assistant-top: 0px;
-  --assistant-keyboard: 0px;
-  --panel-inset: max(var(--notice-bottom), calc(var(--assistant-keyboard) + 10px));
-  --panel-top: max(var(--header-size), calc(var(--assistant-top) + 10px));
-  position: fixed;
-  z-index: var(--dialog-layer);
-  pointer-events: none;
-  right: var(--assistant-right);
-  bottom: var(--panel-inset);
-  width: min(var(--assistant-panel-width), calc(100% - var(--assistant-right) - max(14px, env(safe-area-inset-left, 0px))));
+  z-index:var(--dialog-layer); pointer-events:none; max-width:var(--assistant-panel-width);
 }
 .panel {
   --r: 24px;
   width: 100%;
-  /* Keep both chrome rows and the composer reachable in short viewports. */
-  height: clamp(0px, calc(var(--assistant-height) + var(--assistant-top) + var(--assistant-keyboard) - var(--panel-inset) - var(--panel-top)), 30rem);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: auto;
+  height:min(30rem,var(--popover-height));
+  overflow: hidden;
+  color: var(--ink);
+}
+.chatScroll {
+  height:100%; display:grid; grid-template-rows:auto minmax(4rem,1fr) auto; overflow:auto;
   overscroll-behavior: contain;
   color: var(--ink);
-  background-color: var(--surface-popover) !important;
 }
 .panel[data-open] { pointer-events: auto; }
 .header {
@@ -48,6 +37,7 @@
 .identity h2 { font: 650 .875rem/1.36 var(--font-display); }
 .identity p { color: var(--ink-3); font-size: .73rem; margin-top: 2px; }
 .iconButton {
+  box-shadow: var(--glass-optics);
   flex: none;
   display: grid;
   place-items: center;
@@ -60,12 +50,13 @@
 }
 .iconButton:hover { background: var(--veil-hover); color: var(--ink); }
 .iconButton svg { width: 16px; height: 16px; }
-.log { overflow: auto; overscroll-behavior: contain; padding: 14px 12px; scrollbar-gutter: stable; }
+.log { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 14px 12px; scrollbar-gutter: auto; }
 .welcome, .messages, .turn { display: grid; min-width: 0; gap: 10px; }
 .welcome { font-size: .875rem; line-height: 1.54; color: var(--ink-2); }
-.kicker { font: 700 .72rem/1.4 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--accent-hi); }
+.kicker { font: 700 .72rem/1.4 var(--font-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--accent-hi); }
 .suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
 .suggestions button {
+  box-shadow: var(--glass-optics);
   padding: 6px 10px;
   min-height: 32px;
   border: 1px solid var(--border-subtle);
@@ -115,6 +106,7 @@
   border-top: 1px solid var(--border-subtle);
 }
 .form input {
+  box-shadow: var(--glass-optics);
   min-width: 0;
   min-height: 42px;
   padding: 7px 11px;
@@ -126,25 +118,29 @@
 }
 .disclosure { grid-column: 1 / -1; font-size: .7rem; line-height: 1.35; color: var(--ink-2); }
 .form input::placeholder { color: var(--ink-3); font-size: .83rem; opacity: 1; }
-:global(:root[data-theme="light"]) :is(.form input, .answer, .suggestions button) {
-  border-color: var(--well-edge);
-}
-:global(:root[data-theme="light"]) .suggestions button:not(:hover) { background: var(--surface-well); }
 .form .send { width: 44px; height: 44px; padding: 0; border-radius: 14px; }
 
-@media (min-width: 1024px) {
-  .dock { --assistant-right: max(20px, env(safe-area-inset-right, 0px)); }
-}
-@media (max-width: 360px) {
-  .mark { display: none; }
-  .header { gap: 6px; }
+/* An exact left anchor leaves a narrow column to the right of the stars
+   on phones. Reflow the controls based on the sheet, not the page width. */
+@container header-slot (max-width:280px) {
+  .panel {height:min(38rem,var(--popover-height));}
+  .mark {display:none;}
+  .header {gap:4px;align-items:flex-start;flex-wrap:wrap;padding:8px;}
+  .identity {flex:1 1 5rem;overflow-wrap:anywhere;}
+  .identity h2 {font:700 .82rem/1.3 var(--font-sans);}
+  .log {padding:9px 8px;}
+  .form {padding:8px;gap:5px;}
+  .form .send {width:34px;}
+  .form input {width:100%;padding-inline:6px;}
+  .welcome,.suggestions button {overflow-wrap:anywhere;}
 }
 @media (prefers-reduced-motion: reduce) {
   .loading svg { animation: none; }
 }
 
 .adminBadge {
-  display: inline-block; color: var(--accent-hi); font: 750 .65rem var(--font-mono);
-  padding: .15em .55em; border-radius: 999px; border: 1px solid rgb(255 138 61 / .4); background: rgb(224 90 43 / .12);
+  box-shadow: var(--glass-optics);
+  display: inline-block; color: var(--accent-hi); font: 750 .65rem var(--font-sans);
+  padding: .15em .55em; border-radius: 999px; border: 1px solid color-mix(in srgb,var(--accent) 40%,transparent); background: color-mix(in srgb,var(--accent-deep) 12%,transparent);
 }
 .commandStatus { grid-column: 1 / -1; margin: 0; color: var(--accent-hi); font-size: .76rem; }

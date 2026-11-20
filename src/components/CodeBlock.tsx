@@ -1,4 +1,6 @@
 "use client";
+import LiquidGlass from "@/components/LiquidGlass";
+import { useFeedbackTimer } from "./fx/useFeedbackTimer";
 
 import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import { Check, ChevronDown, Copy, FileText } from "lucide-react";
@@ -10,13 +12,16 @@ export default function CodeBlock({
   content,
   note,
   collapsible = false,
+  copyable = true,
 }: {
   title: string;
   content: string;
   note?: string;
   collapsible?: boolean;
+  copyable?: boolean;
 }) {
   const { toast } = useToast();
+  const feedbackLater=useFeedbackTimer();
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(!collapsible);
   const lines = content.replace(/\n$/, "").split("\n").length;
@@ -25,7 +30,7 @@ export default function CodeBlock({
     try {
       await navigator.clipboard.writeText(content);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      feedbackLater(() => setCopied(false), 1800);
       toast({ title: "Скопировано в буфер обмена", description: title, tone: "success" });
     } catch {
       setCopied(false);
@@ -34,7 +39,7 @@ export default function CodeBlock({
   }
 
   return (
-    <div className="well overflow-hidden" data-open={open ? "" : undefined}>
+    <LiquidGlass className="well overflow-hidden" data-open={open ? "" : undefined}>
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <button
           type="button"
@@ -44,13 +49,13 @@ export default function CodeBlock({
           aria-expanded={open}
         >
           <FileText className="h-4 w-4 flex-none text-accent-hi" aria-hidden="true" />
-          <span className="truncate font-mono text-[13px] font-semibold text-ink">{title}</span>
+          <span className="truncate font-sans text-[13px] font-semibold text-ink">{title}</span>
           <span className="flex-none text-[12px] text-ink-3">{lines} строк</span>
           {collapsible && (
             <ChevronDown className="acc-chevron h-4 w-4 flex-none text-ink-3" aria-hidden="true" />
           )}
         </button>
-        <button
+        {copyable && <button
           type="button"
           className="btn btn-sm !h-9 flex-none !px-3.5 !text-[13px]"
           onClick={copy}
@@ -61,7 +66,7 @@ export default function CodeBlock({
             <Copy aria-hidden="true" />
           )}
           {copied ? "Скопировано" : "Копировать"}
-        </button>
+        </button>}
       </div>
       <OriginDisclosure open={open}>
         {note && <p className="px-4 pb-3 text-[13px] leading-relaxed text-ink-2">{note}</p>}
@@ -70,6 +75,6 @@ export default function CodeBlock({
           {content}
         </pre>
       </OriginDisclosure>
-    </div>
+    </LiquidGlass>
   );
 }

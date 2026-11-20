@@ -15,7 +15,7 @@ export default function GraphicsPicker({ value, onChange, label, presentation = 
         <span className="graphics-picker-name font-bold">{p.short}</span>
         {presentation === "cards" && <>
           <span className="mt-1 block text-xs leading-relaxed text-ink-2">{p.hint}</span>
-          <span className="mt-2 block font-mono text-[11px] text-accent-hi">Draw {p.draw} · Shader {p.shader} · Water {p.water}</span>
+          <span className="mt-2 block font-sans text-[11px] text-accent-hi">Draw {p.draw} · Shader {p.shader} · Water {p.water}</span>
         </>}
       </>,
     }))} /></div>;

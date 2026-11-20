@@ -1,19 +1,20 @@
 "use client";
 
-import { CircleUserRound, Download, Gauge, Link2, LogOut, Upload } from "lucide-react";
-import Image from "next/image";
+import LiquidGlass from "@/components/LiquidGlass";
+import { CircleUserRound, LogOut } from "lucide-react";
+import PlayerCabinet, { Avatar, socialLink } from "./auth/PlayerCabinet";
+import { countBuild, useCabinet } from "@/lib/auth/cabinet";
 import { apiUrl } from "@/lib/api-base";
-import type { PlayerAccount } from "@/lib/auth/types";
 import { signOutLocal } from "@/lib/auth/local";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAccount } from "@/components/auth/AccountProvider";
 import GoogleIcon from "@/components/auth/GoogleIcon";
 import DataBackupModal, { type BackupTab } from "@/components/DataBackupModal";
-import ProfileBuilds from "@/components/auth/ProfileBuilds";
 import { OPEN_PROFILE_EVENT, PROFILE_DIALOG_ID } from "@/components/auth/ProfileGate";
-import Link from "@/components/RouteLink";
+import ProTeaser from "./ProTeaser";
 import Segmented from "@/components/Segmented";
 import { Badge, Button, Input } from "@/components/ui";
+import { usePopupState, usePopupTrigger } from "@/components/fx/usePopupMotion";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useRustFlowStore } from "@/lib/storage/useStore";
@@ -21,23 +22,17 @@ import { useRustFlowStore } from "@/lib/storage/useStore";
 type Mode = "login" | "register";
 const MODES: { value: Mode; label: string }[] = [{ value: "login", label: "Вход" }, { value: "register", label: "Регистрация" }];
 
-function Avatar({ user, large = false }: { user: PlayerAccount; large?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  const size = large ? 42 : 24;
-  const initials = user.name.trim().split(/\s+/).slice(0, 2).map((part) => Array.from(part)[0]).join("").toLocaleUpperCase("ru-RU");
-  return <span className={`profile-avatar${large ? " profile-avatar-lg" : ""}`} aria-hidden="true">
-    {user.avatar && !failed ? <Image src={user.avatar} alt="" width={size} height={size} unoptimized referrerPolicy="no-referrer"
-      className="h-full w-full rounded-full object-cover" onError={() => setFailed(true)} /> : initials}
-  </span>;
-}
-
 export default function PlayerProfile() {
   const trigger = useRef<HTMLButtonElement>(null);
-  const opener = useRef<HTMLElement | null>(null);
-  const { session, ephemeral, refresh, authenticate, saveBuild, signOut } = useAccount();
+  const { isOpen, closing, opener, source, show: present, dismiss, finish } = usePopupState<true>();
+  const open = isOpen && !closing;
+  const { session, ephemeral, refresh, authenticate, quickSignIn, saveBuild, signOut } = useAccount();
   const user = session?.user;
-  const [open, setOpen] = useState(false);
+  const backupOpener = usePopupTrigger();
   const [backup, setBackup] = useState<BackupTab | null>(null);
+  const cabinet = useCabinet(user?.id);
+  const name = cabinet.nickname || user?.name;
+  const social = socialLink(cabinet.social);
   const [mode, setMode] = useState<Mode>("login");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,17 +40,18 @@ export default function PlayerProfile() {
   const { toast } = useToast();
   const active = state?.builds.find((build) => build.id === state.activeBuildId) ?? state?.builds[0];
   const close = () => {
-    setOpen(false);
+    dismiss();
     setBackup(null);
-    // Signing in replaces the original lock button with its enabled action.
-    if (!opener.current?.isConnected) trigger.current?.focus({ preventScroll: true });
   };
+  useLayoutEffect(() => {
+    // The lock button can disappear on sign-in. Refocus after releasing HUD inertness.
+    if (closing && !opener.current?.isConnected) trigger.current?.focus({ preventScroll: true });
+  }, [closing, opener]);
   const show = useCallback((element: HTMLElement | null = trigger.current) => {
-    opener.current = element;
+    present(true, element);
     setError(null);
-    setOpen(true);
     refresh();
-  }, [refresh]);
+  }, [present, refresh]);
 
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -72,13 +68,12 @@ export default function PlayerProfile() {
       const hash = window.location.hash;
       if (hash !== "#profile=google-ok" && hash !== "#profile=google-error") return;
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
-      opener.current = trigger.current;
-      setOpen(true);
+      present(true, trigger.current);
       if (hash.endsWith("ok")) { signOutLocal(); refresh(); }
       if (hash.endsWith("error")) setError("Не удалось войти через Google. Попробуйте ещё раз или войдите с паролем.");
     });
     return () => cancelAnimationFrame(frame);
-  }, [refresh]);
+  }, [present, refresh]);
 
   async function run(action: string, perform: () => Promise<void>) {
     if (busy) return;
@@ -98,7 +93,7 @@ export default function PlayerProfile() {
 
   function google() {
     if (!session?.googleEnabled) {
-      setError("Добавьте VITE_GOOGLE_CLIENT_ID в .env для входа через Google");
+      void run("quick", quickSignIn);
       return;
     }
     const url = new URL(apiUrl("auth/google"), window.location.href);
@@ -109,52 +104,34 @@ export default function PlayerProfile() {
   }
 
   return <>
-    <button ref={trigger} type="button" className="glass nav-pill profile-trigger"
-      aria-label={user ? `Профиль: ${user.name}` : "Профиль"} title={user?.name}
+    <LiquidGlass as="button" island shape="pill" ref={trigger} type="button" data-chrome-panel="" className="glass nav-pill profile-trigger"
+      aria-label={user ? `Профиль: ${name}` : "Профиль"} title={name}
       aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? PROFILE_DIALOG_ID : undefined}
       onClick={(event) => show(event.currentTarget)}>
-      {user ? <Avatar key={`${user.id}:${user.avatar}`} user={user} />
+
+      {user ? <Avatar key={`${user.id}:${user.avatar}`} user={user} identity={cabinet} />
         : <CircleUserRound aria-hidden="true" />}
-      <span className="truncate">{user?.name ?? "Профиль"}</span>
-    </button>
-    <Modal open={open} onClose={close} title="Профиль игрока" variant="profile" id={PROFILE_DIALOG_ID}
-      returnFocus={opener} maxWidth="max-w-[24rem]">
-      {user ? <div className="profile-account">
-        <div className="profile-identity">
-          <Avatar key={`${user.id}:${user.avatar}`} user={user} large />
-          <strong className="min-w-0 wrap-anywhere">{user.name}</strong>
+      <span className="truncate">{name ?? "Профиль"}</span>
+    </LiquidGlass>
+    <Modal open={isOpen} closing={closing} onExited={finish} onClose={close} title="Профиль игрока" variant="profile" id={PROFILE_DIALOG_ID}
+      anchor={trigger} source={source} returnFocus={opener} maxWidth={user ? "max-w-[29rem]" : "max-w-[25rem]"}>
+      {user ? <PlayerCabinet key={user.id} user={user} cabinet={cabinet} active={active} open={open} close={close} backup={from => {backupOpener.capture(from); setBackup("export");}}
+          identity={<>
+          <div className="profile-identity">
+          <Avatar key={`${user.id}:${user.avatar}`} user={user} identity={cabinet} large />
+          <div className="min-w-0"><strong className="wrap-anywhere">{name}</strong>{cabinet.social && <small className="cabinet-social">{social ? <a href={social} target="_blank" rel="noopener noreferrer">{cabinet.social} ↗</a> : cabinet.social}</small>}</div>
           <Badge tone={session?.admin ? "accent" : "neutral"}>{session?.admin ? "ADMIN" : user.kind === "local" ? "Локально" : "Игрок"}</Badge>
         </div>
         {user.kind === "local" && <p className="text-xs text-ink-3">{ephemeral ? "Хранилище недоступно. Профиль действует в этой вкладке до перезагрузки." : "Профиль на этом устройстве. Не синхронизируется с сервером."}</p>}
-        <div className="profile-build">
-          <p className="text-xs font-bold text-accent-hi">Сборка аккаунта</p>
-          <p className="mt-1 wrap-anywhere text-sm text-ink-2">{user.build?.name ?? "Ещё не привязана"}</p>
-          {active ? <Button size="sm" loading={busy === "build"} disabled={Boolean(busy)} title={active.input.name}
-            className="mt-2 w-full" aria-describedby="rf-profile-local-build" onClick={() => void run("build", async () => {
-              await saveBuild(active.input);
-              toast({ title: user.kind === "local" ? "Сборка сохранена в локальном профиле" : "Сборка сохранена в аккаунте", tone: "success" });
-            })}>
-            <Link2 aria-hidden="true" /> {user.build ? "Обновить из браузера" : "Привязать локальную сборку"}
-          </Button> : !user.build && <p className="mt-1 text-xs text-ink-3">Укажите ПК по ссылке «К моей сборке».</p>}
-          {active && <p id="rf-profile-local-build" className="mt-1 wrap-anywhere text-xs text-ink-3">В браузере: {active.input.name}</p>}
-        </div>
-        <Link href="/benchmark?account=1#build-config" className="btn btn-sm mt-2 w-full" onNavigate={close}>
-          <Gauge aria-hidden="true" /> К моей сборке
-        </Link>
-        <ProfileBuilds key={user.id} open={open} onNavigate={close} />
-        <div className="profile-backup-actions" aria-label="Резервная копия браузера" role="group">
-          <button type="button" className="btn btn-sm" aria-haspopup="dialog" onClick={() => setBackup("export")}>
-            <Download aria-hidden="true" /> Экспорт JSON
-          </button>
-          <button type="button" className="btn btn-sm" aria-haspopup="dialog" onClick={() => setBackup("import")}>
-            <Upload aria-hidden="true" /> Импорт JSON
-          </button>
-        </div>
-        <p className="text-xs text-ink-3">В JSON входят локальные сборки, журнал замеров, отметки и настройки Твикера, но не данные входа.</p>
-        <Button size="sm" variant="ghost" loading={busy === "logout"} disabled={Boolean(busy)} className="mt-3 w-full"
-          onClick={() => void run("logout", async () => { await signOut(); setBackup(null); setMode("login"); })}><LogOut aria-hidden="true" /> Выйти из аккаунта</Button>
-      </div> : <>
+        </>} signOut={<Button size="sm" variant="ghost" loading={busy === "logout"} disabled={Boolean(busy)} className="cabinet-signout" aria-label="Выйти из аккаунта" title="Выйти из аккаунта"
+          onClick={() => void run("logout", async () => { await signOut(); setBackup(null); setMode("login"); })}><LogOut aria-hidden="true" /></Button>}
+          busy={Boolean(busy)} binding={busy === "build"} bind={() => run("build", async () => {
+            if (!active) return;
+            await saveBuild(active.input); countBuild(active.id,user.id);
+            toast({ title: user.kind === "local" ? "Сборка сохранена в локальном профиле" : "Сборка сохранена в аккаунте", tone: "success" });
+          })} /> : <>
         {session?.admin && <p className="mb-3 flex items-center gap-2 text-xs text-ink-2"><Badge tone="accent">ADMIN</Badge> Бейдж активен в этом браузере</p>}
+        <ProTeaser />
         <Segmented ariaLabel="Действие с аккаунтом" options={MODES} value={mode}
           onChange={(value) => { if (!busy) { setMode(value); setError(null); } }} className="w-full" />
         <form key={mode} className="profile-auth-form" method="post"
@@ -163,23 +140,24 @@ export default function PlayerProfile() {
             if (event.key !== "Enter" || event.nativeEvent.isComposing || !(event.target instanceof HTMLInputElement)) return;
             event.preventDefault(); submit(event.currentTarget);
           }}>
-          <Input label="Логин или email" name="login" fieldSize="sm" autoComplete="username" minLength={3} maxLength={254} required spellCheck={false} />
+          <Input label="Логин или email" name="login" fieldSize="sm" autoComplete="username" minLength={session?.passwordEnabled ? 3 : 1} maxLength={254} required spellCheck={false} />
           <Input label="Пароль" name="password" fieldSize="sm" type="password" autoComplete={mode === "register" ? "new-password" : "current-password"}
-            minLength={4} maxLength={128} required />
-          {mode === "register" && <Input label="Подтверждение пароля" name="confirm" fieldSize="sm" type="password" autoComplete="new-password" minLength={4} maxLength={128} required />}
+            minLength={session?.passwordEnabled ? 4 : 1} maxLength={128} required />
+          {mode === "register" && <Input label="Подтверждение пароля" name="confirm" fieldSize="sm" type="password" autoComplete="new-password" minLength={session?.passwordEnabled ? 4 : 1} maxLength={128} required />}
           {/* A sandbox can disallow native form submission even when JS is allowed. */}
           <Button type="button" onClick={(event) => submit(event.currentTarget.form)} variant="primary" loading={busy === "credentials"}
-            disabled={Boolean(busy)} size="sm" className="w-full">
+            disabled={Boolean(busy) || !session} size="sm" className="w-full">
             {mode === "register" ? "Создать аккаунт" : "Войти"}
           </Button>
         </form>
         <div className="profile-or" aria-hidden="true">или</div>
-        <button type="button" className="btn btn-sm google-button" onClick={google}><GoogleIcon /> Продолжить через Google</button>
-        <p className="mt-3 text-center text-xs text-ink-3">Сохранённые сборки и JSON доступны после входа в профиль.</p>
+        <button type="button" className="btn btn-sm google-button" disabled={Boolean(busy) || !session} onClick={google} aria-describedby="rf-google-mode"><GoogleIcon /> Продолжить через Google{session && !session.googleEnabled && <small>Демо</small>}</button>
+        <p className="profile-auth-note" id="rf-google-mode">{session?.googleEnabled ? "Безопасный переход к выбору аккаунта Google." : "Демо-вход на этом устройстве: без проверки Google и без облачной синхронизации."}</p>
+        <p className="mt-3 text-center text-xs text-ink-3">{session?.passwordEnabled ? "Гостевая сборка останется в браузере после входа." : "Новый логин создаёт локальный профиль. При следующем входе понадобится тот же пароль."}</p>
       </>}
       {error && <p role="alert" className="mt-3 text-sm leading-relaxed text-danger">{error}</p>}
     </Modal>
-    {user && <DataBackupModal key={user.id} open={open && backup !== null} onClose={() => setBackup(null)}
+    {user && <DataBackupModal origin={backupOpener.origin} key={user.id} open={open && backup !== null} onClose={() => setBackup(null)}
       tab={backup ?? "export"} onTabChange={setBackup} />}
   </>;
 }

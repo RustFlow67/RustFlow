@@ -39,8 +39,7 @@ for (const position of ["left", "bottom"] as const)
           .getByRole("button", { name: theme.name, exact: false });
         await press(choice);
         await expect(page.locator("html")).toHaveAttribute("data-material", theme.id);
-        await expect(studio).toHaveCSS("backdrop-filter", "none"); // ink is not a second glass surface
-        await expect(page.locator("[data-island-bed] .island-skin")).toHaveCSS("backdrop-filter", optics(28,"pane"));
+        await expect(studio).toHaveCSS("backdrop-filter", optics(28, "pane")); // the panel itself is the glass surface
         await expect(page.locator("main")).toHaveAttribute("inert", "");
         await expect(bar).toHaveCSS("pointer-events", "none");
         await page.keyboard.press("Escape");
@@ -196,7 +195,7 @@ test("reading bodies are not stretched buttons; two independent briefs and focus
   }
 });
 
-test("a sourced report lands its borrowed skin; content fades first and the scrim releases immediately", async ({ page }) => {
+test("a sourced report lands on its live button; content fades first and the scrim releases immediately", async ({ page }) => {
   const buttonName = insightName, dialogName = "ИИ-сводка вашей сборки";
   await page.goto("/benchmark");
   await page.evaluate(() => document.fonts.ready); // Auto-width trigger settles with the webfont.
@@ -210,64 +209,90 @@ test("a sourced report lands its borrowed skin; content fades first and the scri
     lastBox = key;
     await page.waitForTimeout(250);
   }
-  const skin = await trigger.locator(".island-skin").elementHandle();
+  const label = await trigger.textContent();
   await press(trigger);
   const panel = page.getByRole("dialog", { name: dialogName });
   await panel.evaluate((el) => Promise.allSettled(el.getAnimations().map((a) => a.finished)));
-  await expect(panel).toHaveAttribute("data-header-motion", "");
+  await expect(panel).not.toHaveAttribute("data-header-motion");
+  await expect(trigger).toHaveCSS("opacity", "1");
+  expect(await trigger.textContent()).toBe(label);
   const flight = await panel.evaluate(async (el) => {
-    const shell = el.parentElement!.querySelector<HTMLElement>("[data-island-bed] .island-skin")!,
-      layer = el.closest<HTMLElement>(".modal-backdrop")!,
+    const layer = el.closest<HTMLElement>(".modal-backdrop")!,
       content = el.firstElementChild as HTMLElement;
+    // Freeze the close at its first frame: one headless rAF can burst past
+    // the 260ms scrim exit before sampling starts. transitionrun fires in
+    // page context at close start, so nothing finishes before capture.
+    const freeze = () => {
+      for (const a of layer.getAnimations({ subtree: true })) a.pause();
+    };
+    layer.addEventListener("transitionrun", freeze);
     (el.querySelector('[aria-label="Закрыть окно"]') as HTMLButtonElement).click();
     await new Promise(requestAnimationFrame);
+    layer.removeEventListener("transitionrun", freeze);
     const animations = layer.getAnimations({ subtree: true }).filter((a) => a instanceof CSSTransition);
     // Seek the *browser's production transitions*: a headless frame may be
     // slower than 16ms. No timer-based guessing about the middle of a close.
-    const width = shell.getAnimations().find((a) => a instanceof CSSTransition && a.transitionProperty === "width")!;
-    const fade = document.querySelector<HTMLElement>('[data-island-source="landing"] [data-island-ink]')!.getAnimations().find((a) => a instanceof CSSTransition && a.transitionProperty === "opacity")!;
+    const morph = el.getAnimations().find((a) => a instanceof CSSTransition && a.transitionProperty === "transform")!;
+    const style = getComputedStyle(el);
+    // The visible landing edge is the rounded clip, not the panel border
+    // box (getBoundingClientRect ignores clip-path). Project it through the
+    // --from pose exactly like the honest FLIP renders it.
+    const pane = el as HTMLElement;
+    const slotBox = pane.parentElement!.getBoundingClientRect();
+    const matrix = new DOMMatrixReadOnly(style.getPropertyValue("--from-transform"));
+    const clip = style
+      .getPropertyValue("--from-clip")
+      .match(/inset\((.*?) round/)![1]
+      .trim()
+      .split(/\s+/)
+      .map(parseFloat);
+    const [ct, cr, cb, cl] = clip;
+    const ck = matrix.a;
+    const landing = [
+      slotBox.x + matrix.e + cl * ck,
+      slotBox.y + matrix.f + ct * ck,
+      (pane.offsetWidth - cr - cl) * ck,
+      (pane.offsetHeight - ct - cb) * ck,
+    ];
     const times = [0, 60, 110, 145, 200, 330, 420];
     return {
-      duration: Number(width.effect!.getTiming().duration),
-      ink: [Number(fade.effect!.getTiming().delay), Number(fade.effect!.getTiming().duration)],
+      duration: Number(morph.effect!.getTiming().duration),
+      easing: String(morph.effect!.getTiming().easing),
+      cascade: [style.transitionDuration, style.transitionDelay],
+      landing,
       samples: times.map((t) => {
         for (const a of animations) {
           a.pause();
           a.currentTime = t;
         }
-        const r = shell.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
         return {
           coat: Number(getComputedStyle(content).opacity),
-          shell: Number(getComputedStyle(shell).opacity),
           rect: [r.x, r.y, r.width, r.height],
           scrim: Number(getComputedStyle(layer, "::before").opacity),
-          background: getComputedStyle(el).backgroundColor,
           blocked: document.body.hasAttribute("data-popup-depth") || !layer.inert,
         };
       }),
     };
   });
-  expect(flight.duration).toBe(380);
-  expect(flight.ink[0]).toBeCloseTo(104.18, 1);
-  expect(flight.ink[1]).toBeCloseTo(275.82, 1);
+  expect(flight.duration).toBe(340);
+  expect(flight.easing).toBe("cubic-bezier(0.32, 0.72, 0, 1)");
+  expect(flight.cascade).toEqual(["0.34s, 0.34s, 0.1s, 0.108s", "0s, 0s, 0.24s, 0s"]);
   const samples = flight.samples;
-  // Content leaves first across 140ms; the borrowed glass lands, never fades.
+  // Content leaves first across 100ms; the panel itself shrinks onto the
+  // live button and dissolves across 240-340ms. No ghost past the unmount.
   expect(samples[0].coat).toBe(1);
   expect(samples[1].coat).toBeLessThan(1);
-  expect(samples[3].coat).toBe(0);
-  for (const s of samples) expect(s.shell).toBe(1);
+  expect(samples[2].coat).toBe(0);
   expect(samples[0].rect).not.toEqual(samples.at(-1)!.rect);
   expect(samples.at(-1)!.rect[2]).toBeLessThan(samples[0].rect[2]);
   expect(samples[1].scrim).toBeLessThan(samples[0].scrim);
   expect(samples[5].scrim).toBe(0); // The independent 260ms scrim exit is done.
-  for (const s of samples) {
-    expect(s.background).toBe("rgba(0, 0, 0, 0)"); // No opaque second panel.
-    expect(s.blocked).toBe(false);
-  }
+  for (const s of samples) expect(s.blocked).toBe(false);
   await expect(trigger).toBeFocused();
   await expect(page.locator("[data-rf-modal]")).toHaveCount(0);
-  expect(await trigger.evaluate((el, original) => el.querySelector(".island-skin") === original, skin)).toBe(true);
-  await skin?.dispose();
+  await expect(trigger).toHaveCSS("opacity", "1");
+  expect(await trigger.textContent()).toBe(label);
   // The depth plane restores on the compositor timeline, which headless
   // frame bursts can hold past detach; only measure a settled trigger.
   await page.waitForFunction(
@@ -284,7 +309,7 @@ test("a sourced report lands its borrowed skin; content fades first and the scri
     box = b;
     await page.waitForTimeout(150);
   }
-  expect(Math.max(...[box.x, box.y, box.width, box.height].map((n, i) => Math.abs(n - samples.at(-1)!.rect[i])))).toBeLessThan(2.5);
+  expect(Math.max(...[box.x, box.y, box.width, box.height].map((n, i) => Math.abs(n - flight.landing[i])))).toBeLessThan(2.5);
   const left = page.locator("#build-config");
   expect(
     await left.evaluate(

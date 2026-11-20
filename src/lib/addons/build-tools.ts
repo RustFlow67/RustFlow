@@ -9,7 +9,7 @@ export function presetBuildInput(preset: HardwarePreset): BuildInput {
     ramGb: preset.ramGb,
     ramMhz: preset.ramMhz,
     ramCl: preset.ramCl,
-    storage: preset.storageId,
+    storage: preset.storageId, nvmeGen: preset.nvmeGen,
     resolution: preset.resolution,
   };
 }

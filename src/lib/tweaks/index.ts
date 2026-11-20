@@ -1,4 +1,7 @@
 import type { EvidenceStatus, TweakGroupId, TweakRiskLevel } from "@/lib/models/tweak";
+import { ADVISORIES } from "./advisories";
+import { PRACTICAL } from "./practical";
+import { SYSTEM_CHECKLISTS } from "./system-checklists";
 import { EXTRA_TWEAKS } from "./extras";
 import { GAME_TWEAKS } from "./game";
 import { OTHER_TWEAKS } from "./other";
@@ -8,33 +11,32 @@ import { WINDOWS_TWEAKS } from "./windows";
 /** Метаданные классификации и оценки прироста для существующих твиков. */
 const ENRICHMENT: Record<
   string,
-  { group: TweakGroupId; riskLevel?: TweakRiskLevel; evidence?: EvidenceStatus; gainPct: number; gainLabel: string }
+  { group: TweakGroupId; riskLevel?: TweakRiskLevel; evidence?: EvidenceStatus; gainLabel: string }
 > = {
-  "restore-point": { group: "cpu-windows", gainPct: 0, gainLabel: "Страховка отката" },
-  "clean-temp-cache": { group: "gpu", gainPct: 4, gainLabel: "Меньше статтеров" },
-  "hardware-checklist": { group: "cpu-windows", gainPct: 16, gainLabel: "+10–20% в сумме" },
-  "ultimate-power-plan": { group: "cpu-windows", gainPct: 7, gainLabel: "+5–10% 1% low" },
-  "game-mode-dvr": { group: "cpu-windows", gainPct: 6, gainLabel: "+3–8% FPS" },
-  hags: { group: "gpu", riskLevel: "caution", gainPct: 5, gainLabel: "+2–6% / отклик" },
-  "background-apps": { group: "cpu-windows", gainPct: 5, gainLabel: "−0.8 ГБ ОЗУ в фоне" },
-  "pagefile-auto": { group: "ram-ssd", gainPct: 10, gainLabel: "Без вылетов OOM" },
-  "mouse-accel-off": { group: "cpu-windows", gainPct: 2, gainLabel: "Точный ввод 1:1" },
-  "visual-effects": { group: "cpu-windows", gainPct: 3, gainLabel: "+2–4% на слабых GPU" },
-  "mmcss-games": { group: "cpu-windows", riskLevel: "caution", gainPct: 3, gainLabel: "+1–3% 1% low" },
-  "rust-priority": { group: "cpu-windows", riskLevel: "caution", gainPct: 4, gainLabel: "+2–5% при фоне" },
-  "fso-gpu-pref": { group: "gpu", riskLevel: "caution", gainPct: 5, gainLabel: "Дискретная GPU + отклик" },
-  "memory-integrity-off": { group: "cpu-windows", riskLevel: "caution", gainPct: 8, gainLabel: "+5–10% CPU (компромисс)" },
-  "nvidia-panel": { group: "gpu", gainPct: 8, gainLabel: "−3..6 мс · Reflex" },
-  "amd-adrenalin": { group: "gpu", gainPct: 8, gainLabel: "−3..6 мс · Anti-Lag" },
-  "steam-checklist": { group: "rust-settings", gainPct: 6, gainLabel: "+3–7% без оверлеев" },
-  "launch-options": { group: "launch-options", gainPct: 4, gainLabel: "Меньше input lag" },
-  "preset-competitive": { group: "rust-settings", gainPct: 28, gainLabel: "+20–35% FPS (оценка)" },
-  "preset-balanced": { group: "rust-settings", gainPct: 15, gainLabel: "+10–20% FPS (оценка)" },
-  "preset-quality": { group: "rust-settings", gainPct: 3, gainLabel: "Чёткость без мыла" },
-  "gc-buffer": { group: "ram-ssd", gainPct: 20, gainLabel: "+15–30% 1% low" },
-  binds: { group: "rust-settings", gainPct: 1, gainLabel: "Удобство в PvP/фарме" },
-  "nic-power": { group: "network", riskLevel: "caution", gainPct: 4, gainLabel: "Без микрообрывов" },
-  "network-reset": { group: "network", riskLevel: "caution", gainPct: 2, gainLabel: "Ремонт стека сети" },
+  "restore-point": { group: "cpu-windows", gainLabel: "Страховка отката" },
+  "clean-temp-cache": { group: "gpu", gainLabel: "Меньше статтеров" },
+  "hardware-checklist": { group: "cpu-windows", gainLabel: "Проверка ограничений" },
+  "ultimate-power-plan": { group: "cpu-windows", gainLabel: "Сравнить от сети" },
+  "game-mode-dvr": { group: "cpu-windows", gainLabel: "Если включена запись" },
+  hags: { group: "gpu", riskLevel: "caution", gainLabel: "Возможна регрессия" },
+  "background-apps": { group: "cpu-windows", gainLabel: "Фон приложений Store" },
+  "pagefile-auto": { group: "ram-ssd", gainLabel: "При нехватке памяти" },
+  "mouse-accel-off": { group: "cpu-windows", gainLabel: "Движение указателя" },
+  "visual-effects": { group: "cpu-windows", gainLabel: "Интерфейс Windows" },
+  "mmcss-games": { group: "cpu-windows", riskLevel: "caution", gainLabel: "Не для пакета" },
+  "rust-priority": { group: "cpu-windows", riskLevel: "caution", gainLabel: "Тест при загрузке CPU" },
+  "fso-gpu-pref": { group: "gpu", riskLevel: "caution", gainLabel: "Проверка режима вывода" },
+  "nvidia-panel": { group: "gpu", gainLabel: "Отклик · Reflex" },
+  "amd-adrenalin": { group: "gpu", gainLabel: "Отклик · Anti-Lag" },
+  "steam-checklist": { group: "rust-settings", gainLabel: "Если занят фон Steam" },
+  "launch-options": { group: "launch-options", gainLabel: "Проверка запуска" },
+  "preset-competitive": { group: "rust-settings", gainLabel: "При ограничении рендера" },
+  "preset-balanced": { group: "rust-settings", gainLabel: "Компромисс графики" },
+  "preset-quality": { group: "rust-settings", gainLabel: "Чёткость без мыла" },
+  "gc-buffer": { group: "ram-ssd", gainLabel: "Бюджет GC" },
+  binds: { group: "rust-settings", gainLabel: "Удобство в PvP/фарме" },
+  "nic-power": { group: "network", riskLevel: "caution", gainLabel: "Тест после сна" },
+  "network-reset": { group: "network", riskLevel: "caution", gainLabel: "Ремонт стека сети" },
 };
 
 function resolveGroup(t: Tweak): TweakGroupId {
@@ -53,16 +55,23 @@ function resolveRiskLevel(t: Tweak): TweakRiskLevel {
 }
 
 function resolveEvidence(t: Tweak): EvidenceStatus {
-  return t.evidence ?? ENRICHMENT[t.slug]?.evidence ?? "measured";
+  return t.evidence ?? ENRICHMENT[t.slug]?.evidence ?? "conditional";
 }
 
-export const TWEAKS: Tweak[] = [...OTHER_TWEAKS, ...WINDOWS_TWEAKS, ...GAME_TWEAKS, ...EXTRA_TWEAKS]
+export const TWEAKS: Tweak[] = [
+  ...OTHER_TWEAKS,
+  ...WINDOWS_TWEAKS,
+  ...SYSTEM_CHECKLISTS,
+  ...GAME_TWEAKS,
+  ...EXTRA_TWEAKS,
+  ...PRACTICAL,
+  ...ADVISORIES,
+]
   .map((t) => ({
     ...t,
     group: resolveGroup(t),
     riskLevel: resolveRiskLevel(t),
     evidence: resolveEvidence(t),
-    gainPct: t.gainPct ?? ENRICHMENT[t.slug]?.gainPct ?? 0,
     gainLabel: t.gainLabel ?? ENRICHMENT[t.slug]?.gainLabel ?? "Стабильность",
     excludeFromPack: Boolean(t.excludeFromPack),
   }))
@@ -76,6 +85,7 @@ export function getTweak(slug: string): Tweak | undefined {
 
 export function toLite(t: Tweak): TweakLite {
   return {
+    windowsVersion: t.windowsVersion,
     slug: t.slug,
     title: t.title,
     tagline: t.tagline,
@@ -84,7 +94,6 @@ export function toLite(t: Tweak): TweakLite {
     group: resolveGroup(t),
     riskLevel: resolveRiskLevel(t),
     evidence: resolveEvidence(t),
-    gainPct: t.gainPct ?? 0,
     gainLabel: t.gainLabel ?? "Стабильность",
     excludeFromPack: Boolean(t.excludeFromPack),
     phase: t.phase,

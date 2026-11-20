@@ -1,6 +1,6 @@
 import type { ElementType, ReactNode } from "react";
 
-/** Hover по оси wght вариативных Unbounded / Manrope / JetBrains Mono. */
+/** Hover по оси wght вариативного шрифта Inter. */
 export default function VariableWeight({
   children,
   className = "",

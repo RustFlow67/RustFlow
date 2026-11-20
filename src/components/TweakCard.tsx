@@ -1,5 +1,8 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger } from "./fx/usePopupMotion";
+
 import {
   Activity,
   ArrowUpRight,
@@ -10,6 +13,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
+import AccordionBody from "./ui/AccordionBody";
+import BoundedNumber from "./ui/BoundedNumber";
 import { useState } from "react";
 import { EvidenceBadge, RiskLevelBadge } from "@/components/Badges";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -37,6 +42,7 @@ export default function TweakCard({
 }) {
   const { toast } = useToast();
   const [stepsOpen, setStepsOpen] = useState(false);
+  const opener = usePopupTrigger();
   const [warnHarmful, setWarnHarmful] = useState(false);
   const [beforeDraft, setBeforeDraft] = useState<string | null>(null);
   const [afterDraft, setAfterDraft] = useState<string | null>(null);
@@ -52,8 +58,9 @@ export default function TweakCard({
     fpsAfter: afterVal ? Number(afterVal) : null,
   });
 
-  function handleToggle(next: boolean) {
+  function handleToggle(next: boolean, from: HTMLElement) {
     if (next && isHarmful) {
+      opener.capture(from);
       setWarnHarmful(true);
       return;
     }
@@ -108,7 +115,7 @@ export default function TweakCard({
 
   return (
     <>
-      <article
+      <LiquidGlass as="article"
         className={`glass glass-hover group flex h-full flex-col p-5 ${
           isHarmful ? "glass-danger" : ""
         }`}
@@ -159,8 +166,8 @@ export default function TweakCard({
             />
           </button>
 
-          {stepsOpen && (
-            <div className="well pop-in mt-2.5 space-y-2 p-3.5">
+          <AccordionBody open={stepsOpen}>
+            <LiquidGlass className="well pop-in mt-2.5 space-y-2 p-3.5">
               <ol className="space-y-1.5 text-[12.5px] leading-relaxed text-ink-2">
                 {tweak.steps.map((step, idx) => (
                   <li key={idx} className="flex gap-2">
@@ -172,13 +179,13 @@ export default function TweakCard({
               <p className="border-t border-white/10 pt-2 text-[12px] text-ink-3">
                 <strong className="text-ink-2">Проверка:</strong> {tweak.check}
               </p>
-            </div>
-          )}
+            </LiquidGlass>
+          </AccordionBody>
         </div>
 
         {/* Интерактивный блок: FPS до/после + Применено */}
         {interactive && (
-          <div className="well mt-auto space-y-3 p-3 pt-3" style={{ marginTop: "1rem" }}>
+          <LiquidGlass className="well mt-auto space-y-3 p-3 pt-3" style={{ marginTop: "1rem" }}>
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
                 {applied && <Check className="h-4 w-4 text-ok" aria-hidden="true" />}
@@ -199,50 +206,10 @@ export default function TweakCard({
 
             <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
               <div>
-                <label
-                  htmlFor={`fps-b-${tweak.slug}`}
-                  className="mb-1 block text-[11px] font-semibold text-ink-3"
-                >
-                  FPS до
-                </label>
-                <input
-                  id={`fps-b-${tweak.slug}`}
-                  type="number"
-                  inputMode="decimal"
-                  min={1}
-                  max={1500}
-                  placeholder="95"
-                  value={beforeVal}
-                  onChange={(e) => setBeforeDraft(e.target.value)}
-                  onBlur={() => {
-                    commitFps(beforeVal, afterVal);
-                    setBeforeDraft(null);
-                  }}
-                  className="field field-sm tabular-nums"
-                />
+                <BoundedNumber label="FPS до" optional decimals={1} min={1} max={1500} value={beforeVal} onValue={setBeforeDraft} onCommit={s=>{commitFps(s,afterVal);setBeforeDraft(null);}}/>
               </div>
               <div>
-                <label
-                  htmlFor={`fps-a-${tweak.slug}`}
-                  className="mb-1 block text-[11px] font-semibold text-ink-3"
-                >
-                  FPS после
-                </label>
-                <input
-                  id={`fps-a-${tweak.slug}`}
-                  type="number"
-                  inputMode="decimal"
-                  min={1}
-                  max={1500}
-                  placeholder="112"
-                  value={afterVal}
-                  onChange={(e) => setAfterDraft(e.target.value)}
-                  onBlur={() => {
-                    commitFps(beforeVal, afterVal);
-                    setAfterDraft(null);
-                  }}
-                  className="field field-sm tabular-nums"
-                />
+                <BoundedNumber label="FPS после" optional decimals={1} min={1} max={1500} value={afterVal} onValue={setAfterDraft} onCommit={s=>{commitFps(beforeVal,s);setAfterDraft(null);}}/>
               </div>
               <button
                 type="button"
@@ -265,7 +232,7 @@ export default function TweakCard({
                 )}
               </button>
             </div>
-          </div>
+          </LiquidGlass>
         )}
 
         {/* Футер карточки: мета + скачать + подробнее */}
@@ -316,9 +283,9 @@ export default function TweakCard({
             </Link>
           </div>
         </div>
-      </article>
+      </LiquidGlass>
 
-      <ConfirmDialog
+      <ConfirmDialog {...opener.origin}
         open={warnHarmful}
         onClose={() => setWarnHarmful(false)}
         onConfirm={() => {

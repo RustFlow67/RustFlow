@@ -2,8 +2,9 @@ import "server-only";
 
 import { endAdminSession, isAdminSession, startAdminSession } from "@/lib/admin-session";
 import { reserveQuestion } from "@/lib/assistant/quota";
+import { driveEstimate } from "@/lib/models/drive";
 import { assistantBuild, type AssistantBuild } from "@/lib/assistant/context";
-import { CONTEXT_ANSWER, CONTEXT_TURNS, MAX_ANSWER, isAdminCommand, truncateQuestion, streamLines, type AssistantEvent } from "@/lib/assistant/protocol";
+import { ASSISTANT_UNAVAILABLE, CONTEXT_ANSWER, CONTEXT_TURNS, MAX_ANSWER, isAdminCommand, truncateQuestion, streamLines, type AssistantEvent } from "@/lib/assistant/protocol";
 import { getCpu, getGpu } from "@/lib/hardware";
 import { findKnowledge } from "@/lib/knowledge-search";
 import { formatBuildResolution } from "@/lib/models/build-resolution";
@@ -12,7 +13,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SYSTEM_PROMPT = `Ты RustFlow Assistant, эксперт по оптимизации игры Rust, подбору CPU/GPU/RAM/SSD,
-настройке Windows и драйверов NVIDIA/AMD, конфигам client.cfg и gc.buffer. Отвечай по-русски, кратко и практически.
+настройке Windows и драйверов NVIDIA/AMD, конфигам client.cfg и gc.buffer. Отвечай по-русски. Предлагай сначала одну понятную проверку. При первом упоминании термина (например, 1% low или DDU) поясняй одной фразой, что он значит для игрока.
 Учитывай переданную конфигурацию и разрешение. Если данных мало, не угадывай: уточни компоненты, симптомы и сцену.
 Не выдавай расчётные FPS или предполагаемую совместимость драйвера за подтверждённый замер.
 Предлагай обратимые изменения по одному и проверку avg FPS, 1% low и frametime в одинаковых условиях.
@@ -31,7 +32,7 @@ function describe(build: AssistantBuild | null): string {
   const cpu = getCpu(build.cpuId);
   const gpu = getGpu(build.gpuId);
   return `Текущий выбор в RustFlow (не телеметрия): ${cpu?.name}; ${gpu?.name}, VRAM ${gpu?.vram} ГБ; ` +
-    `ОЗУ ${build.ramGb} ГБ, ${build.ramMhz} МТ/с, CL${build.ramCl}; накопитель ${build.storage}; разрешение ${formatBuildResolution(build)}.`;
+    `ОЗУ ${build.ramGb} ГБ, ${build.ramMhz} МТ/с, CL${build.ramCl}; ОС: ${build.windowsVersion ? `Windows ${build.windowsVersion}` : "не указана"}; накопитель ${driveEstimate(build).label}; разрешение ${formatBuildResolution(build)}.`;
 }
 
 async function readJson(body: ReadableStream<Uint8Array> | null): Promise<unknown> {
@@ -71,14 +72,14 @@ async function* providerEvents(body: ReadableStream<Uint8Array>): AsyncGenerator
 function configuration() {
   const key = process.env.RUSTFLOW_LLM_API_KEY?.trim();
   const model = "gpt-4o-mini";
-  if (!key) return { error: "ИИ-помощник не подключён. Укажите RUSTFLOW_LLM_API_KEY в .env на сервере и перезапустите RustFlow." } as const;
+  if (!key) return { error: ASSISTANT_UNAVAILABLE } as const;
   try {
     const endpoint = new URL(process.env.RUSTFLOW_LLM_ENDPOINT?.trim() || "https://api.openai.com/v1/chat/completions");
     const loopback = endpoint.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname);
     if ((!loopback && endpoint.protocol !== "https:") || endpoint.username || endpoint.password) throw new Error();
     return { key, endpoint, model };
   } catch {
-    return { error: "Проверьте RUSTFLOW_LLM_ENDPOINT в .env на сервере и перезапустите RustFlow." } as const;
+    return { error: ASSISTANT_UNAVAILABLE } as const;
   }
 }
 
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
   const controller = new AbortController();
   const timeout = AbortSignal.timeout(45000);
   const signal = AbortSignal.any([request.signal, controller.signal, timeout]);
-  const providerFailure = "ИИ не смог ответить. Проверьте настройки API или повторите запрос позже.";
+  const providerFailure = ASSISTANT_UNAVAILABLE;
   const timeoutMessage = "ИИ не успел ответить. Попробуйте ещё раз.";
   let upstream: Response;
   try {

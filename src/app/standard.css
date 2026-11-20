@@ -54,6 +54,13 @@
   }
 }
 :root[data-material] :is(.popover,.toast-card) { background-color: var(--lg-raised); }
+/* Honest FLIP: the panel is the glass now, so it refracts like the borrowed
+   skin did. Set directly (not via --lg-blur) to avoid changing the blur of
+   glass tiles nested inside the dialog. */
+:root[data-refraction][data-material] .rf-dialog-surface {
+  -webkit-backdrop-filter: var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);
+  backdrop-filter: var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);
+}
 :root[data-material] .nav-pill { background-color: var(--bar-tint); border-radius:var(--hud-radius); }
 .nav-capsules .nav-pill {height:var(--capsule-size);min-height:var(--capsule-size);box-sizing:border-box;}
 .nav-capsules :is(.studio-trigger,.assistant-trigger) {width:var(--capsule-size);padding:0;aspect-ratio:1;}
@@ -141,23 +148,23 @@
   top:0;left:var(--rim-left,0px);right:var(--rim-right,0px);bottom:var(--rim-bottom,0px);
   border:1px solid var(--lg-edge);
   border-radius:var(--rim-radius,28px);box-shadow:var(--lg-bevel);}
-.rf-dialog-surface[data-ready]::after {transition-property:left,right,bottom,border-radius;transition-duration:var(--popup-time,440ms);transition-timing-function:var(--morph-ease);}
+.rf-dialog-surface[data-ready]::after {transition-property:left,right,bottom,border-radius;transition-duration:380ms;transition-timing-function:var(--morph-ease);}
 .rf-dialog-surface[data-shown]::after {left:0;right:0;bottom:0;border-radius:28px;}
-.rf-dialog-surface[data-ready]:not([data-open])::after {transition-duration:var(--land-time,420ms);}
-:root .rf-dialog-surface { --morph-ease:cubic-bezier(.22,1,.36,1); transform-origin:0 0; transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; will-change:transform,opacity,filter; }
+.rf-dialog-surface[data-ready]:not([data-open])::after {transition-duration:var(--land-time,340ms);}
+:root .rf-dialog-surface { --morph-ease:cubic-bezier(.32,.72,0,1); transform-origin:0 0; transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; will-change:transform,opacity,filter; }
 :root .profile-panel { transform-origin:100% 0; }
-:root .rf-dialog-surface[data-ready] { transition: transform var(--popup-time,440ms) var(--morph-ease),clip-path var(--popup-time,440ms) var(--morph-ease),opacity var(--popup-time,440ms) var(--morph-ease); }
+:root .rf-dialog-surface[data-ready] { transition: transform 380ms var(--morph-ease),clip-path 380ms var(--morph-ease),opacity 380ms var(--morph-ease); }
 :root .rf-dialog-surface[data-shown] { transform:translate3d(0,0,0) scale(1); clip-path:inset(0px round 28px); opacity:1; }
-/* Split the 420ms morph Bézier at y=.8 (x=.27417). Opacity follows
-   the remaining fifth of *distance*, not the last fifth of clock time.
-   Diffusion is already clear at the split so no frosted tile lands. */
-.rf-dialog-surface[data-flip-source] { --exit-opacity:304.85ms cubic-bezier(.2043,1,.4843,1) 115.15ms; }
+/* Honest 340ms FLIP close: the shell shrinks onto the untouched source
+   for the full cycle while the glass itself dissolves across 240-340ms,
+   landing exactly on the live button. Sourceless entries simply fade. */
+.rf-dialog-surface[data-flip-source] { --exit-opacity:100ms ease 240ms; }
 :root[data-material] .rf-dialog-surface[data-ready]:not([data-open]) {
   transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; pointer-events:none;
   -webkit-backdrop-filter:blur(0px) saturate(100%); backdrop-filter:blur(0px) saturate(100%);
-  transition:transform var(--land-time,420ms) var(--morph-ease),clip-path var(--land-time,420ms) var(--morph-ease),opacity var(--exit-opacity,108ms ease-in-out),backdrop-filter var(--clear-time,108ms) ease-out;
+  transition:transform var(--land-time,340ms) var(--morph-ease),clip-path var(--land-time,340ms) var(--morph-ease),opacity var(--exit-opacity,340ms ease),backdrop-filter var(--clear-time,108ms) ease-out;
 }
-.rf-dialog-surface > * {opacity:0;transition:opacity 150ms ease;}
+.rf-dialog-surface > * {opacity:0;transition:opacity 100ms ease;}
 .rf-dialog-surface[data-shown] > * {opacity:1;}
 /* Blur the moving ink, not the backdrop sampling surface or its lit rim. */
 .rf-dialog-surface[data-velocity="motion-blur-y"] > * {filter:url(#motion-blur-y);}

@@ -57,6 +57,7 @@ export interface HardwarePreset extends UserOwnedRecord {
   ramMhz: number;
   ramCl: number;
   storageId: "hdd" | "sata" | "nvme";
+  nvmeGen?: 3 | 4 | 5;
   storage: string;
   resolution: PresetResolution;
   fpsSource: keyof typeof PRESET_FPS_SOURCE_LABEL;
@@ -154,7 +155,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 32,
     ramMhz: 3600,
     ramCl: 18,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 4,
     storage: "NVMe SSD PCIe 4.0 (1 ТБ)",
     resolution: "1080p",
     bottleneckNote: "Упор в однопоток/L3-кэш 5600X на плотной застройке; RTX 5060 в 1080p держит запас, но следите за 8 ГБ VRAM.",
@@ -270,7 +271,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 16,
     ramMhz: 3200,
     ramCl: 16,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 3,
     storage: "NVMe SSD PCIe 3.0 (1 ТБ)",
     resolution: "1080p",
     bottleneckNote: "12 ГБ VRAM хватает с запасом для чётких текстур; лучший недорогой апгрейд — добавить память до 32 ГБ.",
@@ -328,7 +329,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 32,
     ramMhz: 3600,
     ramCl: 16,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 4,
     storage: "NVMe SSD PCIe 4.0 (1 ТБ)",
     resolution: "1080p",
     bottleneckNote: "96 МБ 3D V-Cache кардинально поднимают FPS возле огромных баз; ограничение — 8 ГБ VRAM у 4060 Ti.",
@@ -386,7 +387,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 30,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 4,
     storage: "NVMe SSD PCIe 4.0 (2 ТБ)",
     resolution: "1440p",
     bottleneckNote: "Ровная связка для 1440p: 16 ГБ VRAM снимают любые вопросы к текстурам, DDR5-6000 CL30 минимизирует задержки.",
@@ -444,7 +445,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 30,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 4,
     storage: "NVMe SSD PCIe 4.0 (2 ТБ)",
     resolution: "1440p",
     bottleneckNote: "Эталонная связка под 165–240 Гц монитор в Rust; в тяжёлых сценах 1440p помогает DLSS Качество.",
@@ -502,7 +503,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 28,
-    storageId: "nvme",
+    storageId: "nvme", nvmeGen: 4,
     storage: "NVMe SSD PCIe 4.0 (2 ТБ)",
     resolution: "1440p",
     bottleneckNote: "В плотных сценах чаще ограничивает главный поток Unity; в открытых при высоких настройках возможен упор и в GPU.",
@@ -604,7 +605,7 @@ function makeCatalogPreset(tier: PresetTier, spec: PresetEstimate, index: number
     ramGb,
     ramMhz,
     ramCl,
-    storageId,
+    storageId, nvmeGen: pcie === "sata" ? undefined : pcie,
     storage: `${pcie === "sata" ? "SATA SSD" : `NVMe SSD PCIe ${pcie}.0`} (${ssdGb < 1000 ? `${ssdGb} ГБ` : `${ssdGb / 1000} ТБ`})`,
     resolution,
     bottleneckNote: spec.bottleneck,
@@ -637,7 +638,7 @@ export const PRESET_SCENE = "Фарм / Берег · нативное разр�
 
 export const HARDWARE_PRESETS: HardwarePreset[] = catalog.map((p) => {
   const build = evaluateBuild10({ name: p.title, cpuId: p.cpuId, gpuId: p.gpuId, ramGb: p.ramGb,
-    ramMhz: p.ramMhz, ramCl: p.ramCl, storage: p.storageId, resolution: "1080p" }, "competitive");
+    ramMhz: p.ramMhz, ramCl: p.ramCl, storage: p.storageId, nvmeGen: p.nvmeGen, resolution: "1080p" }, "competitive");
   if (!build) throw new Error(`Invalid preset hardware: ${p.slug}`);
   const { fpsModded: m, fpsOfficial: o } = build;
   return { ...p, fpsSource: "estimate", fpsModded: [m.min, m.max], fpsOfficial: [o.min, o.max],

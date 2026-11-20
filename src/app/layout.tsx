@@ -1,18 +1,38 @@
+import { SitePlan, SystemPlanProvider } from "@/components/catalog/SystemPlan";
+import { HARDWARE_PRESETS } from "@/lib/models/preset";
+import { TWEAKS_LITE } from "@/lib/tweaks";
 import type { Metadata, Viewport } from "next";
+import { Unbounded } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
-import Backdrop from "@/components/Backdrop";
+import "./glass.css";
+import "./report.css";
+import "./finishes.css";
+import "./standard.css";
+import "./workspace.css";
+import "./island.css";
+import { APPEARANCE_BOOT } from "@/lib/appearance-boot";
+import { GlassAppearance } from "@/components/GlassAppearance";
+import VelocityFilters from "@/components/fx/VelocityFilters";
+import BlobWallpaper from "@/components/BlobWallpaper";
+import LiquidGlassFilters from "@/components/fx/LiquidGlassFilters";
 import { AccountProvider } from "@/components/auth/AccountProvider";
 import Effects from "@/components/Effects";
 import PaletteMount from "@/components/addons/PaletteMount";
 import Footer from "@/components/Footer";
 import Nav from "@/components/Nav";
 import PwaRegistration from "@/components/PwaRegistration";
-import { RouteScroll } from "@/components/RouteLink";
+import { RouteScroll, RouteSurface } from "@/components/RouteLink";
 import { ToastProvider } from "@/components/ui/Toast";
 
+const display = Unbounded({
+  // Load the display faces when a heading needs them; prefetched Dock routes
+  // shouldn't issue speculative font preloads for both alphabets.
+  subsets: ["cyrillic", "latin"], weight: ["700", "800", "900"], display: "swap", preload: false, variable: "--font-unbounded",
+});
+
 const title = "RustFlow: сборка, твики и пресеты для Rust";
-const description = "Оцените сборку под Rust, сравните пресеты по FPS и 1% low и соберите ZIP с настройками и откатом. База знаний, мифы и EAC.";
+const description = "Оцените сборку под Rust, сравните пресеты по FPS и 1% low и соберите ZIP с настройками и откатом. Дорожная карта, драйверы, Windows и безопасность EAC.";
 
 function siteOrigin() {
   try {
@@ -39,35 +59,41 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F2EFEA" },
-    { media: "(prefers-color-scheme: dark)", color: "#0B0908" },
+    { media: "(prefers-color-scheme: light)", color: "#f8f9fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#090605" },
   ],
   colorScheme: "dark light",
 };
 
-// Resolve theme and reduced motion before the first visible content.
-const BOOT = `(function(){var d=document.documentElement,m=window.matchMedia;var t='system',r='auto',l=null;try{t=localStorage.getItem('rustflow:theme')||t;r=localStorage.getItem('rustflow:motion')||r;l=localStorage.getItem('rustflow:lite')}catch(e){}var theme=t==='dark'||t==='light'?t:(m&&m('(prefers-color-scheme: light)').matches?'light':'dark');d.setAttribute('data-theme',theme);d.style.colorScheme=theme;d.setAttribute('data-motion',r==='reduced'||(r!=='full'&&m&&m('(prefers-reduced-motion: reduce)').matches)?'reduced':'full');if(l==='1'||(l!=='0'&&(navigator.connection&&navigator.connection.saveData||navigator.deviceMemory&&navigator.deviceMemory<=2)))d.setAttribute('data-lite','');})();`;
+// Only identifiers, matching dimensions and selection eligibility enter the
+// shared client context. The full instructions and ZIP files stay off that path.
+const planIndex={
+  presets:HARDWARE_PRESETS.map(({title,slug,cpuId,gpuId,ramGb,resolution})=>({title,slug,cpuId,gpuId,ramGb,resolution})),
+  steps:TWEAKS_LITE.map(({slug,riskLevel,evidence,excludeFromPack,windowsVersion})=>({slug,riskLevel,evidence,excludeFromPack,windowsVersion})),
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="ru" data-motion="full" suppressHydrationWarning>
+  return <html lang="ru" className={display.variable} data-material="amber" data-theme="dark" data-motion="full" suppressHydrationWarning>
     <head>
-      <link rel="preload" href="/fonts/unbounded-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-      <link rel="preload" href="/fonts/unbounded-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      <link rel="preload" href="/fonts/inter-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
     </head>
     <body className="antialiased">
-      <script dangerouslySetInnerHTML={{ __html: BOOT }} />
+      <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOT }} />
       <a href="#main-content" className="skip-link">Перейти к содержимому</a>
-      <Backdrop />
+      <VelocityFilters />
+      <LiquidGlassFilters />
+      <BlobWallpaper />
       <ToastProvider>
         <AccountProvider>
-          <RouteScroll>
+          <GlassAppearance><SystemPlanProvider index={planIndex}><RouteScroll>
             <Nav />
             <main id="main-content" tabIndex={-1} className="rf-main mx-auto w-full max-w-6xl px-3.5 outline-none sm:px-6">
-              {children}
+              <div className="rf-depth-slot"><div className="rf-depth-plane"><RouteSurface>{children}<SitePlan/></RouteSurface></div></div>
             </main>
             <Footer />
             <PaletteMount />
-          </RouteScroll>
+          </RouteScroll></SystemPlanProvider></GlassAppearance>
         </AccountProvider>
       </ToastProvider>
       <Effects />

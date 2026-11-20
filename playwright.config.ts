@@ -1,9 +1,13 @@
 import { defineConfig } from "@playwright/test";
 
-const baseURL = "http://127.0.0.1:3000";
+import { IS_DESKTOP_APP } from "./src/lib/config";
+
+const port = IS_DESKTOP_APP ? 3001 : 3000;
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests",
+  ...(IS_DESKTOP_APP ? { testMatch: "**/native-mode.spec.ts" } : { testIgnore: "**/native-mode.spec.ts" }),
   workers: 1,
   timeout: 60_000,
   use: {
@@ -16,7 +20,7 @@ export default defineConfig({
     { name: "touch", use: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } },
   ],
   webServer: {
-    command: "npm run dev -- --hostname 0.0.0.0 --port 3000",
+    command: `npm run dev -- --hostname 0.0.0.0 --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 90_000,

@@ -61,7 +61,9 @@ const gpus = (group: string, vendor: Gpu["vendor"], rows: [string, number, numbe
     vendor,
   }));
 
-export const CPUS: Cpu[] = [
+// Full scoring index: older presets and saved rigs remain readable without pretending
+// the player owns a different processor. Only the curated list is selectable.
+const CPU_INDEX: Cpu[] = [
   ...cpus("AMD Ryzen", [
     ["Ryzen 7 9800X3D", 100],
     ["Ryzen 9 9950X3D", 100],
@@ -161,6 +163,14 @@ export const CPUS: Cpu[] = [
   ]),
 ];
 
+// Same inventory for the picker and the upgrade model. Tiers are relative
+// comparisons within a socket, not live prices or a claim of stock.
+export const BUILD_CPU_TIERS:Record<string,Record<string,number>> = {
+  AM4:{"ryzen-5-5600":1,"ryzen-5-5600x":1,"ryzen-7-5700x3d":2,"ryzen-7-5800x3d":3},
+  AM5:{"ryzen-5-7500f":1,"ryzen-5-7600":1,"ryzen-5-7600x":1,"ryzen-7-7700":2,"ryzen-7-7800x3d":2,"ryzen-7-9800x3d":3},
+  LGA1700:{"core-i5-12400f":1,"core-i5-13400f":1,"core-i5-13600kf":2,"core-i5-14600kf":2,"core-i7-14700kf":3},
+};
+export const CPUS = Object.entries(BUILD_CPU_TIERS).flatMap(([group,ids])=>CPU_INDEX.filter(c=>Object.hasOwn(ids,c.id)).map(c=>({...c,group})));
 export const GPUS: Gpu[] = [
   ...gpus("NVIDIA GeForce", "nvidia", [
     ["GeForce RTX 5090", 160, 32],
@@ -273,7 +283,7 @@ export const GPUS: Gpu[] = [
   ]),
 ];
 
-const CPU_BY_ID = new Map(CPUS.map((c) => [c.id, c]));
+const CPU_BY_ID = new Map(CPU_INDEX.map((c) => [c.id, c]));
 const GPU_BY_ID = new Map(GPUS.map((g) => [g.id, g]));
 
 export const getCpu = (id: string) => CPU_BY_ID.get(id);

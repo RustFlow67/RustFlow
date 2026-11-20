@@ -1,12 +1,23 @@
-import type { ReactNode } from "react";
+"use client";
+import { useState, type ReactNode } from "react";
+import AccordionBody from "../ui/AccordionBody";
 
-/** Inserts only the open disclosure, with a small CSS entry transition. */
-export default function OriginDisclosure({ open, children, className, fallback = null }: {
+/** Lazy first mount (large hardware lists); preserve the body during collapse.
+ * Both pointer and keyboard are blocked as soon as a disclosure closes. */
+export default function OriginDisclosure({
+  open,
+  children,
+  className,
+}: {
   open: boolean;
   children: ReactNode;
   className?: string;
-  fallback?: ReactNode;
 }) {
-  if (!open) return fallback;
-  return <div className={className}><div className="rf-popup-motion" data-open="">{children}</div></div>;
+  const [visited, visit] = useState(open);
+  if (open && !visited) visit(true);
+  return (
+    <div className={className}>
+      <AccordionBody open={open}>{(visited || open) && children}</AccordionBody>
+    </div>
+  );
 }
