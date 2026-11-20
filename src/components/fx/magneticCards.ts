@@ -67,28 +67,38 @@ export function magneticCards() {
     goalY = dy * limit;
     if (!frame) frame = requestAnimationFrame(paint);
   };
+  let moveFrame = 0, scrollFrame = 0;
+  let pending: { x: number; y: number; target: EventTarget | null; mouse: boolean } | null = null;
   const move = (e: PointerEvent) => {
-    pointerX = e.clientX;
-    pointerY = e.clientY;
-    const next =
-      e.pointerType === "mouse" && !e.buttons && fine.matches && !quietMotion() && e.target instanceof Element
-        ? e.target.closest<HTMLElement>(cards)
-        : null;
-    if (next !== tile) {
-      reset(true);
-      tile = next;
-      box = tile?.getBoundingClientRect() ?? null;
-    }
-    aim();
+    pending = { x: e.clientX, y: e.clientY, target: e.target, mouse: e.pointerType === "mouse" && !e.buttons };
+    if (moveFrame) return;
+    moveFrame = requestAnimationFrame(() => {
+      moveFrame = 0;
+      const current = pending;
+      if (!current) return;
+      pointerX = current.x;
+      pointerY = current.y;
+      const next = current.mouse && fine.matches && !quietMotion() && current.target instanceof Element
+        ? current.target.closest<HTMLElement>(cards) : null;
+      if (next !== tile) {
+        reset(true);
+        tile = next;
+        box = tile?.getBoundingClientRect() ?? null;
+      }
+      aim();
+    });
   };
   const stop = () => {
+    cancelAnimationFrame(moveFrame); cancelAnimationFrame(scrollFrame);
+    moveFrame = 0; scrollFrame = 0; pending = null;
     reset(false);
     releaseAnimation?.cancel();
   };
   // A scroll notification may arrive *after* pointermove for the new layout.
   // Keep following a stationary pointer if its real hit is still this tile;
   // otherwise release. Never leave a translated tile over another control.
-  const scrolled = () => {
+  const updateScroll = () => {
+    scrollFrame = 0;
     if (!tile) return;
     if (!tile.contains(document.elementFromPoint(pointerX, pointerY))) {
       stop();
@@ -98,8 +108,12 @@ export function magneticCards() {
     box = new DOMRect(r.x - x, r.y - y, r.width, r.height);
     aim();
   };
+  const scrolled = () => { if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll); };
   const leave = (e: PointerEvent) => {
-    if (!e.relatedTarget) reset(true);
+    if (!e.relatedTarget) {
+      cancelAnimationFrame(moveFrame); moveFrame = 0; pending = null;
+      reset(true);
+    }
   };
   document.addEventListener("pointermove", move, { passive: true });
   document.addEventListener("pointerout", leave);

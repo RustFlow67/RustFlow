@@ -11,7 +11,7 @@ export default function DesktopTitlebar() {
     void getCurrentWindow()[action]().catch(() => {});
   };
   return <div className="desktop-titlebar" data-tauri-drag-region>
-    <span data-tauri-drag-region>RustFlow</span>
+    <div className="desktop-titlebar-drag" data-tauri-drag-region />
     <LiquidGlass className="desktop-window-controls" shape="pill">
       <button type="button" aria-label="Свернуть" onClick={() => run("minimize")}><Minus size={16}/></button>
       <button type="button" aria-label="Развернуть или восстановить" onClick={() => run("toggleMaximize")}><Square size={14}/></button>

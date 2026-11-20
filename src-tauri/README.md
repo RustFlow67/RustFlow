@@ -26,7 +26,7 @@ SmartScreen warnings. WebView2 may require a network connection during setup.
 The workflow definition must first exist on the repository's default branch.
 
 In desktop mode, saving the tweak package creates a new subfolder under the
-current user's Desktop `RustFlow_Tweaks` folder and opens it in Explorer. It
+current user's Desktop `RustFlow_Tweaks` folder and selects `README.txt` in Explorer. It
 contains the existing pack instructions, tweak files and available rollback
 instructions/scripts; no scripts are executed. Existing exports are not
 overwritten. The user must read the instructions, make the recommended backups,

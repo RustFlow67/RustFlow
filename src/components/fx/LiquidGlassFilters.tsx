@@ -3,6 +3,17 @@
 import { useEffect, useRef } from "react";
 import { buildDisplacementMap, bevels } from "../LiquidGlass";
 
+// A shared resource bank also survives React remounts and strict-mode effects.
+const displacementCache = new Map<string, string>();
+function displacement(section: (typeof bevels)[number]) {
+  const key = `${section.w}:${section.h}:${section.r}:${section.bezel}`;
+  const existing = displacementCache.get(key);
+  if (existing) return existing;
+  const url = buildDisplacementMap(section);
+  if (url) displacementCache.set(key, url);
+  return url;
+}
+
 /** One resource bank per document, including portaled menus. */
 export default function LiquidGlassFilters() {
   const defs = useRef<SVGDefsElement>(null);
@@ -20,7 +31,7 @@ export default function LiquidGlassFilters() {
     function sync() {
       if (!ready && !root.hasAttribute("data-lite")) {
         for (const [i, section] of bevels.entries()) {
-          const url = buildDisplacementMap(section);
+          const url = displacement(section);
           if (!url) return;
           images[i].setAttribute("href", url);
         }

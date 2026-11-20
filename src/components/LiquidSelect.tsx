@@ -51,7 +51,7 @@ export default function LiquidSelect<T extends string | number>({ label, hideLab
     window.addEventListener("scroll", queue, { passive: true, capture: true });
     window.addEventListener("resize", queue);
     window.visualViewport?.addEventListener("resize", queue);
-    window.visualViewport?.addEventListener("scroll", queue);
+    window.visualViewport?.addEventListener("scroll", queue, { passive: true });
     return () => {
       observer.disconnect(); cancelAnimationFrame(frame);
       window.removeEventListener("scroll", queue, true); window.removeEventListener("resize", queue);
