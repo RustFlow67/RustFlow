@@ -36,8 +36,8 @@ test("a desktop build without a host never reports an installation, backup or ro
   await press(dialog.getByRole("button", { name: "GTX 10", exact: true }));
   await press(dialog.getByRole("button", { name: "GeForce GTX 1080 Ti", exact: true }));
   await expect(dialog.getByRole("link", { name: /Скачать DDU|Скачать чистый драйвер/ })).toHaveCount(0);
-  await press(dialog.getByRole("button", { name: "Установить чистый драйвер" }));
-  await expect(dialog.locator(".native-actions [role=status]")).toContainText("Изменений на ПК нет");
+  await press(dialog.getByRole("button", { name: "Скачать DDU (удаление старого драйвера) ↗" }));
+  await expect(dialog.locator(".driver-downloads [role=status]")).toContainText("недоступно");
 });
 
 test("the narrow host contract receives the actual preview/selection only on explicit action", async ({
@@ -57,9 +57,10 @@ test("the narrow host contract receives the actual preview/selection only on exp
       rollbackChanges: async () => {
         throw new Error("host disconnected");
       },
-      installCleanDriver: async (device) => {
-        sessionStorage.setItem("test-driver", JSON.stringify(device));
-        return { status: "failed" };
+      installCleanDriver: stub,
+      openOfficialSupport: async (kind) => {
+        sessionStorage.setItem("test-driver-page", kind);
+        return { status: "ok", value: undefined };
       },
     };
     window.rustflowSystem = host;
@@ -93,12 +94,9 @@ test("the narrow host contract receives the actual preview/selection only on exp
   await press(page.locator("#radeon"));
   await press(dialog.getByRole("button", { name: "RX 500 · Polaris", exact: true }));
   await press(dialog.getByRole("button", { name: "Radeon RX 580", exact: true }));
-  await press(dialog.getByRole("button", { name: "Установить чистый драйвер" }));
-  await expect(dialog.locator(".native-actions [role=status]")).toContainText("не подтвердил");
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("test-driver")!))).toEqual({
-    family: "radeon",
-    model: "Radeon RX 580",
-  });
+  await press(dialog.getByRole("button", { name: "Открыть официальный подбор драйвера ↗" }));
+  await expect(dialog.locator(".driver-downloads [role=status]")).toContainText("Открыта официальная страница");
+  expect(await page.evaluate(() => sessionStorage.getItem("test-driver-page"))).toBe("radeon");
 });
 
 test("cfg previews and preset cards use the same desktop action, not a browser download", async ({
@@ -136,7 +134,7 @@ test("Tauri exports a package of instructions and rollback files without running
   });
   await page.goto("/tweaker?mode=quality&gpu=amd");
   const actions = page.locator("#pack-settings .native-actions");
-  await press(actions.getByRole("button", { name: "Сохранить пакет твиков" }));
+  await press(actions.getByRole("button", { name: "Подготовить и открыть пакет твиков" }));
   await expect(actions.getByRole("status")).toContainText("Твики не запускались");
   await expect(actions.getByRole("button", { name: "Откатить изменения" })).toHaveCount(0);
   const names = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pack-files") || "[]") as string[]);

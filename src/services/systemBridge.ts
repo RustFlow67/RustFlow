@@ -35,7 +35,7 @@ export interface SystemBridge {
   applyTweaks(plan: TweakPlan): Promise<SystemResult>;
   rollbackChanges(): Promise<SystemResult>; // Restore the last applied transaction on this machine.
   installCleanDriver(device: DriverSelection): Promise<SystemResult>;
-  openOfficialSupport?(kind: "ddu" | "nvidia" | "radeon" | "arc"): Promise<SystemResult>;
+  openOfficialSupport?(kind: "ddu" | "nvidia" | "radeon" | "arc" | "nvcleanstall"): Promise<SystemResult>;
 }
 
 declare global {

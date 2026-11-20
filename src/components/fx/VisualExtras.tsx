@@ -32,8 +32,9 @@ export default function VisualExtras() {
     );
     if (backdrop) io.observe(backdrop);
 
+    let scrollFrame = 0;
     const onScroll = () => {
-      scrollY = window.scrollY;
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; scrollY = window.scrollY; });
     };
     const onVisibility = () => syncHold();
 
@@ -53,6 +54,7 @@ export default function VisualExtras() {
 
     return () => {
       unsub();
+      cancelAnimationFrame(scrollFrame);
       io.disconnect();
       window.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", onVisibility);

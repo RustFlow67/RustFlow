@@ -22,7 +22,9 @@ export function useChromeMotion() {
     let animations: Animation[] = [],
       previous = Math.max(0, window.scrollY);
     root.toggleAttribute("data-scrolled", previous > 0);
-    const scroll = () => {
+    let scrollFrame = 0;
+    const updateScroll = () => {
+      scrollFrame = 0;
       const y = Math.max(0, window.scrollY);
       root.toggleAttribute("data-scrolled", y > 0);
       if (y !== previous && !document.body.hasAttribute("data-popup-depth")) {
@@ -33,6 +35,7 @@ export function useChromeMotion() {
       }
       previous = y;
     };
+    const scroll = () => { if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll); };
     // A fine trackpad can reverse before its first subpixel delta has changed
     // scrollY. Begin the return now; never consume native scrolling or zoom.
     const wheel = (e: WheelEvent) => {
@@ -95,6 +98,7 @@ export function useChromeMotion() {
     window.addEventListener("rustflow:modal-open", clear);
     return () => {
       clear();
+      cancelAnimationFrame(scrollFrame);
       window.removeEventListener("scroll", scroll);
       window.removeEventListener("wheel", wheel);
       window.removeEventListener("rustflow:chrome-pulse", pulse);

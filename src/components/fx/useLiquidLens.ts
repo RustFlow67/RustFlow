@@ -177,33 +177,49 @@ export function useLiquidLens<
       rail.toggleAttribute("data-scroll-start", rail.scrollLeft > 1);
       rail.toggleAttribute("data-scroll-end", rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1);
     }
-    function scrolled() {
+    let scrollFrame = 0;
+    function updateScroll() {
+      scrollFrame = 0;
       scrollEdges();
       if (point) point.node = document.elementFromPoint(point.x, point.y)?.closest<HTMLElement>(ITEM) ?? null;
       aim();
     }
+    function scrolled() { if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScroll); }
     function measure() {
       scrollEdges();
       measured = false;
       aim();
     }
+    let pointerFrame = 0;
+    let pendingPointer: { x: number; y: number; target: EventTarget | null } | null = null;
     function pointer(e: PointerEvent) {
       if (e.pointerType === "touch") return;
-      point = {
-        x: e.clientX,
-        y: e.clientY,
-        node: e.target instanceof Element ? e.target.closest<HTMLElement>(ITEM) : null,
-      };
-      focused = null;
-      aim();
+      pendingPointer = { x: e.clientX, y: e.clientY, target: e.target };
+      if (pointerFrame) return;
+      pointerFrame = requestAnimationFrame(() => {
+        pointerFrame = 0;
+        const current = pendingPointer;
+        if (!current) return;
+        point = {
+          x: current.x,
+          y: current.y,
+          node: current.target instanceof Element ? current.target.closest<HTMLElement>(ITEM) : null,
+        };
+        focused = null;
+        aim();
+      });
     }
     function leave() {
+      cancelAnimationFrame(pointerFrame);
+      pointerFrame = 0;
+      pendingPointer = null;
       point = null;
       focused = null;
       aim();
     }
     function focus(e: FocusEvent) {
       if (e.target instanceof HTMLElement && e.target.matches(":focus-visible")) {
+        cancelAnimationFrame(pointerFrame); pointerFrame = 0; pendingPointer = null;
         focused = e.target.closest(ITEM);
         point = null;
         aim();
@@ -215,6 +231,7 @@ export function useLiquidLens<
     }
     function visibility() {
       if (document.hidden) {
+        cancelAnimationFrame(pointerFrame); pointerFrame = 0; pendingPointer = null;
         cancelAnimationFrame(frame);
         frame = 0;
         point = null;
@@ -287,7 +304,7 @@ export function useLiquidLens<
     rail.addEventListener("scroll", scrolled, { passive: true });
     // Delegated pointerover is the item-enter event even on nested icons.
     // A touch tap commits via the native control, never a sticky mouse preview.
-    rail.addEventListener("pointermove", pointer);
+    rail.addEventListener("pointermove", pointer, { passive: true });
     rail.addEventListener("pointerover", pointer);
     rail.addEventListener("pointerleave", leave);
     rail.addEventListener("pointercancel", leave);
@@ -298,6 +315,8 @@ export function useLiquidLens<
       if (dock) window.removeEventListener("rustflow:dock-layout", layout);
       sync.current = null;
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(scrollFrame);
+      cancelAnimationFrame(pointerFrame);
       stopBlur?.();
       ro.disconnect();
       changes.disconnect();

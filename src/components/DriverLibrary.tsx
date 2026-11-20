@@ -21,7 +21,6 @@ import {
   driverChoice,
   type FamilyId,
 } from "@/lib/drivers";
-import AdaptiveActions from "./AdaptiveActions";
 import { getSystemBridge } from "@/services/systemBridge";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import { Modal } from "./ui/Modal";
@@ -61,15 +60,18 @@ function NativeSupport({ family }: { family: FamilyId }) {
   const [message, setMessage] = useState("");
   const gpu = family === "nvidia" || family === "radeon" || family === "arc";
   if (!gpu) return null;
-  async function open(kind: "ddu" | "nvidia" | "radeon" | "arc") {
+  async function open(kind: "ddu" | "nvidia" | "radeon" | "arc" | "nvcleanstall") {
     const openSupport = getSystemBridge().openOfficialSupport;
     if (!openSupport) { setMessage("Открытие официального сайта недоступно."); return; }
-    const result = await openSupport(kind);
-    setMessage(result.status === "ok" ? "Открыт официальный сайт. Выберите и проверьте файл перед запуском." : "Не удалось открыть официальный сайт.");
+    try {
+      const result = await openSupport(kind);
+      setMessage(result.status === "ok" ? "Открыта официальная страница загрузки. При необходимости сначала удалите старый драйвер через DDU." : "Не удалось открыть официальный сайт.");
+    } catch { setMessage("Не удалось открыть официальный сайт."); }
   }
   return <div className="driver-downloads">
-    <button className="btn btn-sm" type="button" onClick={() => void open(family as "nvidia" | "radeon" | "arc")}>Открыть официальный подбор драйвера ↗</button>
-    <button className="btn btn-sm" type="button" onClick={() => void open("ddu")}>Открыть официальный сайт DDU ↗</button>
+    <button className="btn btn-sm" type="button" onClick={() => void open(family as "nvidia" | "radeon" | "arc")}>{family === "nvidia" ? "Скачать чистый драйвер ↗" : "Открыть официальный подбор драйвера ↗"}</button>
+    <button className="btn btn-sm" type="button" onClick={() => void open("ddu")}>Скачать DDU (удаление старого драйвера) ↗</button>
+    {family === "nvidia" && <button className="btn btn-sm" type="button" onClick={() => void open("nvcleanstall")}>Скачать NVCleanstall ↗</button>}
     <span role="status">{message}</span>
   </div>;
 }
@@ -92,14 +94,14 @@ function Instructions({ family, model }: { family: FamilyId; model: string }) {
       )}
       {r.url && (
         <div className="driver-downloads">
-          <AdaptiveActions key={model} action={{kind:"driver",family,model}}>
+          {!IS_DESKTOP_APP && <>
             {ext(r.url, `Открыть официальный подбор для ${model}`, true)}
             {gpu && ext(DDU, "Скачать DDU (удаление старого драйвера)", true)}
             {family === "nvidia" && ext(NVCLEANSTALL, "Скачать чистый драйвер + NVCleanstall без телеметрии", true)}
-          </AdaptiveActions>
+          </>}
         </div>
       )}
-      {IS_DESKTOP_APP && <NativeSupport family={family} />}
+      {IS_DESKTOP_APP && (gpu ? <NativeSupport family={family} /> : r.url && <p>Найдите драйвер для точной модели на сайте производителя устройства.</p>)}
       <h3 className="install-heading">{gpu ? "Как установить без лишнего" : "Как установить и проверить"}</h3>
       {gpu ? (
         <>

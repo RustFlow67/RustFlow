@@ -331,3 +331,14 @@ test("the 15 selectable CPUs and readable single files are reachable without los
     expect(await r.text()).toContain(cmd);
   }
 });
+
+test("roadmap keeps five action links without completion tracking", async ({ page }) => {
+  await page.goto("/guide");
+  const roadmap = page.locator("#roadmap");
+  await expect(roadmap.getByRole("heading", { name: "Моя дорожная карта" })).toBeVisible();
+  await expect(roadmap.locator(".road-step")).toHaveCount(5);
+  await expect(roadmap.locator(".road-step a")).toHaveCount(5);
+  await expect(roadmap.getByRole("checkbox")).toHaveCount(0);
+  await expect(roadmap.getByRole("progressbar")).toHaveCount(0);
+  await expect(roadmap).not.toContainText("Выполнено");
+});

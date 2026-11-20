@@ -35,7 +35,7 @@ function NativeActions({ action }: { action: Action }) {
           : await host.applyTweaks(action);
       switch (result.status) {
         case "ok":
-          setMessage(undo ? "Изменения отменены." : driver ? "Драйвер установлен." : action.kind === "pack" && tauri ? "Пакет сохранён на Рабочем столе и открыт. Твики не запускались." : "Настройки применены.");
+          setMessage(undo ? "Изменения отменены." : driver ? "Драйвер установлен." : action.kind === "pack" && tauri ? "Пакет сохранён. Запрошено открытие Проводника с выделением README.txt: прочитайте инструкцию и создайте снимки перед ручным применением. Твики не запускались." : "Настройки применены.");
           break;
         case "unavailable":
           setMessage("Системный модуль пока не подключён. Изменений на ПК нет.");
@@ -57,7 +57,7 @@ function NativeActions({ action }: { action: Action }) {
     <div className="native-actions" aria-busy={busy}>
       <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void run()}>
         {driver ? <Download aria-hidden="true" /> : <Check aria-hidden="true" />}
-        {driver ? "Установить чистый драйвер" : tauri ? action.kind === "cfg" ? "Применить в игру" : "Сохранить пакет твиков" : "Применить в систему"}
+        {driver ? "Установить чистый драйвер" : tauri ? action.kind === "cfg" ? "Применить в игру" : "Подготовить и открыть пакет твиков" : "Применить в систему"}
       </button>
       {!driver && !(action.kind === "pack" && tauri) && (
         <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void run(true)}>

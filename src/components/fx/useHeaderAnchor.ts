@@ -79,13 +79,16 @@ export function useHeaderAnchor(
     window.addEventListener("rustflow:dock-layout", align);
     window.addEventListener("resize", align);
     vp?.addEventListener("resize", align);
-    vp?.addEventListener("scroll", align);
+    let scrollFrame = 0;
+    const onScroll = () => { if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; align(); }); };
+    vp?.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       sizes.disconnect();
       window.removeEventListener("rustflow:dock-layout", align);
       window.removeEventListener("resize", align);
       vp?.removeEventListener("resize", align);
-      vp?.removeEventListener("scroll", align);
+      cancelAnimationFrame(scrollFrame);
+      vp?.removeEventListener("scroll", onScroll);
     };
   }, [anchor, slot, side, open, source]);
 }

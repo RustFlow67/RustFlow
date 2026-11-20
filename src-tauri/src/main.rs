@@ -173,6 +173,7 @@ fn open_official_support(kind: String) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         let url = match kind.as_str() {
             "ddu" => "https://www.wagnardsoft.com/display-driver-uninstaller-ddu",
+            "nvcleanstall" => "https://www.techpowerup.com/download/techpowerup-nvcleanstall/",
             "nvidia" => "https://www.nvidia.com/en-us/drivers/",
             "radeon" => "https://www.amd.com/en/support/download/drivers.html",
             "arc" => "https://www.intel.com/content/www/us/en/download/785597/intel-arc-graphics-windows.html",
@@ -251,8 +252,10 @@ fn save_tweak_pack(app: tauri::AppHandle, files: Vec<PackFile>) -> Result<SavedP
             let mut dest = std::fs::OpenOptions::new().write(true).create_new(true).open(path).map_err(|e| e.to_string())?;
             dest.write_all(&file.data).and_then(|_| dest.sync_all()).map_err(|e| e.to_string())?;
         }
-        let folder = display_desktop.join("RustFlow_Tweaks").join(directory_name).join("RustFlow-Pack");
-        let opened = std::process::Command::new("explorer.exe").arg(folder).spawn().is_ok();
+        // Open the instructions rather than claiming there is a consolidated
+        // apply script: the pack contains manual and non-registry steps too.
+        let readme = display_desktop.join("RustFlow_Tweaks").join(directory_name).join("RustFlow-Pack").join("README.txt");
+        let opened = readme.is_file() && std::process::Command::new("explorer.exe").arg("/select,").arg(readme).spawn().is_ok();
         Ok(SavedPack { opened })
     }
 }
