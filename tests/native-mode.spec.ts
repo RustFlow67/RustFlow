@@ -119,3 +119,27 @@ test("cfg previews and preset cards use the same desktop action, not a browser d
   await expect(dialog.getByRole("button", { name: "Копировать", exact: true })).toHaveCount(0);
   await expect(page.locator('a[download="client.cfg"]')).toHaveCount(0);
 });
+
+test("Tauri exports a package of instructions and rollback files without running it", async ({ page }) => {
+  await page.addInitScript(() => {
+    const win = window as unknown as { isTauri: boolean; __TAURI_INTERNALS__: { invoke: (cmd: string, args?: { files?: { name: string; data: number[] }[] }) => Promise<unknown> } };
+    win.isTauri = true;
+    window.confirm = () => true;
+    win.__TAURI_INTERNALS__ = { invoke: async (cmd, args) => {
+      if (cmd === "read_windows_info") throw new Error("not available");
+      if (cmd === "save_tweak_pack") {
+        sessionStorage.setItem("pack-files", JSON.stringify(args?.files?.map(file => file.name)));
+        return { opened: true };
+      }
+      throw new Error(`Unexpected command: ${cmd}`);
+    } };
+  });
+  await page.goto("/tweaker?mode=quality&gpu=amd");
+  const actions = page.locator("#pack-settings .native-actions");
+  await press(actions.getByRole("button", { name: "Сохранить пакет твиков" }));
+  await expect(actions.getByRole("status")).toContainText("Твики не запускались");
+  await expect(actions.getByRole("button", { name: "Откатить изменения" })).toHaveCount(0);
+  const names = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pack-files") || "[]") as string[]);
+  expect(names).toContain("RustFlow-Pack/README.txt");
+  expect(names.some(name => name.startsWith("RustFlow-Pack/Otkat/"))).toBe(true);
+});

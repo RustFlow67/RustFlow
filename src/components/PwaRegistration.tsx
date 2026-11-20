@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 export default function PwaRegistration() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || !window.isSecureContext ||
+    if (process.env.NEXT_PUBLIC_IS_DESKTOP_APP === "true" || process.env.NODE_ENV !== "production" || !window.isSecureContext ||
         window.top !== window.self || !("serviceWorker" in navigator)) return;
 
     const register = () => {
