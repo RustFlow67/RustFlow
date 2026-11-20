@@ -1,0 +1,70 @@
+/* The button remains the native focus/hit target. Only its glass changes
+   parents. Keep the 1px optical edge inside the original border box. */
+:root[data-material] [data-island-button] {
+  position:relative; isolation:isolate; box-sizing:border-box; overflow:visible; background:transparent; border:1px solid transparent;
+  box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+:root[data-material] [data-island-button]::before {content:none;}
+:root[data-material] [data-island-button="round"] {border-radius:50%;}
+[data-island-button] > [data-island-home] {position:absolute;inset:-1px;pointer-events:none;border-radius:inherit;}
+[data-island-ink] {position:relative;display:inline-flex;align-items:center;justify-content:center;gap:inherit;min-width:0;max-width:100%;opacity:1;transition:opacity 80ms linear;}
+/* Whole-card invokers keep their grid/block layout inside the fading ink. */
+.discovery-item > [data-island-ink] {display:grid;align-content:start;justify-items:start;gap:6px;min-width:0;}
+.category-card > [data-island-ink] {display:block;}
+/* Sample the moving wallpaper once per pane, not again for each button on
+   it — the same .btn carve-out the panes already use. Tiles and cards keep
+   their blur. In flight the skin leaves the pane and refracts as the panel. */
+:is(.glass,.modal-panel,.popover) [data-island-button].btn > [data-island-home] > .island-skin {
+  -webkit-backdrop-filter:none;backdrop-filter:none;}
+[data-island-source="away"] > [data-island-ink] {opacity:0;}
+/* While its window is open the source lends its entire look to the panel:
+   no empty dark oval lingers in the header. The attribute is removed only
+   when the landing settles, so visibility returns exactly at the end. */
+[data-island-source] {opacity:0;pointer-events:none;}
+[data-island-source="away"] {transition:opacity 80ms linear;}
+/* Split cubic-bezier(.22,1,.36,1) at y=.8, x=.27417. Reveal ink above
+   the returning glass across the last fifth of distance, not clock time. */
+[data-island-source="landing"] > [data-island-ink] {transition:opacity 275.82ms cubic-bezier(.2043,1,.4843,1) 104.18ms;}
+body:not(:has(.rf-dialog-surface[data-open]:not([data-header-motion]))) [data-hud="top"][data-island-pinned] {
+  z-index:calc(var(--dialog-layer) + 1);opacity:1;transform:var(--island-pinned-pose);
+}
+body[data-popup-depth] [data-island-pinned] [data-chrome-panel]:not([data-island-source]) {opacity:0;}
+[data-island-bed] {position:absolute;inset:0;pointer-events:none;}
+[data-island] {--island-ease:cubic-bezier(.22,1,.36,1);--island-time:420ms;
+  --cut-right:calc(100% - var(--island-w));--cut-left:0px;
+  --island-clip:inset(0px var(--cut-right) calc(100% - var(--island-h)) var(--cut-left) round var(--island-radius));}
+[data-header-slot="right"][data-island] {--cut-right:0px;--cut-left:calc(100% - var(--island-w));}
+[data-island="landing"] {--island-time:380ms;}
+:root[data-material] .island-skin {position:absolute;inset:0;display:block;border-radius:inherit;pointer-events:none;will-change:transform,opacity,filter;
+  background:var(--lg-coat),var(--island-button-color,var(--bar-tint));box-shadow:var(--hud-panel-shadow,var(--lg-shadow));}
+:root[data-material] [data-island-bed] > .island-skin {
+  inset:0 auto auto 0;width:var(--island-w);height:var(--island-h);border-radius:var(--island-radius);
+  transform:var(--island-from);transform-origin:top left;
+}
+:root[data-material] [data-header-slot="right"] [data-island-bed] > .island-skin {left:auto;right:0;transform-origin:top right;}
+:root[data-material] [data-island]:not([data-island="source"]) [data-island-bed] > .island-skin {
+  transition-property:transform,width,height,border-radius,background-color,box-shadow;transition-duration:var(--island-time);transition-timing-function:var(--island-ease);
+}
+:root[data-material] [data-island="shown"] [data-island-bed] > .island-skin {
+  width:100%;height:100%;transform:translate3d(0,0,0);border-radius:28px;background-color:var(--lg-glass);box-shadow:var(--lg-shadow);
+}
+:root[data-refraction] [data-island="shown"] .island-skin {--lg-blur:var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);}
+/* A separate transparent ink plane shares the physical silhouette. Text is
+   clipped/revealed, never scaled or distorted. No duplicate glass tile on exit. */
+:root[data-material] .rf-dialog-surface[data-header-motion],
+:root[data-material] .rf-dialog-surface[data-header-motion][data-ready]:not([data-open]) {
+  transform:var(--island-from);clip-path:var(--island-clip);opacity:1;
+  background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+}
+:root[data-material] .rf-dialog-surface[data-header-motion][data-ready] {
+  transition:transform var(--island-time) var(--island-ease),clip-path var(--island-time) var(--island-ease);
+}
+:root[data-material] .rf-dialog-surface[data-header-motion][data-shown] {transform:translate3d(0,0,0);clip-path:inset(0px round 28px);}
+.rf-dialog-surface[data-header-motion]::after,.rf-dialog-surface[data-header-motion]::before {display:none;}
+.rf-dialog-surface[data-header-motion][data-shown] > * {transition:opacity 200ms ease 80ms;}
+.rf-dialog-surface[data-header-motion]:not([data-open]) > * {transition:opacity 140ms ease;}
+:root[data-lite] .island-skin {background:var(--surface-solid-fallback);}
+:root:is([data-lite],[data-motion="reduced"],[data-engine-motion="instant"]) :is(.island-skin,[data-island-ink],.rf-dialog-surface[data-header-motion],.rf-dialog-surface[data-header-motion] > *) {transition:none !important;}
+
+:root[data-material="pearl"][data-scrolled] :is(.profile-trigger,[data-header-slot="right"]) {--island-button-color:rgb(34 54 78 / .78);}
+:root[data-scroll-down]:not([data-lite],[data-motion="reduced"],[data-engine-motion="instant"]) [data-island-bed] {--hud-panel-shadow:var(--lg-bevel),0 12px 36px var(--theme-glow);}

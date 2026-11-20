@@ -1,0 +1,474 @@
+/* Form and forecast share one sheet. Only interactive controls need a glass
+   edge; typography and whitespace separate the readouts. Container queries
+   follow the actual column width (in particular with the side Dock). */
+.build-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+  padding: clamp(16px, 3vw, 34px);
+}
+.build-inputs,
+.build-output {
+  min-width: 0;
+  container-type: inline-size;
+  scroll-margin-top: var(--content-inset);
+}
+.build-fields,
+.drive-details,
+.result-sections,
+.model-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.work-heading {
+  margin-bottom: 19px;
+}
+.work-heading h2,
+.driver-library header h2 {
+  margin: 9px 0 7px;
+  font-size: clamp(1.05rem, 2vw, 1.5rem);
+  line-height: 1.32;
+}
+.work-heading p,
+.result-sections section > p,
+.driver-library header p,
+.driver-workbench p,
+.driver-result > small,
+.model-details p {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.field-title,
+.drive-details h4 {
+  font-size: 0.83rem;
+  margin: 0 0 6px;
+}
+.input-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.input-pair > * {
+  min-width: 0;
+}
+.build-disk .drive-controls {
+  padding: 0;
+  gap: 8px;
+}
+.build-disk .drive-controls > div:first-child > label {
+  font-size: 0.76rem;
+}
+:root[data-material] .build-inputs .warmup-readout {
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border: none;
+  padding: 2px 0;
+}
+.build-disclosure {
+  border-top: 1px solid var(--border-subtle);
+  padding: 2px 0;
+}
+.build-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+  font-size: 0.85rem;
+  font-weight: 680;
+  cursor: pointer;
+}
+.build-disclosure > summary svg {
+  flex: none;
+  color: var(--theme-ink);
+}
+.build-disclosure[open] > summary svg {
+  rotate: 180deg;
+}
+.build-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+.build-disclosure > div {
+  padding-block: 8px;
+}
+.build-disclosure .play-settings {
+  padding: 0;
+}
+.capture-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+.capture-mode input {
+  accent-color: var(--theme-accent);
+}
+.build-output {
+  padding-top: 22px;
+  border-top: 1px solid var(--border-subtle);
+}
+.result-sections {
+  gap: 18px;
+}
+.balance-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.balance-overview svg {
+  max-height: 212px;
+}
+.balance-overview > div {
+  min-width: 0;
+}
+.balance-score > small,
+.balance-score dt {
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  font-weight: 650;
+}
+.balance-score > p {
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+.balance-score > p strong {
+  font-size: clamp(2rem, 7cqi, 3rem);
+  letter-spacing: -0.055em;
+  color: var(--theme-ink);
+  line-height: 1.1;
+}
+.balance-score > b {
+  display: block;
+  margin: 5px 0;
+  font-size: 0.84rem;
+}
+.balance-score dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 13px;
+}
+.balance-score dd {
+  font-size: 0.85rem;
+  font-weight: 740;
+  color: var(--theme-ink);
+  font-variant-numeric: tabular-nums;
+}
+.result-sections h3 {
+  font-size: 1.05rem;
+  margin-bottom: 5px;
+}
+.fps-summary table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin: 10px 0 0;
+}
+.fps-summary caption {
+  text-align: start;
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+.fps-summary th,
+.fps-summary td {
+  padding: 7px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fps-summary th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.fps-summary th small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.fps-summary td {
+  color: var(--theme-ink);
+  font-size: 1.2rem;
+  font-weight: 730;
+  font-variant-numeric: tabular-nums;
+}
+.build-modes {
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 94px), 1fr));
+}
+.build-modes .segmented-item {
+  white-space: normal;
+  min-width: 0;
+  padding: 6px;
+  min-height: 42px;
+}
+.result-mode > p {
+  margin: 7px 0 12px;
+}
+.result-mode > .btn,
+.dialog-scroll .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 38px;
+  white-space: normal;
+}
+.first-upgrade h3 {
+  margin-top: 6px;
+}
+.model-details li + li {
+  margin-top: 8px;
+}
+.model-details strong {
+  font-size: 0.84rem;
+}
+@container (min-width:340px) {
+  .input-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .balance-overview {
+    grid-template-columns: minmax(0, 1.04fr) minmax(0, 1fr);
+  }
+}
+@container (max-width:270px) {
+  .fps-summary table {
+    font-size: 0.72rem;
+  }
+  .fps-summary th,
+  .fps-summary td {
+    padding-inline: 2px;
+  }
+  .fps-summary td {
+    font-size: 1rem;
+  }
+  .build-inputs .segmented {
+    flex-wrap: wrap;
+  }
+}
+@media (min-width: 900px) {
+  .build-workspace {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    column-gap: clamp(20px, 3vw, 36px);
+  }
+  .build-output {
+    border-top: 0;
+    border-left: 1px solid var(--border-subtle);
+    padding: 0 0 0 clamp(18px, 3vw, 34px);
+  }
+}
+
+/* The family switch is the source of the sheet, not a row of five articles. */
+.family-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 3px;
+  padding: 6px;
+  border-radius: 9999px;
+}
+.family-choice,
+.series-toggle,
+.model-choice {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.family-choice {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 9999px;
+  scroll-margin: var(--content-inset);
+}
+.family-choice > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--theme-ink);
+}
+.family-choice strong {
+  line-height: 1.3;
+  font-size: 0.9rem;
+}
+.family-choice small,
+.device-dock small {
+  color: var(--ink-2);
+  font-size: 0.73rem;
+}
+.family-switch .liquid-lens,
+.device-dock .liquid-lens,
+.brand-list .liquid-lens {
+  background: var(--lg-coat), color-mix(in srgb, var(--theme-accent) 18%, transparent);
+  backdrop-filter: var(--lg-blur);
+  -webkit-backdrop-filter: var(--lg-blur);
+}
+.brand-list .brand-row {
+  z-index: 1;
+}
+.brand-list .brand-row:hover,
+.family-switch .family-choice:hover {
+  transform: translateZ(0);
+}
+.driver-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.device-dock {
+  position: relative; isolation: isolate;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border-radius: 20px;
+  max-height: clamp(148px, 32dvh, 280px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.device-dock > .rubric {
+  margin: 4px 0 7px 5px;
+}
+.series-toggle,
+.model-choice {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  border-radius: 11px;
+  min-height: 39px;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+}
+.series-toggle {
+  font-weight: 740;
+}
+.series-toggle[aria-expanded="true"] svg {
+  rotate: 180deg;
+}
+.model-list {
+  padding: 2px 0 5px 7px;
+}
+.model-choice[aria-pressed="true"] {
+  background: var(--lg-coat), color-mix(in srgb, var(--theme-accent) 17%, transparent);
+  color: var(--theme-ink);
+  font-weight: 680;
+  box-shadow: var(--lg-bevel);
+}
+.device-dock:has(.liquid-lens[data-positioned]) .model-choice[aria-pressed="true"] {background:transparent;box-shadow:none;}
+.driver-result {
+  padding: clamp(12px, 2.25vw, 24px);
+  border-radius: 22px;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  overflow-wrap: anywhere;
+}
+.driver-result > .link {
+  justify-self: start;
+}
+.driver-result h3 {
+  font-size: 1.22rem;
+}
+.driver-branch {
+  color: var(--theme-ink);
+  font-size: 0.95rem;
+}
+.install-heading {
+  margin-top: 9px;
+}
+.driver-result .driver-version {
+  color: var(--ink-3);
+  font-size: 0.79rem;
+}
+.driver-steps {
+  display: grid;
+  gap: 12px;
+  margin: 5px 0;
+}
+.driver-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.driver-steps li > span {
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-ink);
+}
+.driver-steps h4 {
+  font-size: 0.89rem;
+}
+.driver-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+.driver-downloads .btn {
+  font-size: 0.8rem;
+  text-align: left;
+  padding-block: 7px;
+}
+.driver-oem {
+  border-top: 1px solid var(--border-subtle);
+}
+.driver-oem summary {
+  padding: 10px 0;
+  font-weight: 660;
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+.driver-oem p {
+  margin: 4px 0 8px;
+}
+.driver-library header p {
+  max-width: 66ch;
+}
+@media (min-width: 660px) {
+  .driver-workbench {
+    grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr);
+    gap: clamp(18px, 3vw, 32px);
+  }
+  .device-dock {
+    position: sticky;
+    top: 0;
+    max-height: min(70dvh, 42rem);
+  }
+}
+@media (pointer: coarse) {
+  .series-toggle,
+  .model-choice {
+    min-height: 44px;
+  }
+}
+.device-dock .device-help {
+  font-size: 0.72rem;
+  padding: 0 6px 6px;
+  color: var(--ink-3);
+}
+.build-result-jump {
+  font-size: 0.85rem;
+  justify-self: start;
+}
+@media (min-width: 900px) {
+  .build-result-jump {
+    display: none;
+  }
+}
+
+.tweaker-workspace-tabs { display: inline-grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 25rem); margin-bottom: 16px; }
+.tweaker-workspace-tabs .segmented-item { white-space: normal; min-height: 44px; line-height: 1.25; }
+.native-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.native-actions .btn { min-height: 38px; height: auto; white-space: normal; }
+.native-action-status:not(:empty) { flex-basis: 100%; color: var(--ink-2); font-size: .8rem; }
+.native-action-status:empty { display: none; }
