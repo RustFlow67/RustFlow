@@ -1,5 +1,6 @@
 "use client";
 
+import LiquidGlass from "../LiquidGlass";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import {
   createContext,
@@ -97,7 +98,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           const meta = TONE_ICON[item.tone];
           const Icon = meta.icon;
           return (
-            <div
+            <LiquidGlass
               key={item.id}
               className="toast-card"
               role={item.tone === "error" ? "alert" : "status"}
@@ -132,7 +133,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
-            </div>
+            </LiquidGlass>
           );
         })}
       </div>

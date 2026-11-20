@@ -1,8 +1,9 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import Link from "@/components/RouteLink";
-import { useEffect, type CSSProperties } from "react";
+import { useEffect } from "react";
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -11,8 +12,8 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 
   return (
     <div className="grid min-h-[60vh] place-items-center">
-      <div className="glass pop-in max-w-lg p-8 text-center sm:p-12" role="alert">
-        <span className="icon-tile mx-auto" style={{ "--c1": "#ffd60a", "--c2": "#ff9f0a" } as CSSProperties}>
+      <LiquidGlass className="glass pop-in max-w-lg p-8 text-center sm:p-12" role="alert">
+        <span className="icon-tile mx-auto">
           <TriangleAlert aria-hidden="true" />
         </span>
         <h1 className="headline mt-6 text-2xl">Страница не загрузилась</h1>
@@ -28,7 +29,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
             На главную
           </Link>
         </div>
-      </div>
+      </LiquidGlass>
     </div>
   );
 }

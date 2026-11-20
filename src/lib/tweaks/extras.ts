@@ -1,5 +1,5 @@
 import { OS_ALL, STEP } from "./common";
-import { adminBat, reg } from "./helpers";
+import { adminBat } from "./helpers";
 import type { Tweak } from "./types";
 
 const XMP_TXT = `RustFlow — настройка RAM: XMP / EXPO, двухканал и тайминги
@@ -7,29 +7,28 @@ const XMP_TXT = `RustFlow — настройка RAM: XMP / EXPO, двухкан
 
 ПОЧЕМУ ЭТО КРИТИЧНО В RUST
 Главный поток Unity постоянно обращается к структурам построек и сущностей.
-При промахе L3-кэша процессор ждёт оперативную память: переход с JEDEC 2133/2400
-на XMP 3200–3600 CL16–18 (или DDR5-6000 CL30) даёт +12–22% к avg FPS и до +30% к 1% low.
+Если ограничение в CPU, режим каналов и задержка ОЗУ могут менять длительность кадра.
+Если упор в GPU, средний FPS может не измениться. Запишите исходный профиль и сравните
+по три прогона на одном сервере; не приравнивайте частоту памяти к приросту FPS.
 
 ШАГ 1 — ПРОВЕРКА ТЕКУЩЕГО РЕЖИМА
 [ ] Диспетчер задач → Производительность → Память:
-    проверьте «Скорость» (МТ/с) и «Использовано гнёзд» (должно быть 2 из 2 или 2 из 4).
+    проверьте «Скорость» (МТ/с) и число занятых слотов; это не проверка числа каналов.
 [ ] В CPU-Z (вкладка Memory): Channel = Dual (или 2x 64-bit / 4x 32-bit на DDR5),
     CAS# Latency (CL) совпадает с паспортом модулей.
 
 ШАГ 2 — ПРАВИЛЬНЫЕ СЛОТЫ (ДВУХКАНАЛ)
-[ ] На плате с 4 слотами две планки ставятся в A2 и B2 (2-й и 4-й от CPU).
-    Одна планка или слоты A1+A2 режут пропускную способность вдвое.
+[ ] Сверьте слоты с руководством конкретной платы (для пары модулей часто A2 и B2).
 
-ШАГ 3 — ВКЛЮЧЕНИЕ ПРОФИЛЯ В BIOS
+ШАГ 3 — ПРОФИЛЬ В BIOS, ЕСЛИ ЕГО ПОДДЕРЖИВАЮТ ПЛАТА И ПАМЯТЬ
 [ ] Перезагрузите ПК → Del или F2 → найдите XMP (Intel) / DOCP (AMD AM4) / EXPO (AMD AM5).
 [ ] Выберите Profile 1, сохраните (F10).
-[ ] Для Ryzen 5000 (DDR4-3600): убедитесь, что FCLK = 1800 МГц (режим 1:1 с MCLK).
-[ ] Для Ryzen 7000/9000 (DDR5-6000): UCLK = MEMCLK (режим 1:1).
+[ ] Не форсируйте FCLK, UCLK и напряжения по таблице из чужого теста.
 
-ШАГ 4 — ПРОВЕРКА СТАБИЛЬНОСТИ И EAC
-[ ] Профиль XMP/EXPO и ручная настройка таймингов в BIOS на 100% безопасны для EAC.
+ШАГ 4 — ПРОВЕРКА СТАБИЛЬНОСТИ
+[ ] XMP/EXPO настраивается в BIOS, а не в процессе игры. Проверьте стабильность памяти.
 [ ] При вылетах или BSOD проверьте память в TestMem5 / OCCT Memory; при ошибках
-    снизьте частоту на шаг (например 3600 → 3466) или сбросьте Clear CMOS.
+    верните записанный исходный профиль по инструкции платы.
 `;
 
 const MYTH_LAUNCH_TXT = `RustFlow — разбор мифа: -maxMem, -malloc=system, -cpuCount, -exThreads
@@ -44,8 +43,8 @@ const MYTH_LAUNCH_TXT = `RustFlow — разбор мифа: -maxMem, -malloc=sy
 1. -maxMem, -malloc=system, -cpuCount, -exThreads — аргументы движка Real Virtuality
    (Arma 2 / Arma 3 / DayZ). Движок Unity в Rust их не парсит.
 2. -force-d3d11-no-singlethreaded — устаревший флаг ранних версий Unity.
-3. В слепых замерах (3 прогона по 60 сек на одной сцене) разница по avg FPS и 1% low
-   составляет ±1 FPS — чистая погрешность сервера.
+3. Такие флаги не задают размер памяти или число рабочих потоков в Rust. Проверьте
+   результат в своей версии клиента тремя прогонами в одной сцене.
 
 ЧТО ДЕЛАТЬ ВМЕСТО ЭТОГО
 1. Откройте Steam → Rust → Свойства → Общие → Параметры запуска.
@@ -62,8 +61,8 @@ const DEFENDER_WARNING_TXT = `RustFlow — АНТИ-ТВИК: отключени
 СТАТУС: ВРЕДНО — НЕ ПРИМЕНЯТЬ!
 
 ПОЧЕМУ НЕЛЬЗЯ ВЫРЕЗАТЬ DEFENDER И ОБНОВЛЕНИЯ
-1. Прирост FPS в Rust при вырезании Defender на современном ПК с SSD: 0–1%
-   (в пределах шума замера). Defender сам снижает активность в полноэкранной игре.
+1. Нет основания выключать защиту ради FPS. При совпадении просадок со сканированием
+   выберите другое время для плановой проверки.
 2. Отключение Windows Update и «урезанные игровые сборки» ломают корневые сертификаты,
    обновления планировщика CPU и запуск Easy Anti-Cheat (EAC).
 3. Аккаунты Steam с инвентарём Rust — главная цель стиллеров. Отключённый SmartScreen
@@ -84,16 +83,15 @@ export const EXTRA_TWEAKS: Tweak[] = [
   {
     slug: "xmp-expo-timings",
     title: "Профиль RAM XMP / EXPO и двухканал",
-    tagline: "Снижение задержки памяти и рост 1% low до +20–30%",
+    tagline: "Частота, тайминги и режим каналов при ограничении CPU",
     category: "prep",
     group: "ram-ssd",
-    riskLevel: "safe",
-    evidence: "measured",
-    gainPct: 18,
-    gainLabel: "+12–22% FPS (оценка)",
+    riskLevel: "caution",
+    evidence: "conditional",
+    gainLabel: "Если ограничение в памяти",
     phase: 1,
     order: 4,
-    risk: "safe",
+    risk: "moderate",
     impact: { fps: 3, smooth: 3, latency: 2 },
     admin: false,
     restart: "reboot",
@@ -101,10 +99,13 @@ export const EXTRA_TWEAKS: Tweak[] = [
     os: "BIOS / любая ОС",
     featured: true,
     what: "Пошаговая проверка двухканального режима (слоты A2+B2), активация заводского профиля XMP / DOCP / EXPO в BIOS и контроль делителя FCLK/UCLK 1:1 на Ryzen.",
-    why: "В Rust главный поток CPU постоянно упирается в задержку подсистемы памяти на застроенных серверах. Переход с базовых JEDEC 2133/2400 МТ/с на DDR4-3600 CL16–18 или DDR5-6000 CL30 — один из самых сильных подтверждённых приростов по avg и 1% low. Аппаратная настройка RAM в BIOS на 100% безопасна для EAC.",
+    why: "При промахах кэша главный поток ждёт ОЗУ. Быстрая стабильная память может сократить эти паузы, но не ускорит упирающийся в видеокарту кадр. XMP/EXPO — разгон и не гарантируется на любой комбинации платы, контроллера и модулей.",
+    warnings: [
+      "Запишите исходные параметры BIOS. При ошибках теста памяти или вылетах верните штатный профиль; не увеличивайте напряжение по чужому гайду.",
+    ],
     steps: [
       "Откройте Диспетчер задач → Производительность → Память и проверьте текущую скорость (МТ/с) и число занятых слотов.",
-      "Убедитесь, что две планки установлены через слот — в A2 и B2 (2-й и 4-й от процессора).",
+      "Сверьте слоты для пары модулей с руководством платы (часто A2 и B2).",
       "Перезагрузите ПК, войдите в BIOS (Del / F2), включите XMP / DOCP / EXPO Profile 1 и сохраните настройки (F10).",
       "После загрузки убедитесь, что частота выросла, и сделайте контрольный прогон в Rust.",
     ],
@@ -123,9 +124,8 @@ export const EXTRA_TWEAKS: Tweak[] = [
     category: "prep",
     group: "ram-ssd",
     riskLevel: "safe",
-    evidence: "measured",
-    gainPct: 12,
-    gainLabel: "+15–30% 1% low с HDD",
+    evidence: "conditional",
+    gainLabel: "Чтение и свободное место",
     phase: 1,
     order: 5,
     risk: "safe",
@@ -134,29 +134,22 @@ export const EXTRA_TWEAKS: Tweak[] = [
     restart: "none",
     time: "2 мин",
     os: OS_ALL,
-    what: "Скрипт проверяет и включает команду TRIM для SSD (DisableDeleteNotify = 0) и запускает штатную оптимизацию ReTrim для системного тома.",
-    why: "На HDD загрузка карты Rust длится 10–25 минут, а при беге к крупным базам кадр замирает на подгрузке префабов. На SSD (особенно NVMe) и при 15–20% свободного места контроллер держит высокую скорость случайного чтения 4K и работы файла подкачки.",
+    what: "Показывает настройку уведомлений TRIM с помощью fsutil. Скрипт ничего не включает и не запускает оптимизацию тома.",
+    why: "Свободное место и тип диска стоит проверить при долгой загрузке. Системный флаг TRIM сам по себе не измеряет скорость SSD или FPS и не проверяет, как устройство обрабатывает запросы.",
     steps: [
       "Убедитесь в Steam → Rust → Свойства → Установленные файлы, что игра стоит на SSD, и на нём свободно ≥15–20% объёма.",
       ...STEP.batAdmin,
       "Проверьте строку «DisableDeleteNotify = 0» (это означает, что TRIM активен).",
     ],
     check: "Команда fsutil behavior query DisableDeleteNotify выводит значение 0 (TRIM включён).",
-    revertSteps: [
-      "Откат не требуется: включённый TRIM — штатный и рекомендуемый режим Windows для всех SSD.",
-    ],
+    revertSteps: ["Откат не требуется: скрипт только читает настройку."],
     file: {
       name: "rustflow-ssd-trim-check.bat",
       kind: "bat",
       content: adminBat(
-        "Enable and verify SSD TRIM",
-        String.raw`echo  Checking NTFS TRIM state (0 = enabled)...
-fsutil behavior set DisableDeleteNotify 0
-fsutil behavior query DisableDeleteNotify
-echo.
-echo  Running standard Windows ReTrim on %SystemDrive%...
-defrag %SystemDrive% /O`,
-        "Done. Keep at least 15-20% free space on your Rust SSD.",
+        "Check TRIM notifications",
+        "fsutil behavior query DisableDeleteNotify",
+        "Read-only check. Zero means delete notifications are enabled.",
       ),
     },
   },
@@ -168,7 +161,6 @@ defrag %SystemDrive% /O`,
     group: "launch-options",
     riskLevel: "caution",
     evidence: "myth",
-    gainPct: 0,
     gainLabel: "0% · Плацебо",
     excludeFromPack: true,
     phase: 4,
@@ -180,7 +172,7 @@ defrag %SystemDrive% /O`,
     time: "1 мин",
     os: OS_ALL,
     what: "Разбор строки -maxMem=16384 -malloc=system -cpuCount=8 -exThreads=16 -force-d3d11-no-singlethreaded и инструкция по очистке параметров запуска Steam.",
-    why: "Эти ключи принадлежат движку Real Virtuality (серия Arma / DayZ), а не Unity. В повторных замерах на одной сцене разница составляет 0% (±1 FPS шума сервера), зато лишние флаги мешают диагностировать реальные проблемы при обновлениях Rust.",
+    why: "Эти ключи принадлежат движку Real Virtuality (серия Arma / DayZ), а не Unity. Они не дают управлять рабочими потоками Rust, а лишние флаги мешают диагностировать реальные проблемы при обновлениях Rust.",
     steps: [
       "Откройте Steam → Библиотека → ПКМ по Rust → Свойства → Общие.",
       "Удалите -maxMem, -malloc=system, -cpuCount, -exThreads и -USEALLAVAILABLECORES из поля «Параметры запуска».",
@@ -198,7 +190,6 @@ defrag %SystemDrive% /O`,
     group: "network",
     riskLevel: "caution",
     evidence: "myth",
-    gainPct: 0,
     gainLabel: "0 мс · Миф (TCP≠UDP)",
     excludeFromPack: true,
     phase: 6,
@@ -216,27 +207,24 @@ defrag %SystemDrive% /O`,
       "Если уже добавляли их по чужому гайду: откройте regedit → HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces, найдите свой интерфейс и удалите параметры TcpAckFrequency, TCPNoDelay и TcpDelAckTicks.",
       "Перезагрузите компьютер. Для реального снижения задержек перейдите с Wi-Fi на кабель Ethernet.",
     ],
-    check: "В разделе вашего сетевого интерфейса в реестре отсутствуют ручные параметры TcpAckFrequency и TCPNoDelay.",
+    check:
+      "В разделе вашего сетевого интерфейса в реестре отсутствуют ручные параметры TcpAckFrequency и TCPNoDelay.",
     revertSteps: ["Удалите вручную созданные DWORD-ключи TcpAckFrequency и TCPNoDelay и перезагрузите ПК."],
     file: {
-      name: "rustflow-nagle-default-info.reg",
-      kind: "reg",
-      content: reg(
-        "Remove global MSMQ TCPNoDelay override (return to Windows default)",
-        String.raw`[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\MSMQ\Parameters]
-"TCPNoDelay"=-`,
-      ),
+      name: "rustflow-nagle-readme.txt",
+      kind: "txt",
+      content:
+        "Nagle относится к TCP, а не к игровым UDP-пакетам. Не меняйте параметры сетевых интерфейсов или MSMQ ради пинга в Rust. Если меняли их ранее, восстановите свой экспорт. При потерях сравните связь до шлюза по кабелю и Wi-Fi.",
     },
   },
   {
     slug: "disable-defender-update",
     title: "Отключение Windows Defender и Windows Update",
-    tagline: "НЕ ПРИМЕНЯТЬ: 0% к FPS, поломка EAC и риск угона Steam",
+    tagline: "НЕ ПРИМЕНЯТЬ: потеря защиты системы и риск угона Steam",
     category: "windows",
     group: "cpu-windows",
     riskLevel: "harmful",
     evidence: "myth",
-    gainPct: -5,
     gainLabel: "Вредно · Не применять",
     excludeFromPack: true,
     phase: 2,
@@ -248,13 +236,14 @@ defrag %SystemDrive% /O`,
     time: "3 мин",
     os: OS_ALL,
     what: "Анти-твик (памятка безопасности): полное вырезание Защитника Windows, SmartScreen и Центра обновления утилитами-деблоатерами или установкой «урезанных игровых сборок».",
-    why: "В реальных замерах на ПК с SSD отключение Defender не даёт значимого прироста FPS в Rust (разница <1%). Зато сломанный Центр обновления приводит к ошибкам сертификатов Easy Anti-Cheat, отсутствию патчей планировщика CPU и высокому риску заражения стиллерами.",
+    why: "Отключённая защита и пропущенные исправления повышают риск заражения. Если просадки совпадают с плановой проверкой, перенесите время сканирования, не выключая защиту.",
     steps: [
       "НЕ отключайте Windows Defender, SmartScreen и службу Windows Update ради FPS.",
       "Если защита уже отключена — откройте «Безопасность Windows → Защита от вирусов и угроз» и верните защиту в реальном времени.",
       "Вместо вырезания обновлений просто настройте «Период активности» (Win + I → Центр обновления Windows), чтобы ПК не перезагружался во время игры.",
     ],
-    check: "Безопасность Windows горит зелёной галочкой; Easy Anti-Cheat запускается без ошибок проверки подписи.",
+    check:
+      "Безопасность Windows горит зелёной галочкой; Easy Anti-Cheat запускается без ошибок проверки подписи.",
     revertSteps: ["Включите защиту в реальном времени и службу wuauserv («Вручную») по скачиваемой памятке."],
     warnings: [
       "Анти-твик добавлен в каталог специально для предупреждения и восстановления системы после вредных советов.",
@@ -269,7 +258,6 @@ defrag %SystemDrive% /O`,
     group: "cpu-windows",
     riskLevel: "harmful",
     evidence: "myth",
-    gainPct: -10,
     gainLabel: "Вредно · Риск бана EAC",
     excludeFromPack: true,
     phase: 2,
@@ -287,8 +275,11 @@ defrag %SystemDrive% /O`,
       "Удалите установленные «чистильщики реестра» и «ускорители игр» через «Приложения и возможности».",
       "Если после чужого твикера система работает нестабильно — скачайте и запустите наш скрипт проверки целостности Windows (sfc /scannow + DISM).",
     ],
-    check: "В автозагрузке нет сторонних «бустеров»; sfc /scannow сообщает об отсутствии нарушений целостности.",
-    revertSteps: ["Запустите скачанный скрипт восстановления системных файлов или откатитесь на точку восстановления (rstrui)."],
+    check:
+      "В автозагрузке нет сторонних «бустеров»; sfc /scannow сообщает об отсутствии нарушений целостности.",
+    revertSteps: [
+      "Запустите скачанный скрипт восстановления системных файлов или откатитесь на точку восстановления (rstrui).",
+    ],
     warnings: [
       "EAC банит навсегда за инжекторы, подмену DLL, чтение/запись памяти Rust и макросы на отдачу. Снять такой бан нельзя.",
     ],
@@ -308,13 +299,12 @@ sfc /scannow`,
   },
   {
     slug: "bcdedit-timers-harmful",
-    title: "Правки таймера bcdedit (useplatformtick)",
+    title: "HPET и Dynamic Tick в BCD: не форсировать таймеры",
     tagline: "НЕ ПРИМЕНЯТЬ: рост DPC-задержек и рваный frametime",
     category: "windows",
     group: "cpu-windows",
     riskLevel: "harmful",
     evidence: "myth",
-    gainPct: -8,
     gainLabel: "Вредно · Статтеры",
     excludeFromPack: true,
     phase: 2,
@@ -326,7 +316,7 @@ sfc /scannow`,
     time: "2 мин",
     os: OS_ALL,
     what: "Анти-твик + скрипт возврата стандартного системного таймера Windows (удаляет принудительные useplatformclock, useplatformtick и disabledynamictick).",
-    why: "Принудительное переключение Windows с быстрого процессорного счётчика TSC на медленный HPET (useplatformclock yes) резко снижает FPS в CPU-зависимых играх вроде Rust и увеличивает задержку кадра. Скачиваемый файл ниже НЕ включает эти флаги, а безопасно удаляет их, если они остались после чужих паков.",
+    why: "Принудительное переключение Windows с быстрого процессорного счётчика TSC на медленный HPET (useplatformclock yes) резко снижает FPS в CPU-зависимых играх вроде Rust и увеличивает задержку кадра. Скачиваемый файл ниже НЕ включает эти флаги, а снимает переопределения, если они остались после чужих паков.",
     steps: [
       "Не выполняйте команды bcdedit /set useplatformclock yes и useplatformtick yes из старых гайдов.",
       "Чтобы проверить и вернуть заводской таймер TSC, скачайте и запустите скрипт сброса ниже от имени администратора.",
@@ -334,9 +324,7 @@ sfc /scannow`,
     ],
     check: "Команда bcdedit /enum не содержит строк useplatformclock, useplatformtick и disabledynamictick.",
     revertSteps: ["Скачанный файл сам является скриптом возврата к заводским параметрам Windows."],
-    warnings: [
-      "Анти-твик: файл ниже выполняет только очистку вредных параметров таймера (deletevalue).",
-    ],
+    warnings: ["Анти-твик: файл ниже выполняет только очистку вредных параметров таймера (deletevalue)."],
     file: {
       name: "rustflow-RESTORE-default-timers.bat",
       kind: "bat",

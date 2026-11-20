@@ -1,4 +1,15 @@
 import type { NextConfig } from "next";
+import { WINDOWS_TAB_HREF } from "./src/lib/tweaker-routes";
+import path from "node:path";
+
+// npm scripts use the webpack next/font loader so even air-gapped builds
+// can resolve the requested Google family from the checked-in OFL subsets.
+// Direct `next build` (Turbopack) uses the regular Google build-time fetch.
+// The dev compiler is forked without the CLI's --webpack argv. Next sets
+// TURBOPACK before loading this config in both CLI and worker processes.
+if (!process.env.TURBOPACK && process.env.RUSTFLOW_FONT_SOURCE !== "google") {
+  process.env.NEXT_FONT_GOOGLE_MOCKED_RESPONSES ??= path.resolve("src/lib/unbounded-offline.cjs");
+}
 
 // Only this public prefix is inlined; API keys and client secrets stay at runtime on the server.
 function apiBase(raw: string | undefined) {
@@ -32,6 +43,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      { source: "/windows", destination: WINDOWS_TAB_HREF, permanent: true },
       { source: "/setup", destination: "/tweaker", permanent: true },
       { source: "/tweaks", destination: "/tweaker", permanent: true },
       { source: "/tweaks/:slug", destination: "/tweaker?tweak=:slug", permanent: true },
@@ -40,6 +52,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const prefix = publicApiBase.endsWith("/api") ? publicApiBase : `${publicApiBase}/api`;
     return [
+      { source: "/api/auth/build", destination: "/api/auth/active-build" },
       { source: "/manifest.webmanifest", destination: "/manifest.json" },
       ...(prefix.startsWith("/") && prefix !== "/api" ? [{ source: `${prefix}/:path*`, destination: "/api/:path*" }] : []),
     ];

@@ -1,6 +1,7 @@
+import { WINDOWS_TAB_HREF } from "@/lib/tweaker-routes";
 import { HARDWARE_PRESETS } from "@/lib/models/preset";
 import { TWEAKS_LITE } from "@/lib/tweaks";
-import { isSupersededTweak, tweakerHref } from "@/lib/tweaker";
+import { isSupersededTweak, packEligible, tweakerHref } from "@/lib/tweaker";
 import CommandPalette, { type CommandEntry } from "./CommandPalette";
 import { ProgressObserver } from "./OptimizerLevel";
 
@@ -13,7 +14,8 @@ const ENTRIES: CommandEntry[] = [
   { href: "/tools", title: "Мастерская оптимизации", kind: "Страница" },
   { href: "/tools#quiz", title: "Миф или правда", kind: "Инструмент", keywords: "квиз викторина" },
   { href: "/tools#level", title: "Уровень оптимизатора", kind: "Инструмент", keywords: "достижения опыт XP" },
-  { href: "/guide", title: "База знаний", kind: "Страница" },
+  { href: "/guide", title: "С чего начать", kind: "Страница", keywords:"дорожная карта база знаний" },
+  {href:"/drivers",title:"Драйверы",kind:"Страница"}, {href:WINDOWS_TAB_HREF,title:"Твикер · Система Windows",kind:"Страница"},
   ...TWEAKS_LITE.filter((t) => !isSupersededTweak(t.slug)).map((tweak): CommandEntry => ({
     href: tweakerHref(tweak.slug), title: tweak.title, kind: "Твик", keywords: tweak.tagline,
   })),
@@ -21,7 +23,7 @@ const ENTRIES: CommandEntry[] = [
     href: `/presets#preset-${preset.slug}`, title: preset.title, kind: "Пресет", keywords: preset.badge,
   })),
 ];
-const ELIGIBLE = TWEAKS_LITE.filter((tweak) => tweak.riskLevel === "safe" && tweak.evidence === "measured").map(({ slug }) => slug);
+const ELIGIBLE = TWEAKS_LITE.filter((tweak) => tweak.riskLevel === "safe" && packEligible(tweak)).map(({ slug }) => slug);
 
 export default function PaletteMount() {
   // Only display/search metadata crosses the server–client boundary, never tweak scripts.

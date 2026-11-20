@@ -1,7 +1,11 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger } from "./fx/usePopupMotion";
+
 import { Activity, Check, RotateCcw } from "lucide-react";
 import Link from "next/link";
+import BoundedNumber from "./ui/BoundedNumber";
 import { useState } from "react";
 import { Button, Skeleton, Switch } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/Modal";
@@ -26,6 +30,7 @@ export default function TweakPersonalBar({
 
   const [beforeDraft, setBeforeDraft] = useState<string | null>(null);
   const [afterDraft, setAfterDraft] = useState<string | null>(null);
+  const opener = usePopupTrigger();
   const [confirmHarmful, setConfirmHarmful] = useState(false);
   const before = beforeDraft ?? record?.fpsBefore?.toString() ?? "";
   const after = afterDraft ?? record?.fpsAfter?.toString() ?? "";
@@ -41,8 +46,9 @@ export default function TweakPersonalBar({
     fpsAfter: after ? Number(after) : null,
   });
 
-  function toggle(next: boolean) {
+  function toggle(next: boolean, from: HTMLElement) {
     if (next && isHarmful) {
+      opener.capture(from);
       setConfirmHarmful(true);
       return;
     }
@@ -54,7 +60,7 @@ export default function TweakPersonalBar({
     });
   }
 
-  function saveFps() {
+  function saveFps(before:string,after:string) {
     const b = before.trim() ? Number(before) : null;
     const a = after.trim() ? Number(after) : null;
     storage.setTweakFps(slug, b, a);
@@ -71,7 +77,7 @@ export default function TweakPersonalBar({
       });
       return;
     }
-    saveFps();
+    saveFps(before,after);
     storage.addLog({
       title,
       tweakSlug: slug,
@@ -94,7 +100,7 @@ export default function TweakPersonalBar({
 
   return (
     <>
-      <section className="glass p-5" aria-label="Статус и личный замер">
+      <LiquidGlass as="section" className="glass p-5" aria-label="Статус и личный замер">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold tracking-tight">Мой статус</h2>
@@ -119,42 +125,10 @@ export default function TweakPersonalBar({
         <p className="text-[12.5px] font-semibold text-ink-2">Личный замер (1 сцена)</p>
         <div className="mt-2 grid grid-cols-2 gap-2.5">
           <div>
-            <label htmlFor="detail-fps-before" className="mb-1 block text-[11.5px] text-ink-3">
-              FPS до
-            </label>
-            <input
-              id="detail-fps-before"
-              type="number"
-              min={1}
-              max={1500}
-              placeholder="92"
-              value={before}
-              onChange={(e) => setBeforeDraft(e.target.value)}
-              onBlur={() => {
-                saveFps();
-                setBeforeDraft(null);
-              }}
-              className="field field-sm tabular-nums"
-            />
+            <BoundedNumber label="FPS до" optional decimals={1} min={1} max={1500} value={before} onValue={setBeforeDraft} onCommit={s=>{saveFps(s,after);setBeforeDraft(null);}}/>
           </div>
           <div>
-            <label htmlFor="detail-fps-after" className="mb-1 block text-[11.5px] text-ink-3">
-              FPS после
-            </label>
-            <input
-              id="detail-fps-after"
-              type="number"
-              min={1}
-              max={1500}
-              placeholder="109"
-              value={after}
-              onChange={(e) => setAfterDraft(e.target.value)}
-              onBlur={() => {
-                saveFps();
-                setAfterDraft(null);
-              }}
-              className="field field-sm tabular-nums"
-            />
+            <BoundedNumber label="FPS после" optional decimals={1} min={1} max={1500} value={after} onValue={setAfterDraft} onCommit={s=>{saveFps(before,s);setAfterDraft(null);}}/>
           </div>
         </div>
 
@@ -191,9 +165,9 @@ export default function TweakPersonalBar({
         <Link href="/journal" className="link mt-3 inline-block text-[12.5px]">
           Открыть весь журнал замеров →
         </Link>
-      </section>
+      </LiquidGlass>
 
-      <ConfirmDialog
+      <ConfirmDialog {...opener.origin}
         open={confirmHarmful}
         onClose={() => setConfirmHarmful(false)}
         onConfirm={() => {

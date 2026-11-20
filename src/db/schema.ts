@@ -51,3 +51,8 @@ export const accountSessions = pgTable("rf_account_sessions", {
   accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, (t) => [index("rf_account_sessions_account_idx").on(t.accountId)]);
+
+/** Aggregate explicit opens only: no search strings, identities or PC details. */
+export const catalogViews = pgTable("rf_catalog_views", {
+  section: varchar("section", {length:16}).notNull(), item: varchar("item", {length:100}).notNull(), opens: integer("opens").notNull().default(0),
+}, t => [uniqueIndex("rf_catalog_views_item_idx").on(t.section,t.item)]);

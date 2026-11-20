@@ -12,7 +12,8 @@ title RustFlow - __TITLE__
 fltmc >nul 2>&1
 if errorlevel 1 (
   echo Requesting administrator rights...
-  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  set "RF_BAT=%~f0"
+  powershell -NoProfile -Command "Start-Process -FilePath $env:RF_BAT -Verb RunAs"
   exit /b
 )
 echo.
@@ -62,7 +63,8 @@ const HYBRID_HEAD = String.raw`<# : batch portion
 @echo off
 setlocal
 title RustFlow - __TITLE__
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Expression (Get-Content -LiteralPath '%~f0' -Raw)"
+set "RF_BAT=%~f0"
+powershell -NoProfile -Command "Invoke-Expression (Get-Content -LiteralPath $env:RF_BAT -Raw)"
 echo.
 pause
 exit /b

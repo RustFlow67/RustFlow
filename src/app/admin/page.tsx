@@ -1,3 +1,4 @@
+import LiquidGlass from "@/components/LiquidGlass";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -24,7 +25,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
   const origin = adminOrigin(await headers());
   const admin = await isAdminSession();
-  return <section className="glass glass-blur mx-auto max-w-md p-5 sm:p-7" aria-labelledby="admin-title">
+  return <LiquidGlass as="section" className="glass glass-blur mx-auto max-w-md p-5 sm:p-7" aria-labelledby="admin-title">
     <h1 id="admin-title" className="headline text-xl sm:text-2xl">Активация ADMIN</h1>
     {admin ? <>
       <p className="mt-3 text-sm leading-relaxed text-ink-2">Бейдж ADMIN активен в «Профиле». Сессия действует в этом браузере до 8 часов.</p>
@@ -42,5 +43,5 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         {error === "connection" && <p role="alert" className="text-sm text-danger">Откройте /admin на том же сайте через HTTPS.</p>}
         <button type="submit" className="btn btn-primary btn-sm">Активировать ADMIN</button>
       </form>}
-  </section>;
+  </LiquidGlass>;
 }

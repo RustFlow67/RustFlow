@@ -1,15 +1,14 @@
-import { MessageCircle, Settings, ShieldAlert } from "lucide-react";
+import { Cpu, PanelsTopLeft, Settings, ShieldAlert } from "lucide-react";
 
-export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield" | "chat";
+export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield" | "chip" | "window";
 
 /** Move the page, needle, or knob itself instead of rotating the whole glyph. */
 export default function DockIcon({ glyph }: { glyph: DockGlyph }) {
   const attrs = { "data-dock-glyph": glyph, "aria-hidden": true } as const;
+  if (glyph === "chip") return <Cpu {...attrs} data-part="chip" />;
+  if (glyph === "window") return <PanelsTopLeft {...attrs} data-part="window" />;
   if (glyph === "gear") return <Settings {...attrs} />;
   if (glyph === "shield") return <ShieldAlert {...attrs} />;
-  if (glyph === "chat") return <MessageCircle {...attrs}>
-    {[8, 12, 16].map((x) => <circle key={x} data-part="dot" cx={x} cy="12" r="1.15" fill="currentColor" stroke="none" />)}
-  </MessageCircle>;
   return <svg {...attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     {glyph === "home" ? <>
       <path data-part="roof" d="m2.5 10.5 8.2-7.1a2 2 0 0 1 2.6 0l8.2 7.1" />

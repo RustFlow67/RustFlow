@@ -1,10 +1,12 @@
+import { readSavedBuild } from "@/lib/models/saved-build";
+import { defaultMemoryKit,requiredMemory } from "@/lib/models/build-settings";
 import {
   defaultClForMhz,
   evaluateBuild10,
-  isValidBuildInput,
   type BuildInput,
   type UserBuild,
 } from "@/lib/models/build";
+import { countBuild, countTweak, resetCabinetTweaks } from "@/lib/auth/cabinet";
 import { LOCAL_OWNER_ID, makeId, nowIso, SCHEMA_VERSION } from "@/lib/models/common";
 import { SAMPLE_LOGS, TEST_PROTOCOL_STEPS, type BenchmarkLog, type NewBenchmarkLog } from "@/lib/models/log";
 import type { UserTweakRecord } from "@/lib/models/tweak";
@@ -99,10 +101,11 @@ function defaultState(): PersistedState {
   };
 }
 
-function sanitizeFps(v: unknown): number | null {
+function sanitizeFps(v: unknown,min=1,max=1500): number | null {
   if (typeof v !== "number" && typeof v !== "string") return null;
+  if(typeof v==="string" && !/^\d+(?:\.\d+)?$/.test(v))return null;
   const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0 || n > 2000) return null;
+  if (!Number.isFinite(n) || n < min || n > max) return null;
   return Math.round(n * 10) / 10;
 }
 
@@ -117,8 +120,8 @@ function readJournalLogs(raw: unknown, ownerId: string): BenchmarkLog[] {
       const bLow = sanitizeFps(l.beforeLow1);
       const aLow = sanitizeFps(l.afterLow1);
       if (!bAvg || !aAvg || !bLow || !aLow) continue;
-      const bFt = sanitizeFps(l.beforeFrametime) ?? Math.round((1000 / bAvg) * 10) / 10;
-      const aFt = sanitizeFps(l.afterFrametime) ?? Math.round((1000 / aAvg) * 10) / 10;
+      const bFt = sanitizeFps(l.beforeFrametime,.5,1000) ?? Math.round((1000 / bAvg) * 10) / 10;
+      const aFt = sanitizeFps(l.afterFrametime,.5,1000) ?? Math.round((1000 / aAvg) * 10) / 10;
       const ts = nowIso();
       validLogs.push({
         id: typeof l.id === "string" && l.id ? l.id.slice(0, 64) : makeId("log"),
@@ -179,7 +182,7 @@ function migrateLegacy(base: PersistedState): PersistedState {
         input?: { cpuId?: string; gpuId?: string; ram?: number; storage?: string; resolution?: string };
       };
       if (parsed?.input?.cpuId && parsed?.input?.gpuId) {
-        const mhz = 3200;
+        const mhz = requiredMemory(parsed.input.cpuId)==="DDR5" ? defaultMemoryKit("DDR5").ramMhz : 3200;
         const candidate: BuildInput = {
           name: "Моя сборка",
           cpuId: parsed.input.cpuId,
@@ -289,10 +292,11 @@ class LocalStorageAdapter implements StorageAdapter {
         typeof parsed.ownerId === "string" && parsed.ownerId.trim() ? parsed.ownerId : LOCAL_OWNER_ID;
       // Old or partially written entries must not break the profile or calculator.
       const ids = new Set<string>();
-      const builds = (Array.isArray(parsed.builds) ? parsed.builds.slice(0, 12) : []).filter((build) => {
-        if (!build || typeof build.id !== "string" || !build.id || ids.has(build.id) || !isValidBuildInput(build.input)) return false;
-        ids.add(build.id);
-        return true;
+      const builds = (Array.isArray(parsed.builds) ? parsed.builds.slice(0,12) : []).flatMap(build=>{
+        if (!build || typeof build.id!=="string" || !build.id || ids.has(build.id))return [];
+        const input=readSavedBuild(build.input);if(!input)return [];
+        const record=input===build.input?build:buildRecordFromInput(input,ownerId,build);
+        if(!record)return [];ids.add(build.id);return [record];
       });
       const state: PersistedState = {
         schemaVersion: SCHEMA_VERSION,
@@ -337,6 +341,7 @@ class LocalStorageAdapter implements StorageAdapter {
       activeBuildId: record.id,
       builds,
     });
+    if (!prev) countBuild(record.id);
     return record;
   }
 
@@ -378,6 +383,7 @@ class LocalStorageAdapter implements StorageAdapter {
     const state = this.getState();
     const prev = this.getOrCreateTweak(state, slug);
     const updated: UserTweakRecord = { ...prev, applied, updatedAt: nowIso() };
+    countTweak(slug, applied);
     this.persist({
       ...state,
       tweaks: { ...state.tweaks, [slug]: updated },
@@ -403,6 +409,7 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   resetTweakProgress(): void {
+    resetCabinetTweaks();
     const state = this.getState();
     this.persist({ ...state, tweaks: {} });
   }
@@ -507,13 +514,13 @@ class LocalStorageAdapter implements StorageAdapter {
     for (const item of rawBuilds.slice(0, 12)) {
       if (!item || typeof item !== "object") continue;
       const b = item as Partial<UserBuild>;
-      if (!isValidBuildInput(b.input)) continue;
-      const rebuilt = buildRecordFromInput(b.input, ownerId, {
+      const input=readSavedBuild(b.input);if (!input) continue;
+      const rebuilt = buildRecordFromInput(input, ownerId, {
         id: typeof b.id === "string" && b.id ? b.id.slice(0, 64) : makeId("build"),
         ownerId: typeof b.ownerId === "string" && b.ownerId ? b.ownerId.slice(0, 64) : ownerId,
         createdAt: typeof b.createdAt === "string" ? b.createdAt : nowIso(),
         updatedAt: nowIso(),
-        input: b.input,
+        input,
         score10: 0,
         verdictLabel: "",
         fpsModded: [0, 0],
@@ -630,6 +637,7 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   resetAll(): void {
+    resetCabinetTweaks();
     this.addons.clear();
     if (typeof window !== "undefined") {
       try {

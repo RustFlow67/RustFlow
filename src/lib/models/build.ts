@@ -1,16 +1,16 @@
-import { type GraphicsProfileId } from "@/lib/graphics-profiles";
+import { getGraphicsProfile, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import {
-  CPUS,
   getCpu,
   getGpu,
   GPUS,
   type Bottleneck,
-  type StorageId,
 } from "@/lib/hardware";
 import type { GpuVendor, PresetId } from "@/lib/tweaks/meta";
 import { formatBuildResolution, getResolutionSize, RESOLUTION_SIZES, type BuildResolution } from "./build-resolution";
-import { getBiosProfile, getMemoryType, isRamValue, isValidBuildSettings, RAM_CL_BOUNDS, RAM_MHZ_BOUNDS, type BuildSettings } from "./build-settings";
+import { getBiosProfile, getMemoryType, validMemory, isValidBuildSettings, type BuildSettings } from "./build-settings";
 import { clamp, round1, type UserOwnedRecord } from "./common";
+import { driveEstimate, validDrive, warmupTime, type DriveSettings } from "./drive";
+import { gcBudget } from "./play-settings";
 import { avgFps, calibratedFps, type RustScenario } from "./fps-calibration";
 
 /**
@@ -27,6 +27,7 @@ export const RAM_FREQ_OPTIONS = [
   { value: 3200, label: "3200 МТ/с (DDR4 XMP)" },
   { value: 3600, label: "3600 МТ/с (DDR4 Sweet Spot)" },
   { value: 4000, label: "4000 МТ/с (DDR4 OC)" },
+  { value: 5333, label: "5333 МТ/с (DDR4)" },
   { value: 4800, label: "4800 МТ/с (JEDEC DDR5)" },
   { value: 5200, label: "5200 МТ/с (DDR5)" },
   { value: 5600, label: "5600 МТ/с (DDR5)" },
@@ -36,6 +37,7 @@ export const RAM_FREQ_OPTIONS = [
   { value: 7200, label: "7200 МТ/с (DDR5 High)" },
   { value: 7600, label: "7600 МТ/с (DDR5)" },
   { value: 8000, label: "8000 МТ/с (DDR5)" },
+  { value: 9600, label: "9600 МТ/с (DDR5)" },
 ] as const;
 
 export const RAM_CL_OPTIONS = [
@@ -53,14 +55,14 @@ export const RAM_CL_OPTIONS = [
   { value: 40, label: "CL40 (JEDEC DDR5)" },
 ] as const;
 
-export interface BuildInput extends BuildResolution, BuildSettings {
+export interface BuildInput extends BuildResolution, BuildSettings, DriveSettings {
+  graphicsProfile?: GraphicsProfileId;
   name: string;
   cpuId: string;
   gpuId: string;
   ramGb: number;
   ramMhz: number;
   ramCl: number;
-  storage: StorageId;
 }
 
 export type BreakdownKey = "cpuSingle" | "ramLatency" | "ssdRandom" | "gpuTier" | "vramHeadroom";
@@ -185,36 +187,21 @@ function resolutionLoad(pixels: number) {
   };
 }
 
-const STORAGE_SPEC: Record<StorageId, { score10: number; detail: string }> = {
-  hdd: {
-    score10: 2.5,
-    detail: "HDD (~100 IOPS): долгая загрузка карты (10–25 мин) и статтеры подгрузки баз",
-  },
-  sata: {
-    score10: 7.8,
-    detail: "SATA SSD (~70K IOPS): нормальная подгрузка префабов, вход на сервер за 2–4 мин",
-  },
-  nvme: {
-    score10: 9.8,
-    detail: "NVMe SSD (300K+ IOPS): быстрый прогрев ассетов и минимальные задержки стриминга",
-  },
-};
-
 export function isValidBuildInput(input: Partial<BuildInput> | null | undefined): input is BuildInput {
   if (!input) return false;
   return (
     typeof input.name === "string" &&
     typeof input.cpuId === "string" &&
-    CPUS.some((c) => c.id === input.cpuId) &&
+    Boolean(getCpu(input.cpuId)) &&
     typeof input.gpuId === "string" &&
     GPUS.some((g) => g.id === input.gpuId) &&
     typeof input.ramGb === "number" &&
-    input.ramGb >= 8 &&
+    Number.isInteger(input.ramGb) && input.ramGb >= 8 &&
     input.ramGb <= 128 &&
-    isRamValue(input.ramMhz, RAM_MHZ_BOUNDS) &&
-    isRamValue(input.ramCl, RAM_CL_BOUNDS) &&
+    validMemory({...input,cpuId:input.cpuId}) &&
     isValidBuildSettings(input, input.cpuId) &&
-    (input.storage === "hdd" || input.storage === "sata" || input.storage === "nvme") &&
+    (input.graphicsProfile === undefined || !!getGraphicsProfile(input.graphicsProfile)) &&
+    validDrive(input) &&
     getResolutionSize(input) !== null
   );
 }
@@ -223,7 +210,7 @@ export function isValidBuildInput(input: Partial<BuildInput> | null | undefined)
  * Прозрачный расчёт оценки сборки /10 и ожидаемых диапазонов FPS под Rust.
  * FPS: общие диапазоны режима «Комбат» и поправки на нагрузку, память и сервер.
  */
-export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | null = null, scene: RustScenario = "coast"): BuildEvaluation | null {
+export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | null = null, scene: RustScenario = input.scenario ?? "coast"): BuildEvaluation | null {
   const cpu = getCpu(input.cpuId);
   const gpu = getGpu(input.gpuId);
   if (!cpu || !gpu || !isValidBuildInput(input)) return null;
@@ -295,15 +282,15 @@ export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | nul
         : `${gpu.vram} ГБ — впритык для ${resolutionLabel}, снижайте качество текстур до 1–2`;
 
   // 5) Накопитель (/10)
-  const st = STORAGE_SPEC[input.storage];
-  const ssdScore = st.score10;
+  const st = driveEstimate(input);
+  const ssdScore = st.score;
 
   const rawItems: { key: BreakdownKey; score: number; detail: string }[] = [
     { key: "cpuSingle", score: cpuScore, detail: cpuDetail },
     { key: "ramLatency", score: ramScore, detail: ramDetail },
     { key: "gpuTier", score: gpuScore, detail: gpuDetail },
     { key: "vramHeadroom", score: vramScore, detail: vramDetail },
-    { key: "ssdRandom", score: ssdScore, detail: st.detail },
+    { key: "ssdRandom", score: ssdScore, detail: `${st.label}. Asset Warmup: ${warmupTime(st.warmupMin)}–${warmupTime(st.warmupMax)} мин:с (модель)` },
   ];
 
   const breakdown: BreakdownItem[] = rawItems.map((item) => {
@@ -350,7 +337,7 @@ export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | nul
   // Вердикт по шкале /10
   let verdictLabel = "Тяжело";
   let verdictSummary = "Нужны минимальные настройки, строгая чистка фона и апгрейд слабого узла.";
-  let verdictColor = "#ff6961";
+  let verdictColor = "#E05A2B";
   if (score10 >= 8.7) {
     verdictLabel = "Флагман под Rust";
     verdictSummary = "Высокий запас по железу. На плотных серверах и в рейдах ориентируйтесь на FPS и 1% low выбранного сценария.";
@@ -376,39 +363,35 @@ export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | nul
   };
 
   if (input.storage === "hdd") {
-    push("ssd-trim-free-space", "Игра на HDD — перенос Rust на SSD уберёт главные фризы подгрузки и сократит вход в 4–5 раз.");
+    push("rust-library-ssd", "Игра на HDD: перенос на SSD сокращает задержку случайного чтения. Сравните Asset Warmup и длинные кадры на своём маршруте.");
   }
+  if (input.storage!=="hdd" && input.diskFill === "high") push("ssd-trim-free-space", "Диск заполнен более чем на 85%: освободите место и повторите прогрев карты до покупки нового SSD.");
   if (input.biosProfile === "stock" || (!bios && isJedec) || latencyNs > 11.2) {
     push(
       "xmp-expo-timings",
       `Память ${input.ramMhz} МТ/с CL${input.ramCl} (~${latencyNs} нс): сверьте режим двухканала и совместимый профиль памяти. Эффект проверьте по 1% low.`,
     );
   }
-  if (input.ramGb >= 12) {
-    const targetBuf = input.ramGb >= 32 ? 4096 : input.ramGb >= 16 ? 2048 : 1024;
-    push("gc-buffer", `Для ${input.ramGb} ГБ ОЗУ оптимален gc.buffer ${targetBuf} — редкие паузы сборщика мусора Unity.`);
+  {
+    const { mb: targetBuf } = gcBudget(input.ramGb, input);
+    push("gc-buffer", `В конфиге gc.buffer ${targetBuf} при ${input.ramGb} ГБ ОЗУ. Сравните паузы GC и расход памяти в одной сцене.`);
   }
   if (input.ramGb <= 16) {
     push("pagefile-auto", `При ${input.ramGb} ГБ ОЗУ авто-подкачка на SSD защищает от вылетов при загрузке больших карт.`);
-    push("background-apps", "Освобождает 600–1200 МБ ОЗУ и фоновые пробуждения CPU.", "medium");
+    push("startup-apps", "При малом объёме ОЗУ проверьте автозапуск одного ненужного лаунчера, не выключая службы Windows.", "medium");
   }
-  push(
-    `preset-${recommendedPreset}`,
-    recommendedPreset === "competitive"
-      ? "Снижает draw calls, тени и воду — максимальный прирост FPS и читаемости в бою."
-      : recommendedPreset === "balanced"
-        ? "Убирает тяжёлые постэффекты, сохраняя чёткую картинку под ваш запас GPU."
-        : "Раскрывает запас видеокарты без мыльных эффектов (motion blur, vignette).",
-  );
+  if (input.windowsVersion) push(`windows-${input.windowsVersion}-graphics`, `Проверьте штатный профиль приложения в Windows ${input.windowsVersion}. Если выбрана правильная GPU, менять ничего не нужно.`);
+  push("steam-checklist", "Проверьте фоновые загрузки Steam и ненужные оверлеи перед контрольным прогоном.", "medium");
+  if (bottleneck === "gpu" && pixels>1920*1080) push("render-resolution-check", `При цели ${resolutionLabel} вероятный ограничитель — GPU. Сравните масштаб рендера и качество теней в одной сцене.`, "medium");
   if (bottleneck === "cpu" || cpuScore < 8) {
-    push("ultimate-power-plan", "Убирает парковку ядер и просадки частоты при упоре в главный поток Rust.");
+    push("hardware-checklist", "Проверьте частоты и температуру главного потока под длительной нагрузкой. Не фиксируйте питание всех ядер без сравнения.");
   }
   if (vendor === "nvidia") {
-    push("nvidia-panel", "Режим макс. производительности, Shader Cache 10 ГБ и NVIDIA Reflex On + Boost.", "medium");
+    push("nvidia-panel", "Сверьте параметры драйвера NVIDIA и выбранный для Rust режим Reflex. Сравните задержку и 1% low в одной сцене.", "medium");
   } else if (vendor === "amd") {
-    push("amd-adrenalin", "Radeon Anti-Lag On и отключение Chill/Enhanced Sync для ровного отклика.", "medium");
+    push("amd-adrenalin", "Сверьте настройки AMD Software с выбранным режимом задержки. Radeon Anti-Lag меняется в драйвере, а не в client.cfg.", "medium");
   }
-  push("game-mode-dvr", "Отключает фоновую запись Game DVR и отдаёт приоритет потокам игры.", "medium");
+  if (input.backgroundLoad !== "stream") push("game-mode-dvr", "Отключает фоновую запись Game DVR и отдаёт приоритет потокам игры.", "medium");
   push("launch-options", "Чистый -window-mode exclusive без нерабочих флагов из Arma.", "medium");
   push("restore-point", "Создайте точку восстановления перед системными правками.", "medium");
 
@@ -456,7 +439,7 @@ export function evaluateBuild10(input: BuildInput, mode: GraphicsProfileId | nul
     bottleneck,
     recommendedPreset,
     vendor,
-    recommendations: recs.slice(0, 8),
+    recommendations: recs,
     notes,
     cpuName: cpu.name,
     gpuName: gpu.name,

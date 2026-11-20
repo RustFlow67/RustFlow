@@ -1,5 +1,5 @@
 // RustFlow PWA Service Worker (cache-first for static assets, network-first for pages)
-const CACHE_NAME = "rustflow-v7";
+const CACHE_NAME = "rustflow-v23";
 const PRECACHE = [
   "/",
   "/benchmark",
@@ -7,6 +7,8 @@ const PRECACHE = [
   "/presets",
   "/faq",
   "/guide",
+  "/drivers",
+  "/tweaker?tab=windows",
   "/icon.svg",
   "/manifest.json",
   "/icons/rustflow-192.png",

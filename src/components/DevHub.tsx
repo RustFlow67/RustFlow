@@ -1,4 +1,6 @@
 "use client";
+import LiquidGlass from "@/components/LiquidGlass";
+import { useFeedbackTimer } from "./fx/useFeedbackTimer";
 
 import { apiUrl } from "@/lib/api-base";
 
@@ -26,9 +28,10 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CodeBlock from "@/components/CodeBlock";
 import DownloadButton from "@/components/DownloadButton";
+import { useLiquidLens } from "./fx/useLiquidLens";
 import Segmented from "@/components/Segmented";
 import { useToast } from "@/components/ui/Toast";
 import { APP_KIT_GROUPS, type AppKitGroup } from "@/lib/app-kit";
@@ -113,6 +116,7 @@ export default function DevHub({
   const { toast } = useToast();
 
   // Explorer state
+  const feedbackLater=useFeedbackTimer();
   const [tab, setTab] = useState<ExplorerTab>("site");
   const [siteGroup, setSiteGroup] = useState<"all" | SiteFolderGroup>("all");
   const [kitGroup, setKitGroup] = useState<"all" | AppKitGroup>("all");
@@ -227,7 +231,7 @@ export default function DevHub({
         description: activePath,
         tone: "success",
       });
-      setTimeout(() => setCopiedCode(false), 1800);
+      feedbackLater(() => setCopiedCode(false), 1800);
     } catch {
       toast({ title: "Буфер обмена недоступен", tone: "error" });
     }
@@ -278,6 +282,8 @@ export default function DevHub({
 
   const totalFullCount = manifest.siteFiles.length + manifest.kitFiles.length + 1;
   const totalFullBytes = manifest.siteTotalBytes + manifest.kitTotalBytes;
+  const files = tab === "site" ? filteredSiteFiles : filteredKitFiles;
+  const { list: fileList, lens: fileLens } = useLiquidLens(files.findIndex(f => f.path === activePath), files.length, { lazy: true, continuous: true });
   const lineCount = activeContent ? activeContent.replace(/\n$/, "").split("\n").length : 0;
 
   return (
@@ -289,11 +295,10 @@ export default function DevHub({
         </h2>
         <div className="grid gap-4 lg:grid-cols-3" data-stagger>
           {/* Главный полный архив */}
-          <article className="glass glass-accent glass-hover sweep flex flex-col p-6">
+          <LiquidGlass as="article" className="glass glass-accent glass-hover sweep flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
-                style={{ "--c1": "#ffba6b", "--c2": "#ff5722" } as CSSProperties}
               >
                 <Package aria-hidden="true" />
               </span>
@@ -312,7 +317,7 @@ export default function DevHub({
               (.exe), Docker, Nginx, SQL-схема облака и русский гайд.
             </p>
 
-            <div className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
+            <LiquidGlass className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
               <div>
                 <strong className="block text-base font-extrabold tabular-nums text-ink">
                   {totalFullCount}
@@ -325,26 +330,26 @@ export default function DevHub({
                 </strong>
                 <span className="text-ink-3">исходников + ассетов</span>
               </div>
-            </div>
+            </LiquidGlass>
 
             <ul className="mt-4 space-y-1.5 text-[13px] text-ink-2">
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
-                Распаковал → <code className="font-mono text-ink">npm install && npm run dev</code>
+                Распаковал → <code className="font-sans text-ink">npm install && npm run dev</code>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
-                Сборка Windows <code className="font-mono text-ink">Setup.exe</code> (Tauri / Electron)
+                Сборка Windows <code className="font-sans text-ink">Setup.exe</code> (Tauri / Electron)
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
-                Ноль секретов: <code className="font-mono text-ink">.env.example</code> и <code className="font-mono text-ink">.gitignore</code>
+                Ноль секретов: <code className="font-sans text-ink">.env.example</code> и <code className="font-sans text-ink">.gitignore</code>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
                 Все бинарники внутри: 6 шрифтов, скриншот Rust (если добавлен),{" "}
-                <code className="font-mono text-ink">wallpaper.jpg</code>, <code className="font-mono text-ink">icon.svg</code>,{" "}
-                <code className="font-mono text-ink">favicon.ico</code>
+                <code className="font-sans text-ink">wallpaper.jpg</code>, <code className="font-sans text-ink">icon.svg</code>,{" "}
+                <code className="font-sans text-ink">favicon.ico</code>
               </li>
             </ul>
 
@@ -357,14 +362,13 @@ export default function DevHub({
                 className="w-full"
               />
             </div>
-          </article>
+          </LiquidGlass>
 
           {/* Только код сайта */}
-          <article className="glass glass-hover flex flex-col p-6">
+          <LiquidGlass as="article" className="glass glass-hover flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
-                style={{ "--c1": "#ffcb9b", "--c2": "#d47740" } as CSSProperties}
               >
                 <Globe aria-hidden="true" />
               </span>
@@ -379,7 +383,7 @@ export default function DevHub({
               CPU/GPU, пресеты, Твикер, мифы/EAC, PWA-манифест, Dockerfile и docker-compose.yml.
             </p>
 
-            <div className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
+            <LiquidGlass className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
               <div>
                 <strong className="block text-base font-extrabold tabular-nums text-ink">
                   {manifest.siteFiles.length + 1}
@@ -392,7 +396,7 @@ export default function DevHub({
                 </strong>
                 <span className="text-ink-3">включая шрифты и фото</span>
               </div>
-            </div>
+            </LiquidGlass>
 
             <ul className="mt-4 space-y-1.5 text-[13px] text-ink-2">
               <li className="flex items-center gap-2">
@@ -401,7 +405,7 @@ export default function DevHub({
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
-                Кириллические шрифты Unbounded + Manrope + JB Mono
+                Вариативный Inter с кириллицей и латиницей
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 flex-none text-ok" aria-hidden="true" />
@@ -429,14 +433,13 @@ export default function DevHub({
                     : "Включить PWA / Офлайн-режим"}
               </button>
             </div>
-          </article>
+          </LiquidGlass>
 
           {/* Только App Kit */}
-          <article className="glass glass-hover flex flex-col p-6">
+          <LiquidGlass as="article" className="glass glass-hover flex flex-col p-6">
             <div className="flex items-start justify-between gap-3">
               <span
                 className="icon-tile"
-                style={{ "--c1": "#faac80", "--c2": "#be4d34" } as CSSProperties}
               >
                 <Laptop aria-hidden="true" />
               </span>
@@ -451,7 +454,7 @@ export default function DevHub({
               — строго безопасно для Easy Anti-Cheat.
             </p>
 
-            <div className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
+            <LiquidGlass className="well mt-4 grid grid-cols-2 gap-2 p-3 text-center text-xs">
               <div>
                 <strong className="block text-base font-extrabold tabular-nums text-ink">
                   {manifest.kitFiles.length}
@@ -464,7 +467,7 @@ export default function DevHub({
                 </strong>
                 <span className="text-ink-3">итоговый Tauri Setup.exe</span>
               </div>
-            </div>
+            </LiquidGlass>
 
             <ul className="mt-4 space-y-1.5 text-[13px] text-ink-2">
               <li className="flex items-center gap-2">
@@ -497,12 +500,12 @@ export default function DevHub({
                 Смотреть Rust-ядро приложения
               </button>
             </div>
-          </article>
+          </LiquidGlass>
         </div>
       </section>
 
       {/* ==================== 1.5 БИНАРНЫЕ АССЕТЫ ==================== */}
-      <section aria-labelledby="assets-heading" className="glass p-5 sm:p-7">
+      <LiquidGlass as="section" aria-labelledby="assets-heading" className="glass p-5 sm:p-7">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="eyebrow">Проверено и упаковано</p>
@@ -511,7 +514,7 @@ export default function DevHub({
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-2">
               Все {assets.filter((a) => a.exists).length} файлов лежат в архивах в папке{" "}
-              <code className="font-mono text-ink">public/</code> байт-в-байт (метод store, без пережатия) и отдаются
+              <code className="font-sans text-ink">public/</code> байт-в-байт (метод store, без пережатия) и отдаются
               сайтом по прямым ссылкам ниже. Суммарно {fmtSize(assets.reduce((s, a) => s + a.size, 0))}. Если архив
               распаковался неполностью — сохраните файлы вручную по этим URL.
             </p>
@@ -526,7 +529,7 @@ export default function DevHub({
           {assets.map((asset) => {
             const Icon = asset.kind === "font" ? Fingerprint : asset.kind === "icon" ? ImageIcon : ImageIcon;
             return (
-              <li key={asset.path} className="tile flex items-center gap-3 p-3">
+              <LiquidGlass as="li" key={asset.path} className="tile flex items-center gap-3 p-3">
                 <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-white/10">
                   <Icon className="h-4 w-4 text-accent-hi" aria-hidden="true" />
                 </span>
@@ -535,12 +538,12 @@ export default function DevHub({
                     href={asset.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block truncate font-mono text-[12.5px] font-bold text-ink hover:text-accent-hi"
+                    className="block truncate font-sans text-[12.5px] font-bold text-ink hover:text-accent-hi"
                     title={`Открыть ${asset.url}`}
                   >
                     {asset.url}
                   </a>
-                  <span className="mt-0.5 block truncate font-mono text-[11px] text-ink-3">
+                  <span className="mt-0.5 block truncate font-sans text-[11px] text-ink-3">
                     {asset.path} · {fmtSize(asset.size)}
                   </span>
                 </span>
@@ -553,20 +556,20 @@ export default function DevHub({
                 >
                   <Download className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
-              </li>
+              </LiquidGlass>
             );
           })}
         </ul>
 
         {assets.some((a) => !a.exists) && (
-          <p role="alert" className="well mt-4 p-3.5 text-sm font-semibold text-danger">
+          <LiquidGlass as="p" role="alert" className="well mt-4 p-3.5 text-sm font-semibold text-danger">
             Не найдены на диске: {assets.filter((a) => !a.exists).map((a) => a.path).join(", ")}
-          </p>
+          </LiquidGlass>
         )}
-      </section>
+      </LiquidGlass>
 
       {/* ==================== 2. ДОРОЖНАЯ КАРТА СБОРКИ ==================== */}
-      <section aria-labelledby="roadmap-heading" className="glass p-5 sm:p-8">
+      <LiquidGlass as="section" aria-labelledby="roadmap-heading" className="glass p-5 sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow">Пошаговая инструкция</p>
@@ -599,7 +602,7 @@ export default function DevHub({
               </h3>
               <p className="text-sm leading-relaxed text-ink-2">
                 Поставьте <strong>Node.js 22 LTS</strong> (nodejs.org) и <strong>VS Code</strong>. Распакуйте
-                скачанный архив <code className="font-mono text-ink">RustFlow-Complete-Edition.zip</code> и выполните в
+                скачанный архив <code className="font-sans text-ink">RustFlow-Complete-Edition.zip</code> и выполните в
                 терминале:
               </p>
               <CodeBlock
@@ -634,10 +637,10 @@ npm run typecheck && npm run lint && npm run build`}
               </h3>
               <ul className="space-y-2.5">
                 {CUSTOMIZE_MAP.map((row) => (
-                  <li key={row.openPath} className="tile flex items-center justify-between gap-3 p-3.5">
+                  <LiquidGlass as="li" key={row.openPath} className="tile flex items-center justify-between gap-3 p-3.5">
                     <div className="min-w-0">
                       <p className="text-[13.5px] font-bold text-ink">{row.what}</p>
-                      <p className="mt-0.5 truncate font-mono text-[11.5px] text-ink-3">{row.where}</p>
+                      <p className="mt-0.5 truncate font-sans text-[11.5px] text-ink-3">{row.where}</p>
                     </div>
                     <button
                       type="button"
@@ -646,7 +649,7 @@ npm run typecheck && npm run lint && npm run build`}
                     >
                       Открыть
                     </button>
-                  </li>
+                  </LiquidGlass>
                 ))}
               </ul>
             </div>
@@ -661,7 +664,7 @@ npm run typecheck && npm run lint && npm run build`}
                 Нативное Windows-приложение на Tauri v2 + Rust (рекомендуется)
               </h3>
               <p className="text-sm leading-relaxed text-ink-2">
-                Даёт компактный установщик <code className="font-mono text-ink">RustFlow_1.0.0_x64-setup.exe</code>{" "}
+                Даёт компактный установщик <code className="font-sans text-ink">RustFlow_1.0.0_x64-setup.exe</code>{" "}
                 размером <strong>~8 МБ</strong> и минимальное потребление ОЗУ. Установите{" "}
                 <strong>Rust (rustup.rs)</strong> и <strong>Visual Studio C++ Build Tools</strong>, затем выполните в
                 PowerShell:
@@ -700,10 +703,10 @@ npx tauri build
                   { cmd: "create_restore_point", desc: "Создание точки восстановления Windows с системным UAC" },
                   { cmd: "apply_tweak_script", desc: "Безопасное выполнение .reg и .bat твиков с запросом прав админа" },
                 ].map((item) => (
-                  <div key={item.cmd} className="tile p-3.5">
-                    <code className="font-mono text-xs font-bold text-accent-hi">{item.cmd}()</code>
+                  <LiquidGlass key={item.cmd} className="tile p-3.5">
+                    <code className="font-sans text-xs font-bold text-accent-hi">{item.cmd}()</code>
                     <p className="mt-1 text-xs leading-relaxed text-ink-2">{item.desc}</p>
-                  </div>
+                  </LiquidGlass>
                 ))}
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -735,10 +738,10 @@ npx tauri build
               </h3>
               <p className="text-sm leading-relaxed text-ink-2">
                 Если вам удобнее чистый JavaScript/Node.js, используйте готовый модуль{" "}
-                <code className="font-mono text-ink">app-kit/electron/</code>. Он реализует ровно тот же интерфейс{" "}
-                <code className="font-mono text-ink">desktop-bridge.ts</code> с включёнными{" "}
-                <code className="font-mono text-ink">contextIsolation</code> и{" "}
-                <code className="font-mono text-ink">sandbox</code>.
+                <code className="font-sans text-ink">app-kit/electron/</code>. Он реализует ровно тот же интерфейс{" "}
+                <code className="font-sans text-ink">desktop-bridge.ts</code> с включёнными{" "}
+                <code className="font-sans text-ink">contextIsolation</code> и{" "}
+                <code className="font-sans text-ink">sandbox</code>.
               </p>
               <CodeBlock
                 title="PowerShell — сборка Setup.exe и Portable.exe через Electron"
@@ -762,7 +765,7 @@ npx electron-builder --config electron/electron-builder.yml --win
                 <HardDrive className="h-5 w-5 text-accent-hi" aria-hidden="true" />
                 Tauri v2 или Electron — что выбрать?
               </h3>
-              <div className="tile space-y-2 p-4 text-sm text-ink-2">
+              <LiquidGlass className="tile space-y-2 p-4 text-sm text-ink-2">
                 <p>
                   <strong className="text-ink">Tauri v2 (рекомендуется для релиза):</strong> установщик ~8 МБ, быстрый
                   холодный старт, меньше расход памяти в фоне, встроенный Chromium WebView2 с поддержкой всех эффектов
@@ -771,9 +774,9 @@ npx electron-builder --config electron/electron-builder.yml --win
                 <p>
                   <strong className="text-ink">Electron (быстрый прототип на JS):</strong> не нужен компилятор Rust и
                   C++ Build Tools, собирается за пару минут, на выходе сразу и установщик, и{" "}
-                  <code className="font-mono text-ink">Portable.exe</code> (~140 МБ).
+                  <code className="font-sans text-ink">Portable.exe</code> (~140 МБ).
                 </p>
-              </div>
+              </LiquidGlass>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -820,26 +823,26 @@ sudo systemctl reload nginx`}
                 Подключение аккаунтов и облака (Этап 2)
               </h3>
               <p className="text-sm leading-relaxed text-ink-2">
-                Все сущности проекта (<code className="font-mono text-ink">builds</code>,{" "}
-                <code className="font-mono text-ink">tweaks</code>)
-                уже содержат <code className="font-mono text-ink">ownerId</code> и работают через единый адаптер:
+                Все сущности проекта (<code className="font-sans text-ink">builds</code>,{" "}
+                <code className="font-sans text-ink">tweaks</code>)
+                уже содержат <code className="font-sans text-ink">ownerId</code> и работают через единый адаптер:
               </p>
               <ol className="space-y-2 text-[13.5px] text-ink-2">
-                <li className="tile p-3">
+                <LiquidGlass as="li" className="tile p-3">
                   <strong className="text-ink">1.</strong> Выполните{" "}
-                  <code className="font-mono text-ink">app-kit/cloud/schema.sql</code> в PostgreSQL или Supabase.
-                </li>
-                <li className="tile p-3">
+                  <code className="font-sans text-ink">app-kit/cloud/schema.sql</code> в PostgreSQL или Supabase.
+                </LiquidGlass>
+                <LiquidGlass as="li" className="tile p-3">
                   <strong className="text-ink">2.</strong> Подключите авторизацию (Steam OpenID / Discord / Google через
                   Better Auth, Auth.js или Supabase Auth).
-                </li>
-                <li className="tile p-3">
+                </LiquidGlass>
+                <LiquidGlass as="li" className="tile p-3">
                   <strong className="text-ink">3.</strong> Скопируйте{" "}
-                  <code className="font-mono text-ink">api-sync-route.ts</code> в{" "}
-                  <code className="font-mono text-ink">src/app/api/sync/route.ts</code> и вызовите{" "}
-                  <code className="font-mono text-ink">createCloudSync</code> — сайт и .exe начнут синхронизировать
+                  <code className="font-sans text-ink">api-sync-route.ts</code> в{" "}
+                  <code className="font-sans text-ink">src/app/api/sync/route.ts</code> и вызовите{" "}
+                  <code className="font-sans text-ink">createCloudSync</code> — сайт и .exe начнут синхронизировать
                   сборки и отметки автоматически.
-                </li>
+                </LiquidGlass>
               </ol>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -863,7 +866,7 @@ sudo systemctl reload nginx`}
 
         {guideTab === "eac" && (
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="tile space-y-2.5 p-5">
+            <LiquidGlass className="tile space-y-2.5 p-5">
               <h3 className="flex items-center gap-2 text-base font-bold text-ink">
                 <ShieldCheck className="h-5 w-5 text-ok" aria-hidden="true" />
                 Правила безопасности Easy Anti-Cheat для вашего .exe
@@ -871,7 +874,7 @@ sudo systemctl reload nginx`}
               <ul className="space-y-2 text-sm leading-relaxed text-ink-2">
                 <li>
                   • <strong>Никогда</strong> не открывайте дескриптор процесса{" "}
-                  <code className="font-mono text-ink">RustClient.exe</code> на чтение/запись памяти и не инжектите DLL
+                  <code className="font-sans text-ink">RustClient.exe</code> на чтение/запись памяти и не инжектите DLL
                   или свои оверлеи поверх игры.
                 </li>
                 <li>
@@ -879,17 +882,17 @@ sudo systemctl reload nginx`}
                   неподписанные kernel-драйверы.
                 </li>
                 <li>
-                  • Меняйте только штатный <code className="font-mono text-ink">cfg/client.cfg</code> при{" "}
-                  <strong>закрытом</strong> Rust (в нашем <code className="font-mono text-ink">lib.rs</code> эта
+                  • Меняйте только штатный <code className="font-sans text-ink">cfg/client.cfg</code> при{" "}
+                  <strong>закрытом</strong> Rust (в нашем <code className="font-sans text-ink">lib.rs</code> эта
                   проверка уже встроена) и документированные параметры Windows.
                 </li>
                 <li>
                   • Всегда создавайте резервную копию и точку восстановления перед системными изменениями.
                 </li>
               </ul>
-            </div>
+            </LiquidGlass>
 
-            <div className="tile space-y-2.5 p-5">
+            <LiquidGlass className="tile space-y-2.5 p-5">
               <h3 className="flex items-center gap-2 text-base font-bold text-ink">
                 <Sparkles className="h-5 w-5 text-accent-hi" aria-hidden="true" />
                 Релиз, автообновления и подпись кода Windows
@@ -897,27 +900,27 @@ sudo systemctl reload nginx`}
               <ul className="space-y-2 text-sm leading-relaxed text-ink-2">
                 <li>
                   • Чтобы Windows SmartScreen не показывал предупреждение «Неизвестный издатель», подпишите{" "}
-                  <code className="font-mono text-ink">Setup.exe</code> через{" "}
+                  <code className="font-sans text-ink">Setup.exe</code> через{" "}
                   <strong>Azure Trusted Signing</strong> или OV/EV Code Signing сертификат.
                 </li>
                 <li>
-                  • Для автоматической сборки <code className="font-mono text-ink">.exe</code> на каждый релиз подключите
-                  официальный GitHub Action <code className="font-mono text-ink">tauri-apps/tauri-action</code>.
+                  • Для автоматической сборки <code className="font-sans text-ink">.exe</code> на каждый релиз подключите
+                  официальный GitHub Action <code className="font-sans text-ink">tauri-apps/tauri-action</code>.
                 </li>
                 <li>
                   • Для автообновлений приложения включите плагин{" "}
-                  <code className="font-mono text-ink">tauri-plugin-updater</code> с криптографической подписью патчей.
+                  <code className="font-sans text-ink">tauri-plugin-updater</code> с криптографической подписью патчей.
                 </li>
                 <li>
-                  • Публикуйте открытый список всех <code className="font-mono text-ink">.reg</code>/
-                  <code className="font-mono text-ink">.bat</code> и SHA-256 суммы релизов — это даёт максимальное
+                  • Публикуйте открытый список всех <code className="font-sans text-ink">.reg</code>/
+                  <code className="font-sans text-ink">.bat</code> и SHA-256 суммы релизов — это даёт максимальное
                   доверие игроков.
                 </li>
               </ul>
-            </div>
+            </LiquidGlass>
           </div>
         )}
-      </section>
+      </LiquidGlass>
 
       {/* ==================== 3. ИНТЕРАКТИВНЫЙ ПРОВОДНИК КОДА ==================== */}
       <section id="code-explorer" aria-labelledby="explorer-heading" className="scroll-mt-24 space-y-4">
@@ -943,7 +946,7 @@ sudo systemctl reload nginx`}
         </div>
 
         {/* Фильтры и поиск */}
-        <div className="glass space-y-3 p-4">
+        <LiquidGlass className="glass space-y-3 p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <label className="relative block flex-1">
               <span className="sr-only">Поиск файла по имени</span>
@@ -975,46 +978,14 @@ sudo systemctl reload nginx`}
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Фильтр по папке">
-            {tab === "site"
-              ? SITE_GROUPS.map((g) => {
-                  const active = siteGroup === g.value;
-                  return (
-                    <button
-                      key={g.value}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setSiteGroup(g.value)}
-                      className={`chip !h-8 !px-3 transition-transform ${
-                        active ? "chip-accent font-bold" : "opacity-80 hover:opacity-100"
-                      }`}
-                    >
-                      {g.label}
-                    </button>
-                  );
-                })
-              : KIT_GROUPS.map((g) => {
-                  const active = kitGroup === g.value;
-                  return (
-                    <button
-                      key={g.value}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setKitGroup(g.value)}
-                      className={`chip !h-8 !px-3 transition-transform ${
-                        active ? "chip-accent font-bold" : "opacity-80 hover:opacity-100"
-                      }`}
-                    >
-                      {g.label}
-                    </button>
-                  );
-                })}
-          </div>
-        </div>
+          {tab === "site"
+            ? <Segmented options={SITE_GROUPS} value={siteGroup} onChange={setSiteGroup} ariaLabel="Фильтр по папке" />
+            : <Segmented options={KIT_GROUPS} value={kitGroup} onChange={setKitGroup} ariaLabel="Фильтр по папке" />}
+        </LiquidGlass>
 
         {/* Две колонки: дерево файлов + код */}
         <div className="grid items-start gap-4 lg:grid-cols-[330px_minmax(0,1fr)]">
-          <aside className="glass p-3" aria-label="Список файлов проекта">
+          <LiquidGlass as="aside" className="glass p-3" aria-label="Список файлов проекта">
             <div className="mb-2 flex items-center justify-between px-2 text-xs text-ink-3">
               <span>
                 Файлов:{" "}
@@ -1025,7 +996,8 @@ sudo systemctl reload nginx`}
               <span>Нажмите для просмотра</span>
             </div>
 
-            <div className="max-h-[560px] space-y-1 overflow-y-auto pr-1" role="listbox" aria-label="Файлы">
+            <div ref={fileList} className="liquid-options relative max-h-[560px] space-y-1 overflow-y-auto pr-1" role="listbox" aria-label="Файлы">
+              <LiquidGlass as="span" shape="pill" ref={fileLens} className="lens liquid-lens" aria-hidden="true" />
               {tab === "site" ? (
                 filteredSiteFiles.length === 0 ? (
                   <p className="p-4 text-center text-sm text-ink-3">Файлы по запросу не найдены.</p>
@@ -1036,7 +1008,7 @@ sudo systemctl reload nginx`}
                       <button
                         key={file.path}
                         type="button"
-                        role="option"
+                        role="option" data-liquid-item=""
                         aria-selected={selected}
                         onClick={() => setSelectedSitePath(file.path)}
                         className="option !py-2 !text-[12.5px]"
@@ -1046,7 +1018,7 @@ sudo systemctl reload nginx`}
                             className={`h-3.5 w-3.5 flex-none ${selected ? "text-accent-hi" : "text-ink-3"}`}
                             aria-hidden="true"
                           />
-                          <span className="truncate font-mono">{file.path}</span>
+                          <span className="truncate font-sans">{file.path}</span>
                         </span>
                         <span className="flex-none text-[11px] tabular-nums text-ink-3">
                           {fmtSize(file.size)}
@@ -1064,7 +1036,7 @@ sudo systemctl reload nginx`}
                     <button
                       key={file.path}
                       type="button"
-                      role="option"
+                      role="option" data-liquid-item=""
                       aria-selected={selected}
                       onClick={() => setSelectedKitPath(file.path)}
                       className="option flex-col !items-start !gap-0.5 !py-2.5"
@@ -1075,19 +1047,19 @@ sudo systemctl reload nginx`}
                           {fmtSize(file.size)}
                         </span>
                       </span>
-                      <span className="w-full truncate font-mono text-[11px] text-ink-3">{file.path}</span>
+                      <span className="w-full truncate font-sans text-[11px] text-ink-3">{file.path}</span>
                     </button>
                   );
                 })
               )}
             </div>
-          </aside>
+          </LiquidGlass>
 
           {/* Панель просмотра кода */}
-          <div className="glass min-w-0 overflow-hidden p-4 sm:p-5">
+          <LiquidGlass className="glass min-w-0 overflow-hidden p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="break-all font-mono text-[13.5px] font-bold text-ink">{activePath}</p>
+                <p className="break-all font-sans text-[13.5px] font-bold text-ink">{activePath}</p>
                 {activeKitMeta && (
                   <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{activeKitMeta.description}</p>
                 )}
@@ -1128,12 +1100,12 @@ sudo systemctl reload nginx`}
             <div className="hairline my-4" />
 
             {tab === "site" && activeSiteMeta?.binary ? (
-              <div className="well p-6 text-center">
+              <LiquidGlass className="well p-6 text-center">
                 <p className="text-sm font-bold text-ink">
                   Бинарный ассет ({fmtSize(activeSiteMeta.size)})
                 </p>
                 <p className="mt-1.5 text-xs leading-relaxed text-ink-2">
-                  Файл <code className="font-mono text-ink">{activeSiteMeta.path}</code> (шрифт или изображение) уже
+                  Файл <code className="font-sans text-ink">{activeSiteMeta.path}</code> (шрифт или изображение) уже
                   включён в архивы <strong>RustFlow-Complete-Edition.zip</strong> и{" "}
                   <strong>RustFlow-Site-Source.zip</strong>.
                 </p>
@@ -1145,7 +1117,7 @@ sudo systemctl reload nginx`}
                   <Download aria-hidden="true" />
                   Скачать ассет отдельно
                 </a>
-              </div>
+              </LiquidGlass>
             ) : isLoading ? (
               <div className="space-y-2.5 p-2" role="status" aria-label="Загрузка кода файла">
                 <div className="skeleton h-5 w-2/3" />
@@ -1155,17 +1127,17 @@ sudo systemctl reload nginx`}
                 <div className="skeleton h-48 w-full" />
               </div>
             ) : loadError ? (
-              <div className="well p-5 text-sm text-danger" role="alert">
+              <LiquidGlass className="well p-5 text-sm text-danger" role="alert">
                 {loadError}
-              </div>
+              </LiquidGlass>
             ) : (
-              <div className="well overflow-hidden">
+              <LiquidGlass className="well overflow-hidden">
                 <pre className="code max-h-[540px] overflow-auto p-4" tabIndex={0}>
                   {activeContent ?? ""}
                 </pre>
-              </div>
+              </LiquidGlass>
             )}
-          </div>
+          </LiquidGlass>
         </div>
       </section>
     </div>

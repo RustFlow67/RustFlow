@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Star } from "lucide-react";
 import { useAddonValue } from "@/lib/addons/progress";
 import { storage } from "@/lib/storage/adapter";
@@ -15,10 +16,13 @@ function decode(value: unknown): Record<Kind, string[]> {
 export const useFavorites = () => useAddonValue("favorites", decode);
 
 export function FavoriteButton({ kind, slug, title, active }: { kind: Kind; slug: string; title: string; active: boolean }) {
-  return <button type="button" className="btn btn-sm !h-8 !w-8 !p-0" aria-pressed={active} title="Избранное"
+  const gradient = useId();
+  return <button type="button" className="favorite-drop" aria-pressed={active} title="Избранное"
     aria-label={`Избранное: ${title}`} onClick={() => storage.addons.update("favorites", decode, (saved) => ({ ...saved,
       [kind]: saved[kind].includes(slug) ? saved[kind].filter((s) => s !== slug) : [slug, ...saved[kind]].slice(0, 64),
     }))}>
-    <Star className={active ? "text-accent-hi" : "text-ink-3"} fill={active ? "currentColor" : "none"} aria-hidden="true" />
+    <Star size={18} aria-hidden="true" fill={active ? `url(#${gradient})` : "none"}>
+      <defs><linearGradient id={gradient} x1="0%" y1="100%" x2="100%" y2="0%"><stop stopColor="var(--theme-accent)" /><stop offset="1" stopColor="var(--theme-tip)" /></linearGradient></defs>
+    </Star>
   </button>;
 }

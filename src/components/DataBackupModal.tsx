@@ -1,5 +1,10 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger, type PopupOrigin } from "./fx/usePopupMotion";
+import { useDownload } from "./fx/useDownload";
+import { useFeedbackTimer } from "./fx/useFeedbackTimer";
+
 import { Check, Copy, Download, FileJson, RotateCcw, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import Segmented from "@/components/Segmented";
@@ -12,20 +17,14 @@ import { useRustFlowStore } from "@/lib/storage/useStore";
 export type BackupTab = "export" | "import";
 
 function useDownloadBackup() {
+  const download=useDownload();
   const { toast } = useToast();
   return () => {
     const bundle = storage.exportBundle();
     const json = JSON.stringify(bundle, null, 2);
     const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
     const date = new Date().toISOString().slice(0, 10);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `rustflow-profile-${date}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (!download(blob,`rustflow-profile-${date}.json`)) return;
     toast({
       title: "JSON-профиль скачан",
       description: `Сборок: ${bundle.builds.length}, твиков: ${bundle.appliedTweaks.length}.`,
@@ -39,21 +38,25 @@ function useDownloadBackup() {
  * «Моя сборка + применённые твики + FPS до/после + настройки Твикера».
  */
 export default function DataBackupModal({
+  origin,
   open,
   onClose,
   tab,
   onTabChange,
 }: {
+  origin: PopupOrigin;
   open: boolean;
   onClose: () => void;
   tab: BackupTab;
   onTabChange: (tab: BackupTab) => void;
 }) {
+  const confirm = usePopupTrigger();
   const { state } = useRustFlowStore();
   const { toast } = useToast();
   const handleDownloadJson = useDownloadBackup();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const feedbackLater=useFeedbackTimer();
   const [rawInput, setRawInput] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -75,7 +78,7 @@ export default function DataBackupModal({
       const json = JSON.stringify(storage.exportBundle(), null, 2);
       await navigator.clipboard.writeText(json);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      feedbackLater(() => setCopied(false), 1800);
       toast({ title: "JSON скопирован в буфер обмена", tone: "success" });
     } catch {
       toast({ title: "Не удалось скопировать", description: "Скачайте JSON файлом.", tone: "error" });
@@ -128,7 +131,7 @@ export default function DataBackupModal({
 
   return (
     <>
-      <Modal
+      <Modal {...origin}
         open={open}
         onClose={onClose}
         title="Резервная копия профиля (JSON)"
@@ -148,31 +151,31 @@ export default function DataBackupModal({
 
         {tab === "export" ? (
           <div className="mt-5 space-y-4">
-            <div className="well space-y-2.5 p-4">
+            <LiquidGlass className="well space-y-2.5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-ink">Текущие данные в браузере</span>
                 <Badge tone="measured">schema v1 · localStorage</Badge>
               </div>
               <div className="grid grid-cols-2 gap-2.5 pt-1 text-sm sm:grid-cols-3">
-                <div className="tile p-3 text-center">
+                <LiquidGlass className="tile p-3 text-center">
                   <span className="block text-xl font-extrabold tabular-nums">{buildsCount}</span>
                   <span className="text-[12px] text-ink-3">сборок</span>
-                </div>
-                <div className="tile p-3 text-center">
+                </LiquidGlass>
+                <LiquidGlass className="tile p-3 text-center">
                   <span className="block text-xl font-extrabold tabular-nums">{appliedCount}</span>
                   <span className="text-[12px] text-ink-3">применено</span>
-                </div>
-                <div className="tile p-3 text-center">
+                </LiquidGlass>
+                <LiquidGlass className="tile p-3 text-center">
                   <span className="block text-xl font-extrabold tabular-nums">{measuredCount}</span>
                   <span className="text-[12px] text-ink-3">FPS в твиках</span>
-                </div>
+                </LiquidGlass>
               </div>
               {activeBuild && (
                 <p className="pt-1 text-[13px] text-ink-2">
                   Активная сборка: <strong className="text-ink">{activeBuild.input.name}</strong> ({activeBuild.score10}/10)
                 </p>
               )}
-            </div>
+            </LiquidGlass>
 
             <div className="flex flex-wrap gap-2.5">
               <Button variant="primary" onClick={handleDownloadJson} className="flex-1">
@@ -189,7 +192,7 @@ export default function DataBackupModal({
 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <p className="text-[12.5px] text-ink-3">Очистить локальное хранилище (сборки, журнал, отметки, настройки)</p>
-              <Button variant="danger" size="sm" onClick={() => setConfirmReset(true)}>
+              <Button variant="danger" size="sm" onClick={e => {confirm.capture(e.currentTarget); setConfirmReset(true);}}>
                 <RotateCcw aria-hidden="true" />
                 Сбросить всё
               </Button>
@@ -219,7 +222,7 @@ export default function DataBackupModal({
               </label>
               <textarea
                 id="rf-import-json"
-                className="field font-mono !text-[12.5px]"
+                className="field font-sans !text-[12.5px]"
                 rows={5}
                 placeholder='{"app": "RustFlow", "schemaVersion": 1, ...}'
                 value={rawInput}
@@ -234,7 +237,7 @@ export default function DataBackupModal({
             </div>
 
             {preview && (
-              <div className="well space-y-2 p-4">
+              <LiquidGlass className="well space-y-2 p-4">
                 <p className="flex items-center gap-2 text-sm font-bold text-ok">
                   <FileJson className="h-4 w-4" aria-hidden="true" />
                   Файл проверен и готов к импорту
@@ -247,7 +250,7 @@ export default function DataBackupModal({
                 {preview.myBuildTitle && (
                   <p className="text-[12.5px] text-ink-3">Главная сборка: {preview.myBuildTitle}</p>
                 )}
-              </div>
+              </LiquidGlass>
             )}
 
             <div className="flex flex-wrap justify-end gap-2.5">
@@ -261,7 +264,7 @@ export default function DataBackupModal({
               <Button
                 variant="primary"
                 disabled={!preview}
-                onClick={() => setConfirmReplace(true)}
+                onClick={e => {confirm.capture(e.currentTarget); setConfirmReplace(true);}}
               >
                 Заменить полностью
               </Button>
@@ -270,7 +273,7 @@ export default function DataBackupModal({
         )}
       </Modal>
 
-      <ConfirmDialog
+      <ConfirmDialog {...confirm.origin}
         open={open && confirmReplace}
         onClose={() => setConfirmReplace(false)}
         onConfirm={() => executeImport("replace")}
@@ -279,7 +282,7 @@ export default function DataBackupModal({
         confirmLabel="Да, заменить"
       />
 
-      <ConfirmDialog
+      <ConfirmDialog {...confirm.origin}
         open={open && confirmReset}
         onClose={() => setConfirmReset(false)}
         onConfirm={() => {

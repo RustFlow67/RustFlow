@@ -7,15 +7,11 @@ export default function ScoreRing({
   value,
   size = 172,
   stroke = 13,
-  color = "#ff8e4f",
-  colorTo = "#ffd9a8",
   children,
 }: {
   value: number;
   size?: number;
   stroke?: number;
-  color?: string;
-  colorTo?: string;
   children?: ReactNode;
 }) {
   const id = useId();
@@ -37,8 +33,8 @@ export default function ScoreRing({
       >
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor={colorTo} />
-            <stop offset="1" stopColor={color} />
+            <stop offset="0" stopColor="var(--theme-tip)" />
+            <stop offset="1" stopColor="var(--theme-accent)" />
           </linearGradient>
         </defs>
         <circle

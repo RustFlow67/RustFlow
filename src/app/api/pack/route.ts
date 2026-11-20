@@ -2,8 +2,9 @@ import type { NextRequest } from "next/server";
 import { buildPack } from "@/lib/pack";
 import { getGraphicsProfile } from "@/lib/graphics-profiles";
 import { isPackRam, isPlanVram, isRecommendedTweak, isTweakerVendor } from "@/lib/tweaker";
-import { getConnectionProfile, parseMonitorHz } from "@/lib/models/build-settings";
+import { getConnectionProfile, parseMonitorHz,isWindows } from "@/lib/models/build-settings";
 import { accountFor, AuthError, authHandler, authOrigin, authJson, NO_STORE } from "@/lib/auth/server";
+import { readPlaySettings } from "@/lib/models/play-settings";
 import { TWEAKS_LITE } from "@/lib/tweaks";
 
 export const dynamic = "force-dynamic";
@@ -30,11 +31,15 @@ function respondWithPack(request: NextRequest) {
   if ((q.has("hz") && !monitorHz) || (q.has("net") && !connection)) {
     return authJson({ error: "Проверьте герцовку монитора и профиль сети." }, 400);
   }
-  const tuning = { monitorHz, connection: connection?.value };
+  const play = readPlaySettings(k => q.get(k));
+  if (!play) return authJson({ error: "Проверьте настройки нагрузки игры." }, 400);
+  const os=q.get("windows");
+  if(os!==null && !isWindows(os))return authJson({error:"Проверьте версию Windows."},400);
+  const tuning = { windowsVersion:os??undefined,...play, monitorHz, connection: connection?.value };
   if ((vram !== undefined && !isPlanVram(vram)) || !mode || !isTweakerVendor(gpu) || !isPackRam(ram) || (raw?.length ?? 0) > 2400) {
     return authJson({ error: "Некорректные параметры пакета." }, 400);
   }
-  const slugs = hasSelection ? (raw ? raw.split(",") : []) : TWEAKS_LITE.filter((t) => isRecommendedTweak(t, gpu)).map((t) => t.slug);
+  const slugs = hasSelection ? (raw ? raw.split(",") : []) : TWEAKS_LITE.filter((t) => isRecommendedTweak(t, gpu) && !(play.backgroundLoad === "stream" && t.slug === "game-mode-dvr")).map((t) => t.slug);
   if (slugs.length > TWEAKS_LITE.length || slugs.some((slug) => !/^[a-z0-9-]{1,64}$/.test(slug))) {
     return authJson({ error: "Некорректный список твиков." }, 400);
   }

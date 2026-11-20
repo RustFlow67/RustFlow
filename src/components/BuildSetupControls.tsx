@@ -4,90 +4,245 @@ import { useState } from "react";
 import LiquidSelect from "@/components/LiquidSelect";
 import Segmented from "@/components/Segmented";
 import OriginDisclosure from "@/components/fx/OriginDisclosure";
-import { AnimatedNumber } from "@/components/fx/AnimatedNumber";
-import { Input, Meter } from "@/components/ui";
-import { calcRamLatencyNs, RAM_CL_OPTIONS, RAM_FREQ_OPTIONS, type BuildEvaluation, type BuildInput } from "@/lib/models/build";
+import { getGpu } from "@/lib/hardware";
 import {
-  BIOS_PROFILES, CONNECTION_PROFILES, DEFAULT_CONNECTION, DEFAULT_MONITOR_HZ, REFRESH_RATES,
-  defaultMemoryKit, formatMonitorHz, getMemoryType, isRamValue, monitorPotential, RAM_CL_BOUNDS, RAM_MHZ_BOUNDS, requiredMemory,
+  backgroundBudget,
+  gcBudget,
+  PLAY_DEFAULTS,
+  PLAY_OPTIONS,
+  supportedLatency,
+} from "@/lib/models/play-settings";
+import BoundedNumber from "./ui/BoundedNumber";
+import { calcRamLatencyNs, RAM_CL_OPTIONS, RAM_FREQ_OPTIONS, type BuildInput } from "@/lib/models/build";
+import {
+  CONNECTION_PROFILES,
+  DEFAULT_CONNECTION,
+  defaultMemoryKit,
+  getMemoryType,
+  validMemory,
+  MEMORY_LIMITS,
+  requiredMemory,
   type MemoryType,
 } from "@/lib/models/build-settings";
-import { avgFps } from "@/lib/models/fps-calibration";
 
-const MEMORY_TYPES = [ { value: "DDR4", label: "DDR4" }, { value: "DDR5", label: "DDR5" } ] as const;
-const MONITORS = REFRESH_RATES.map((value) => ({ value, label: formatMonitorHz(value) }));
+const MEMORY_TYPES = [
+  { value: "DDR4", label: "DDR4" },
+  { value: "DDR5", label: "DDR5" },
+] as const;
 type InputProps = { input: BuildInput; patch: (value: Partial<BuildInput>) => void };
 
-function RamNumber({ label, fieldLabel, options, value, onChange, bounds, hint }: {
-  label: string; fieldLabel: string; options: readonly { value: number; label: string }[];
-  value: number; onChange: (value: number) => void; bounds: { min: number; max: number }; hint?: string;
+function RamNumber({
+  label,
+  fieldLabel,
+  options,
+  value,
+  onChange,
+  bounds,
+  hint,
+  memory,
+}: {
+  memory: MemoryType;
+  label: string;
+  fieldLabel: string;
+  options: readonly { value: number; label: string }[];
+  value: number;
+  onChange: (value: number) => void;
+  bounds: { min: number; max: number };
+  hint?: string;
 }) {
   const [custom, setCustom] = useState(false);
-  const valid = isRamValue(value, bounds);
   const manual = custom || !options.some((opt) => opt.value === value);
-  return <div className="min-w-0 space-y-2">
-    <LiquidSelect<number | "custom">
-      label={label}
-      value={manual ? "custom" : value}
-      options={[...options, { value: "custom", label: "Кастомное" }]}
-      hint={hint}
-      onChange={(next) => { setCustom(next === "custom"); if (next !== "custom") onChange(next); }} />
-    <OriginDisclosure open={manual}>
-      <Input label={fieldLabel} type="number" inputMode="numeric" step={1} required {...bounds}
-        value={Number.isFinite(value) ? value : ""} error={valid ? undefined : `${bounds.min}–${bounds.max}, целое число`}
-        onChange={(event) => { setCustom(true); onChange(event.target.valueAsNumber); }} />
-    </OriginDisclosure>
-  </div>;
+  return (
+    <div className="min-w-0 space-y-2">
+      <LiquidSelect<number | "custom">
+        label={label}
+        value={manual ? "custom" : value}
+        options={[...options, { value: "custom", label: "Кастомное" }]}
+        hint={hint}
+        onChange={(next) => {
+          setCustom(next === "custom");
+          if (next !== "custom") onChange(next);
+        }}
+      />
+      <OriginDisclosure open={manual}>
+        <BoundedNumber
+          label={fieldLabel}
+          {...bounds}
+          value={value}
+          context={memory}
+          unit={label === "Частота RAM" ? "МТ/с" : "CL"}
+          onValue={(v) => {
+            if (Number(v) !== value) onChange(Number(v));
+          }}
+        />
+      </OriginDisclosure>
+    </div>
+  );
 }
 
 export function MemoryControls({ input, patch }: InputProps) {
-  const memory = getMemoryType(input), fixed = requiredMemory(input.cpuId);
-  const valid = isRamValue(input.ramMhz, RAM_MHZ_BOUNDS) && isRamValue(input.ramCl, RAM_CL_BOUNDS);
-  const latency = valid ? `Задержка доступа: ~${calcRamLatencyNs(input.ramMhz, input.ramCl).toFixed(1)} нс` : "Укажите действительные частоту и CL.";
-  return <>
-    <div>
-      <span className="mb-1.5 block text-[13px] font-semibold text-ink-2">Поколение памяти</span>
-      <Segmented<MemoryType> options={fixed ? MEMORY_TYPES.filter((item) => item.value === fixed) : MEMORY_TYPES} value={memory}
-        onChange={(type) => { if (type !== memory) patch(defaultMemoryKit(type)); }}
-        ariaLabel="Поколение памяти" className="w-full" />
-      {fixed && <p className="mt-1.5 text-xs text-ink-3">Этот процессор использует {fixed}.</p>}
-    </div>
-    <div key={memory} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <RamNumber label="Частота RAM" fieldLabel="Частота RAM вручную, МТ/с" value={input.ramMhz} bounds={RAM_MHZ_BOUNDS}
-        options={RAM_FREQ_OPTIONS.filter(({ value }) => memory === "DDR5" ? value >= 4800 : value <= 4000)}
-        onChange={(ramMhz) => patch({ memoryType: memory, ramMhz })} />
-      <RamNumber label="Первый тайминг (CAS)" fieldLabel="Первый тайминг вручную, CL" value={input.ramCl} bounds={RAM_CL_BOUNDS}
-        options={RAM_CL_OPTIONS.filter(({ value }) => memory === "DDR5" ? value >= 28 : value <= 22)}
-        hint={latency} onChange={(ramCl) => patch({ memoryType: memory, ramCl })} />
-    </div>
-  </>;
+  const memory = getMemoryType(input),
+    fixed = requiredMemory(input.cpuId);
+  return (
+    <>
+      <div>
+        <span className="mb-1.5 block text-[13px] font-semibold text-ink-2">Поколение памяти</span>
+        <Segmented<MemoryType>
+          options={fixed ? MEMORY_TYPES.filter((item) => item.value === fixed) : MEMORY_TYPES}
+          value={memory}
+          onChange={(type) => {
+            if (type !== memory) patch(defaultMemoryKit(type));
+          }}
+          ariaLabel="Поколение памяти"
+          className="w-full"
+        />
+        {fixed && <p className="mt-1.5 text-xs text-ink-3">Этот процессор использует {fixed}.</p>}
+      </div>
+      <RamNumber
+        key={memory}
+        label="Частота RAM"
+        fieldLabel="Частота RAM вручную, МТ/с"
+        value={input.ramMhz}
+        bounds={MEMORY_LIMITS[memory].speed}
+        memory={memory}
+        hint={`${memory}: ${MEMORY_LIMITS[memory].speed.min}–${MEMORY_LIMITS[memory].speed.max} МТ/с. Укажите скорость из диспетчера задач, а не цель разгона.`}
+        options={RAM_FREQ_OPTIONS.filter((o) => o.label.includes(memory)).map((o) => ({
+          value: o.value,
+          label: `${o.value} МТ/с`,
+        }))}
+        onChange={(ramMhz) => patch({ memoryType: memory, ramMhz })}
+      />
+    </>
+  );
 }
 
-export function PersonalBuildSettings({ input, patch, evaluation }: InputProps & { evaluation: BuildEvaluation | null }) {
-  const hz = input.monitorHz ?? DEFAULT_MONITOR_HZ;
-  const potential = evaluation ? monitorPotential(avgFps(evaluation.fpsOfficial), hz) : null;
-  return <div className="build-personal well space-y-4 p-3 sm:p-4">
-    <div>
-      <h3 className="mb-2 text-sm font-bold">Профиль разгона и BIOS</h3>
-      <Segmented options={BIOS_PROFILES} value={input.biosProfile ?? "xmp"} onChange={(biosProfile) => patch({ biosProfile })}
-        presentation="grid" ariaLabel="Профиль разгона и BIOS" className="build-profile-picker" />
-      <p className="mt-1.5 text-xs text-ink-3">Поправка к оценке CPU/RAM, FPS и 1% low. Калькулятор не меняет настройки BIOS.</p>
+export function TimingControl({ input, patch }: InputProps) {
+  const memory = getMemoryType(input);
+  const valid = validMemory(input);
+  const latency = valid
+    ? `CAS — ожидание ответа памяти. По расчёту: ~${calcRamLatencyNs(input.ramMhz, input.ramCl).toFixed(1)} нс`
+    : "Укажите действительные частоту и CL.";
+  return (
+    <RamNumber
+      key={memory}
+      label="Первый тайминг (CAS)"
+      fieldLabel="Первый тайминг вручную, CL"
+      value={input.ramCl}
+      bounds={MEMORY_LIMITS[memory].cl}
+      memory={memory}
+      options={RAM_CL_OPTIONS.filter(({ value }) => (memory === "DDR5" ? value >= 28 : value <= 22))}
+      hint={latency}
+      onChange={(ramCl) => patch({ memoryType: memory, ramCl })}
+    />
+  );
+}
+
+function PlayControl<T extends string>({
+  n,
+  title,
+  options,
+  value,
+  onChange,
+  hint,
+}: {
+  n: string;
+  title: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  hint: string;
+}) {
+  return (
+    <div className="play-control">
+      <h4>
+        <span aria-hidden="true">{n}</span>
+        {title}
+      </h4>
+      <Segmented
+        options={options}
+        value={value}
+        onChange={onChange}
+        presentation="grid"
+        ariaLabel={title}
+        className="play-picker"
+      />
+      <p>{hint}</p>
     </div>
-    <div>
-      <h3 className="mb-2 text-sm font-bold">Герцовка монитора</h3>
-      <Segmented options={MONITORS} value={hz} onChange={(monitorHz) => patch({ monitorHz })}
-        presentation="grid" ariaLabel="Герцовка монитора" className="build-monitor-picker" />
-      <p className="mt-2 text-xs text-ink-2" aria-live="polite">
-        {potential === null ? "Потенциал монитора появится после расчёта." : <>Потенциал монитора: раскрыт на <strong className="tabular-nums text-accent-hi"><AnimatedNumber value={potential} />%</strong></>}
-      </p>
-      {potential !== null && <Meter percent={potential} className="mt-2" />}
-      <p className="mt-1.5 text-xs text-ink-3">По среднему OFFICIAL в выбранной сцене. В конфиге: <code className="text-accent-hi">fps.limit {hz}</code>.</p>
-    </div>
-    <div>
-      <h3 className="mb-2 text-sm font-bold">Качество соединения / Сеть</h3>
-      <Segmented options={CONNECTION_PROFILES} value={input.connection ?? DEFAULT_CONNECTION}
-        onChange={(connection) => patch({ connection })} presentation="grid" ariaLabel="Качество соединения / Сеть" className="build-profile-picker" />
-      <p className="mt-1.5 text-xs text-ink-3">Меняет сглаживание сетевых позиций в client.cfg, а не пинг или FPS.</p>
-    </div>
-  </div>;
+  );
+}
+
+export function PersonalBuildSettings({ input, patch }: InputProps) {
+  const vendor = getGpu(input.gpuId)?.vendor;
+  const latency = supportedLatency(input.latencyMode, vendor);
+  const gc = gcBudget(input.ramGb, input);
+  return (
+    <>
+      <section className="play-settings" aria-label="Параметры игровой сессии">
+        <header>
+          <p className="eyebrow">Профиль сессии</p>
+          <h3 className="mt-1 text-lg font-bold">Параметры Rust</h3>
+        </header>
+        <PlayControl
+          n="01"
+          title="Игровой сценарий / Нагрузка"
+          options={PLAY_OPTIONS.scenario}
+          value={input.scenario ?? PLAY_DEFAULTS.scenario}
+          onChange={(scenario) => patch({ scenario })}
+          hint="Постройки, эффекты и число игроков меняют нагрузку на главный поток и видеокарту."
+        />
+        <PlayControl
+          n="02"
+          title="Режим задержки GPU и системы"
+          options={PLAY_OPTIONS.latencyMode.filter((o) => supportedLatency(o.value, vendor) === o.value)}
+          value={latency}
+          onChange={(latencyMode) => patch({ latencyMode })}
+          hint={
+            vendor === "amd"
+              ? "Anti-Lag включается в AMD Software. Boost доступен только на NVIDIA."
+              : vendor === "intel"
+                ? "Для этой видеокарты Reflex и Radeon Anti-Lag недоступны."
+                : "Короткая очередь рендера снижает задержку, а не гарантирует рост FPS. Boost может увеличить энергопотребление."
+          }
+        />
+        <PlayControl
+          n="03"
+          title="Фоновая нагрузка на систему"
+          options={PLAY_OPTIONS.backgroundLoad}
+          value={input.backgroundLoad ?? PLAY_DEFAULTS.backgroundLoad}
+          onChange={(backgroundLoad) => patch({ backgroundLoad })}
+          hint={`Модель учитывает занятые потоки CPU. Резерв RAM для фоновых задач: ${backgroundBudget(input).reserveGb} ГБ.`}
+        />
+        <PlayControl
+          n="04"
+          title="Размер буфера сборки мусора (gc.buffer)"
+          options={PLAY_OPTIONS.gcBuffer}
+          value={input.gcBuffer ?? PLAY_DEFAULTS.gcBuffer}
+          onChange={(gcBuffer) => patch({ gcBuffer })}
+          hint={`gc.buffer задаёт запас памяти между её очистками: слишком частая очистка может ощущаться как рывок. В client.cfg: gc.buffer ${gc.mb}. ${gc.mb > gc.auto ? "Выше автоматического значения: проверьте запас ОЗУ и подкачку." : "Авто учитывает объём памяти после вычета фоновой нагрузки."}`}
+        />
+        <PlayControl
+          n="05"
+          title="Оптимизация рендера и теней"
+          options={PLAY_OPTIONS.renderStyle}
+          value={input.renderStyle ?? PLAY_DEFAULTS.renderStyle}
+          onChange={(renderStyle) => patch({ renderStyle })}
+          hint="Настраивает тени и сглаживание поверх базового графического пресета."
+        />
+      </section>
+      <div>
+        <h3 className="mb-2 text-sm font-bold">Качество соединения / Сеть</h3>
+        <Segmented
+          options={CONNECTION_PROFILES}
+          value={input.connection ?? DEFAULT_CONNECTION}
+          onChange={(connection) => patch({ connection })}
+          presentation="grid"
+          ariaLabel="Качество соединения / Сеть"
+          className="build-profile-picker"
+        />
+        <p className="mt-1.5 text-xs text-ink-3">
+          Меняет сглаживание сетевых позиций в client.cfg, а не пинг или FPS.
+        </p>
+      </div>
+    </>
+  );
 }

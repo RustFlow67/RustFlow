@@ -12,13 +12,12 @@ export interface PresetView extends HardwarePreset {
   purpose: string;
 }
 
-function presetPurpose(preset: HardwarePreset): string {
-  if (preset.settings.shaderLevel >= 600) return "Для высокой детализации и съёмки";
-  if (preset.resolution === "4k") return "Для 4K и красивой картинки";
-  if (preset.settings.shaderLevel >= 350 || preset.resolution === "1440p") return "Для 2K и высокой детализации";
-  if (preset.settings.shaderLevel <= 150) return "Для PvP и рейдов";
-  return "Универсальный баланс";
-}
+const PURPOSE: Record<GraphicsProfileId, string> = {
+  competitive: "PvP и рейды",
+  balanced: "Универсальный баланс",
+  quality: "Высокая детализация",
+  realistic: "Детализация и съёмка",
+};
 
 function anchorMode(preset: HardwarePreset): GraphicsProfileId {
   const shader = preset.settings.shaderLevel;
@@ -30,7 +29,7 @@ export function projectPreset(preset: HardwarePreset, mode: GraphicsProfileId | 
   const resolution: BuildResolution = target && getResolutionSize(target) ? target : { resolution: preset.resolution };
   const resolutionLabel = resolution.resolution === "4k" ? "4K" : formatBuildResolution(resolution);
   const appliedMode = mode ?? anchorMode(preset);
-  const base: PresetView = { ...preset, mode, target: resolution, resolutionLabel, purpose: presetPurpose(preset) };
+  const base: PresetView = { ...preset, mode, target: resolution, resolutionLabel, purpose: `${PURPOSE[appliedMode]} · ${resolutionLabel}` };
   const after = evaluateBuild10({ ...presetBuildInput(preset), ...resolution }, appliedMode);
   if (!after) return base;
   const { fpsModded: modded, fpsOfficial: official } = after;
@@ -38,6 +37,11 @@ export function projectPreset(preset: HardwarePreset, mode: GraphicsProfileId | 
   const commands = profile ? graphicsCommands(profile.id, preset.ramGb) : null;
   return {
     ...base, fpsSource: "estimate", score10: after.score10,
+    testScene: `${resolutionLabel} · ${preset.testScene}`,
+    // An editorial note about the original 1440p rig is not a prediction for
+    // 1080p/4:3. Use the current evaluation when the scenario has changed.
+    bottleneckNote: resolution.resolution !== preset.resolution || appliedMode !== anchorMode(preset)
+      ? after.notes[0] ?? preset.bottleneckNote : preset.bottleneckNote,
     fpsModded: [modded.min, modded.max], low1Modded: modded.low1, frametimeModdedMs: frameMs(modded),
     fpsOfficial: [official.min, official.max], low1Official: official.low1, frametimeOfficialMs: frameMs(official),
     cfgText: profile ? profileCfg(profile.id, preset.ramGb, preset.cfgText) : preset.cfgText,

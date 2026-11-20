@@ -1,5 +1,8 @@
 import { getConnectionProfile, isMonitorHz, type ConfigTuning } from "./models/build-settings";
 
+import { gcBudget, gcForMemory, supportedLatency } from "./models/play-settings";
+export { gcForMemory } from "./models/play-settings";
+
 /** Shared Rust graphics choices. The original catalog configurations are never mutated. */
 export const GRAPHICS_PROFILES = [
   { id: "competitive", title: "Комбат / PvP", short: "Комбат", draw: 2500, shader: 100, water: 0, shadows: 0, cpu: 1, gpu: 1,
@@ -14,7 +17,6 @@ export const GRAPHICS_PROFILES = [
 
 export type GraphicsProfileId = typeof GRAPHICS_PROFILES[number]["id"];
 export const getGraphicsProfile = (id: unknown) => GRAPHICS_PROFILES.find((p) => p.id === id);
-export const gcForMemory = (ramGb: number) => ramGb >= 32 ? 4096 : ramGb >= 16 ? 2048 : 1024;
 
 export function graphicsCommands(id: GraphicsProfileId, ramGb: number) {
   const p = getGraphicsProfile(id) ?? GRAPHICS_PROFILES[1];
@@ -48,10 +50,28 @@ export function graphicsCommands(id: GraphicsProfileId, ramGb: number) {
 
 export const textureMipForVram = (vram: number) => vram <= 4 ? 3 : vram <= 6 ? 2 : vram <= 8 ? 1 : 0;
 
-export function profileCfg(id: GraphicsProfileId, ramGb: number, base = "", textureMip?: number, tuning?: ConfigTuning) {
+export function profileCfg(id: GraphicsProfileId, ramGb: number, base = "", textureMip?: number, tuning?: ConfigTuning, vendor?: string) {
   const connection = getConnectionProfile(tuning?.connection);
+  const baseCommands = graphicsCommands(id, ramGb);
+  const scene = tuning?.scenario, bg = tuning?.backgroundLoad, style = tuning?.renderStyle;
+  const latency = supportedLatency(tuning?.latencyMode, vendor);
+  // Only real client commands here. Radeon Anti-Lag belongs in Adrenalin (ZIP readme).
   const changes = {
-    ...graphicsCommands(id, ramGb),
+    ...baseCommands,
+    "gc.buffer": gcBudget(ramGb, tuning).mb,
+    ...(scene === "raid" || scene === "pvp" ? {
+      "graphics.drawdistance": Math.min(baseCommands["graphics.drawdistance"], scene === "raid" ? 1600 : 2000),
+      "effects.maxgibs": scene === "raid" ? 0 : 16,
+    } : {}),
+    ...(bg === "apps" || bg === "stream" ? { "graphics.shaderlod": Math.max(50, baseCommands["graphics.shaderlod"] - (bg === "stream" ? 50 : 25)) } : {}),
+    ...(tuning?.latencyMode ? {
+      "graphics.reflexmode": vendor === "nvidia" ? (latency === "boost" ? 2 : latency === "on" ? 1 : 0) : 0,
+      ...(latency !== "standard" ? { "graphics.vsync": 0 } : {}),
+    } : {}),
+    ...(style === "esports" ? { "graphics.shadowquality": 0, "graphics.shadowmode": 0, "graphics.shadowdistance": 30,
+      "graphics.shadowcascades": 1, "graphics.grassshadows": "False", "effects.ao": "False", "effects.antialiasing": 0 }
+      : style === "clear" ? { "graphics.shadowquality": 2, "graphics.shadowmode": 2, "graphics.shadowcascades": 2,
+        "graphics.shadowdistance": 180, "effects.antialiasing": 1, "effects.bloom": "False", "effects.motionblur": "False" } : {}),
     ...(textureMip === undefined ? {} : { "graphicssettings.globaltexturemipmaplimit": textureMip }),
     ...(isMonitorHz(tuning?.monitorHz) ? { "fps.limit": tuning.monitorHz } : {}),
     ...(connection ? { "lerp.enabled": "True", "lerp.interpolation": connection.interpolation, "lerp.smoothing": connection.smoothing } : {}),

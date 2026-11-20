@@ -54,8 +54,8 @@ export default function BuildRadar({ builds, compact = false }: { builds: readon
   const value = (i: number, axis: BreakdownKey) => series[i].evaluation.breakdown.find((item) => item.key === axis)?.score ?? 0;
 
   return (
-    <div className={compact ? `${styles.surface} ${styles.compactRadar}` : styles.chartGrid}>
-      <svg className={styles.chart} viewBox={compact ? "0 7 340 302" : "0 0 340 248"}
+    <div className={compact ? styles.compactRadar : `${styles.chartGrid} ${styles.openRadar}`}>
+      <svg className={styles.radarCanvas} viewBox={compact ? "0 7 340 302" : "0 0 340 248"}
         role={compact ? "group" : "img"} aria-label="Радар оценок: CPU, RAM, SSD, GPU и VRAM, от 0 до 10">
         <title>Радар оценки сборки</title>
         {[2, 4, 6, 8, 10].map((score) => <polygon key={score} className={styles.gridline} points={polygon(() => score / 10)} />)}

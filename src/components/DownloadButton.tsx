@@ -1,4 +1,5 @@
 "use client";
+import { useFeedbackTimer } from "./fx/useFeedbackTimer";
 
 import { Check, Download, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -21,6 +22,7 @@ export default function DownloadButton({
   className?: string;
 }) {
   const { toast } = useToast();
+  const feedbackLater=useFeedbackTimer();
   const [done, setDone] = useState(false);
   const Icon = variant === "revert" ? RotateCcw : Download;
   const classes = [
@@ -42,7 +44,7 @@ export default function DownloadButton({
       title={iconOnly ? label : undefined}
       onClick={() => {
         setDone(true);
-        setTimeout(() => setDone(false), 2000);
+        feedbackLater(() => setDone(false), 2000);
         toast({
           title: variant === "revert" ? "Скачивается файл отката" : "Загрузка файла началась",
           description: "Все файлы открытые — их можно проверить в Блокноте.",

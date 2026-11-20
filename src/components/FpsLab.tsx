@@ -1,4 +1,6 @@
 "use client";
+import LiquidGlass from "@/components/LiquidGlass";
+import { useDownload } from "./fx/useDownload";
 
 import {
   Activity,
@@ -7,10 +9,7 @@ import {
   Download,
   Flame,
   Gauge,
-  Moon,
   RotateCcw,
-  Sun,
-  SunMoon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useToast } from "@/components/ui/Toast";
@@ -24,7 +23,7 @@ import {
   useLab,
   type LabSettings,
 } from "@/lib/fps/lab";
-import { getResolvedTheme, useTheme, type ThemeChoice } from "@/lib/theme";
+import { getResolvedTheme } from "@/lib/theme";
 
 const OPEN_KEY = "rustflow:lab-open";
 
@@ -38,9 +37,9 @@ function readOpen(): boolean {
 }
 
 function statusColor(avg: number): string {
-  if (avg >= 55) return "#46dc70";
-  if (avg >= 30) return "#ffdf52";
-  return "#ff6961";
+  if (avg >= 55) return "var(--ok)";
+  if (avg >= 30) return "var(--warn)";
+  return "var(--danger)";
 }
 
 const SLIDERS: {
@@ -58,11 +57,7 @@ const SLIDERS: {
   { key: "quality", label: "Качество / DPR", unit: "×", hint: "Разрешение canvas относительно экрана" },
 ];
 
-const THEME_BTNS: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
-  { value: "system", label: "Авто", icon: SunMoon },
-  { value: "dark", label: "Тёмная", icon: Moon },
-  { value: "light", label: "Светлая", icon: Sun },
-];
+
 
 function LabSlider({
   k,
@@ -93,7 +88,7 @@ function LabSlider({
       <input
         id={`lab-${k}`}
         type="range"
-        className="lab-range"
+        className="liquid-range"
         min={lim.min}
         max={lim.max}
         step={lim.step}
@@ -114,7 +109,7 @@ function LabSlider({
 export default function FpsLab() {
   const stats = useFpsStats();
   const { settings } = useLab();
-  const { choice: themeChoice, setChoice: setThemeChoice } = useTheme();
+  const download=useDownload();
   const { toast } = useToast();
   const [open, setOpen] = useState<boolean>(() => readOpen());
   const mounted = useSyncExternalStore(
@@ -130,7 +125,7 @@ export default function FpsLab() {
     } catch {
       /* ignore */
     }
-  }, [open ]);
+  }, [open]);
 
   /* График FPS в общем rAF-цикле движка (пауза при hidden — внутри движка). */
   useEffect(() => {
@@ -164,6 +159,14 @@ export default function FpsLab() {
     }
     setup();
 
+    const root = document.documentElement;
+    const palette = () => { const css = getComputedStyle(root); return {
+      accent: css.getPropertyValue("--theme-accent").trim(), tip: css.getPropertyValue("--theme-tip").trim(),
+      glow: css.getPropertyValue("--theme-glow").trim(), label: css.getPropertyValue("--ink-3").trim(),
+    }; };
+    let colors = palette();
+    const observer = new MutationObserver(() => { colors = palette(); });
+    observer.observe(root, { attributes: true, attributeFilter: ["data-material"] });
     const draw = () => {
       if (!visible || w < 2) return;
       const light = getResolvedTheme() === "light";
@@ -175,13 +178,13 @@ export default function FpsLab() {
       const yOf = (fps: number) => h - 6 - (Math.min(max, Math.max(0, fps)) / max) * (h - 14);
 
       // Пороги 30 / 60 / 120
-      ctx.font = "9px 'JetBrains Mono Variable', monospace";
+      ctx.font = "9px 'Inter Variable', 'Segoe UI', sans-serif";
       ctx.textBaseline = "middle";
-      const grid = light ? "rgb(28 35 51 / 0.16)" : "rgb(255 255 255 / 0.14)";
-      const gridTx = light ? "rgb(91 99 118 / 0.9)" : "rgb(174 181 199 / 0.9)";
+      const grid = light ? "rgb(47 32 21 / 0.16)" : "rgb(255 255 255 / 0.14)";
+      const gridTx = colors.label;
       for (const line of [30, 60, 120]) {
         const y = yOf(line);
-        ctx.strokeStyle = line === 60 ? (light ? "rgb(156 63 6 / 0.5)" : "rgb(255 194 142 / 0.55)") : grid;
+        ctx.strokeStyle = line === 60 ? colors.glow : grid;
         ctx.lineWidth = line === 60 ? 1.4 : 1;
         ctx.setLineDash(line === 60 ? [] : [4, 4]);
         ctx.beginPath();
@@ -200,13 +203,7 @@ export default function FpsLab() {
 
       // Заливка под кривой
       const grad = ctx.createLinearGradient(0, 0, 0, h);
-      if (light) {
-        grad.addColorStop(0, "rgb(200 90 18 / 0.5)");
-        grad.addColorStop(1, "rgb(200 90 18 / 0.02)");
-      } else {
-        grad.addColorStop(0, "rgb(255 150 80 / 0.55)");
-        grad.addColorStop(1, "rgb(255 110 40 / 0.02)");
-      }
+      grad.addColorStop(0, colors.glow); grad.addColorStop(1, "transparent");
       ctx.beginPath();
       ctx.moveTo(0, h);
       for (let i = 0; i < n; i += 1) {
@@ -225,7 +222,7 @@ export default function FpsLab() {
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = light ? "#9c3f06" : "#ffb878";
+      ctx.strokeStyle = colors.accent;
       ctx.lineWidth = 1.8;
       ctx.lineJoin = "round";
       ctx.stroke();
@@ -235,20 +232,20 @@ export default function FpsLab() {
       const ly = yOf(samples[n - 1]);
       ctx.beginPath();
       ctx.arc(lx - 1, ly, 3, 0, Math.PI * 2);
-      ctx.fillStyle = light ? "#9c3f06" : "#ffd0aa";
+      ctx.fillStyle = colors.tip;
       ctx.shadowBlur = 8;
-      ctx.shadowColor = light ? "rgb(156 63 6 / 0.8)" : "rgb(255 160 90 / 0.9)";
+      ctx.shadowColor = colors.glow;
       ctx.fill();
       ctx.shadowBlur = 0;
     };
 
     const unsub = fpsEngine.onTick(draw);
     return () => {
-      unsub();
+      unsub(); observer.disconnect();
       ro.disconnect();
       io.disconnect();
     };
-  }, [open ]);
+  }, [open]);
 
   function exportSnapshot() {
     const s = fpsEngine.getStats();
@@ -270,14 +267,7 @@ export default function FpsLab() {
     };
     try {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `rustflow-fps-lab-${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      if (!download(blob,`rustflow-fps-lab-${Date.now()}.json`)) return;
       toast({ title: "Снапшот лаборатории сохранён", description: `avg ${s.avg} · 1% low ${s.low1} · ${s.frametime} мс`, tone: "success" });
     } catch {
       toast({ title: "Не удалось сохранить снапшот", tone: "error" });
@@ -290,7 +280,7 @@ export default function FpsLab() {
   if (!open) {
     return (
       <div className="fps-lab-fab">
-        <button
+        <LiquidGlass as="button"
           type="button"
           onClick={() => setOpen(true)}
           className="glass glass-blur group flex h-12 items-center gap-2.5 rounded-full py-1.5 pl-2.5 pr-4"
@@ -307,7 +297,7 @@ export default function FpsLab() {
             </span>
             <span className="mt-0.5 block text-[10px] text-ink-3">FPS-лаб · открыть</span>
           </span>
-        </button>
+        </LiquidGlass>
       </div>
     );
   }
@@ -315,7 +305,7 @@ export default function FpsLab() {
   /* ---------- Полная панель ---------- */
   return (
     <section className="fps-lab" aria-label="FPS-лаборатория рендера страницы">
-      <div className="glass glass-blur max-h-[calc(100dvh-120px)] overflow-y-auto p-4" style={{ "--r": "24px" } as React.CSSProperties}>
+      <LiquidGlass className="glass glass-blur max-h-[calc(100dvh-120px)] overflow-y-auto p-4" style={{ "--r": "24px" } as React.CSSProperties}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-[14px] font-extrabold tracking-tight">
             <Gauge className="h-4 w-4 text-accent-hi" aria-hidden="true" />
@@ -348,56 +338,30 @@ export default function FpsLab() {
             { v: `${stats.frametime}`, l: "мс" },
             { v: stats.frames > 9999 ? `${(stats.frames / 1000).toFixed(1)}k` : String(stats.frames), l: "кадры" },
           ].map((c) => (
-            <div key={c.l} className="well px-1 py-1.5">
+            <LiquidGlass key={c.l} className="well px-1 py-1.5">
               <span className="block text-[14px] font-extrabold tabular-nums" style={c.l === "avg" ? { color: statusColor(stats.avg) } : undefined}>
                 {c.v}
               </span>
               <span className="block text-[9.5px] text-ink-3">{c.l}</span>
-            </div>
+            </LiquidGlass>
           ))}
         </div>
 
         {/* График */}
-        <div className="well mt-2.5 overflow-hidden p-1.5">
+        <LiquidGlass className="well mt-2.5 overflow-hidden p-1.5">
           <canvas
             ref={graphRef}
             className="block h-[86px] w-full"
             role="img"
             aria-label={`График FPS страницы за последние секунды. Средний ${stats.avg}, 1% low ${stats.low1}.`}
           />
-        </div>
+        </LiquidGlass>
 
         {/* 7 слайдеров нагрузки */}
         <div className="mt-3 space-y-2">
           {SLIDERS.map((s) => (
             <LabSlider key={s.key} k={s.key} label={s.label} unit={s.unit} hint={s.hint} value={settings[s.key]} />
           ))}
-        </div>
-
-        {/* 8-й контрол: тема */}
-        <div className="mt-2.5">
-          <span className="mb-1 block text-[12px] font-semibold text-ink-2">Тема оформления</span>
-          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Тема оформления">
-            {THEME_BTNS.map((b) => {
-              const Icon = b.icon;
-              const active = themeChoice === b.value;
-              return (
-                <button
-                  key={b.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setThemeChoice(b.value)}
-                  className={`flex h-9 items-center justify-center gap-1.5 rounded-full text-[12px] font-bold transition-transform ${
-                    active ? "btn-primary" : "bg-black/20 text-ink-2 hover:text-ink"
-                  }`}
-                  style={active ? undefined : { boxShadow: "inset 0 0 0 1px var(--border-subtle)" }}
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {b.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Действия */}
@@ -451,7 +415,7 @@ export default function FpsLab() {
             Рандом
           </button>
         </div>
-      </div>
+      </LiquidGlass>
     </section>
   );
 }

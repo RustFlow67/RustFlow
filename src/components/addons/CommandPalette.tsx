@@ -1,8 +1,12 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
+import { usePopupTrigger } from "../fx/usePopupMotion";
+
 import { ArrowUpRight, Command, Cpu, Layers3, Search, SlidersHorizontal } from "lucide-react";
 import { useRouteNavigation } from "@/components/RouteLink";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useLiquidLens } from "../fx/useLiquidLens";
 import { Modal } from "@/components/ui/Modal";
 import styles from "./addons.module.css";
 
@@ -19,12 +23,13 @@ const normalize = (value: string) => value.toLocaleLowerCase("ru").replaceAll("�
 
 export function PaletteButton() {
   return <button type="button" aria-haspopup="dialog" className={styles.action}
-    onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}>
+    onClick={e => window.dispatchEvent(new CustomEvent(OPEN_EVENT, {detail:e.currentTarget}))}>
     <Command aria-hidden="true" />Палитра команд <kbd className={styles.keys}>Ctrl / ⌘ + K</kbd>
   </button>;
 }
 
 export default function CommandPalette({ entries }: { entries: readonly CommandEntry[] }) {
+  const {capture, origin} = usePopupTrigger();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -38,11 +43,13 @@ export default function CommandPalette({ entries }: { entries: readonly CommandE
   const matched = catalog.filter(({ search }) => terms.every((term) => search.includes(term)));
   const results = matched.slice(0, terms.length === 0 ? 12 : 24);
   const active = Math.min(highlight, results.length - 1);
+  const { list, lens } = useLiquidLens<HTMLUListElement, HTMLLIElement>(active, results.length, { enabled: open, continuous: true });
   const activeId = active >= 0 ? `${listId}-${active}` : undefined;
 
   useEffect(() => {
-    function launch() {
+    function launch(event?: Event) {
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      capture(event instanceof CustomEvent && event.detail instanceof HTMLElement ? event.detail : null);
       setQuery("");
       setHighlight(0);
       setOpen(true);
@@ -61,7 +68,7 @@ export default function CommandPalette({ entries }: { entries: readonly CommandE
       window.removeEventListener(OPEN_EVENT, launch);
       window.removeEventListener("keydown", shortcut);
     };
-  }, [open]);
+  }, [open, capture]);
 
   useEffect(() => { if (open) input.current?.focus({ preventScroll: true }); }, [open]);
   useEffect(() => {
@@ -84,7 +91,7 @@ export default function CommandPalette({ entries }: { entries: readonly CommandE
     }
   }
 
-  return <Modal open={open} title="Палитра команд" onClose={() => setOpen(false)} maxWidth="max-w-2xl">
+  return <Modal {...origin} open={open} title="Палитра команд" onClose={() => setOpen(false)} maxWidth="max-w-2xl">
     <div className={`${styles.surface} ${styles.palette}`}>
       <label className={styles.label}>
         <span className={styles.actions}><Search size={15} aria-hidden="true" />Поиск по RustFlow</span>
@@ -93,10 +100,11 @@ export default function CommandPalette({ entries }: { entries: readonly CommandE
           type="text" autoComplete="off" placeholder="Например: 7800X3D, замеры, миф…"
           onChange={(event) => { setQuery(event.target.value); setHighlight(0); }} onKeyDown={onQueryKey} />
       </label>
-      <ul className={styles.options} id={listId} role="listbox" aria-label="Найденные команды">
+      <ul ref={list} className={`${styles.options} liquid-options`} id={listId} role="listbox" aria-label="Найденные команды">
+        <LiquidGlass as="li" shape="pill" ref={lens} aria-hidden="true" className="lens liquid-lens" />
         {results.map(({ entry }, index) => {
           const Icon = ICONS[entry.kind];
-          return <li key={entry.href} role="option" id={`${listId}-${index}`} aria-selected={index === active}
+          return <li key={entry.href} role="option" data-liquid-item="" id={`${listId}-${index}`} aria-selected={index === active}
             className={styles.option} onMouseDown={(event) => event.preventDefault()} onClick={() => navigate(entry)}>
             <Icon aria-hidden="true" />
             <span><strong>{entry.title}</strong><span className={`block ${styles.muted}`}>{entry.kind}</span></span>

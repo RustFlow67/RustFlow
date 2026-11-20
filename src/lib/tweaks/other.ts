@@ -1,43 +1,16 @@
 import { OS_ALL, STEP } from "./common";
-import { adminBat, userBat } from "./helpers";
+import { adminBat } from "./helpers";
 import type { Tweak } from "./types";
 
-const HARDWARE_TXT = `RustFlow — чек-лист железа
-==========================
+const HARDWARE_TXT = `RustFlow — проверка железа без изменения BIOS
 
-Эти пункты не лечатся файлами, но дают больше, чем любой твик реестра.
+[ ] Монитор: сравните частоту в дополнительных параметрах дисплея с паспортом монитора. Если меняете её, запишите прежнее значение.
+[ ] ОЗУ: запишите скорость в МТ/с, число модулей и используемые каналы. Сверьте их с документацией платы и комплекта памяти. Один занятый слот — не причина менять напряжения.
+[ ] Платформа: посмотрите версии BIOS и драйвера чипсета. Не обновляйте прошивку и не переключайте параметры загрузки ради этого чек-листа.
+[ ] Охлаждение: после прогрева запишите частоты, температуры и признаки ограничения частоты. Сверяйте пределы с характеристиками вашей модели.
+[ ] Накопитель: в Steam проверьте диск библиотеки Rust и свободное место. Сравните время холодного и повторного входа.
 
-МОНИТОР
-[ ] Кабель монитора подключён к видеокарте, а не к материнской плате.
-[ ] Параметры → Система → Дисплей → Расширенные параметры дисплея:
-    выбрана максимальная частота обновления (144 / 165 / 240 Гц).
-    Очень частая ошибка: монитор на 144 Гц годами работает на 60 Гц.
-
-ОПЕРАТИВНАЯ ПАМЯТЬ
-[ ] Диспетчер задач → Производительность → Память → «Скорость».
-    Если там 2133 или 2400 МГц, а на планках написано 3200+ —
-    профиль XMP / DOCP / EXPO в BIOS не включён.
-[ ] В BIOS включён профиль XMP (Intel), DOCP или EXPO (AMD).
-    Rust очень чувствителен к скорости памяти.
-[ ] Две планки стоят в двухканальном режиме: слоты A2 и B2
-    (второй и четвёртый от процессора), см. инструкцию к плате.
-
-BIOS
-[ ] Включены Above 4G Decoding и Resizable BAR
-    (для RTX 3000+, RX 6000+ и Intel Arc).
-[ ] BIOS обновлён до актуальной версии — по инструкции производителя платы.
-
-ОХЛАЖДЕНИЕ
-[ ] Температура процессора в игре ниже 85–90 °C, видеокарты ниже 80–85 °C.
-    Проверить можно в HWiNFO или MSI Afterburner.
-[ ] Системный блок и радиаторы очищены от пыли.
-
-НАКОПИТЕЛЬ
-[ ] Rust установлен на SSD, на диске свободно не менее 15–20 %.
-
-КАК ОТКАТИТЬ
-Профиль памяти отключается в том же меню BIOS. Если ПК перестал запускаться
-после включения XMP / EXPO — сбросьте BIOS кнопкой или перемычкой Clear CMOS.
+Проверка не требует отката. Если меняли частоту монитора, верните прежнее значение в параметрах дисплея. Профиль XMP/EXPO — отдельный тест стабильности, он не включается этим файлом.
 `;
 
 const NVIDIA_TXT = `RustFlow — чек-лист: Панель управления NVIDIA
@@ -137,10 +110,7 @@ export const OTHER_TWEAKS: Tweak[] = [
     featured: true,
     what: "Включает защиту системы на системном диске и создаёт точку восстановления Windows с именем «RustFlow - before tweaks».",
     why: "На FPS не влияет — это страховка. Если после любого твика что-то пойдёт не так, систему можно вернуть в исходное состояние за несколько минут, даже не разбираясь, какой именно параметр виноват. С этого шага начинается полная настройка.",
-    steps: [
-      ...STEP.batAdmin,
-      "Дождитесь сообщения «Restore point created» — создание занимает до пары минут.",
-    ],
+    steps: [...STEP.batAdmin, "Дождитесь сообщения «Restore point created» — создание занимает до пары минут."],
     check:
       "Win + R → rstrui → «Выбрать другую точку восстановления»: в списке есть запись «RustFlow - before tweaks».",
     revertSteps: [
@@ -156,90 +126,66 @@ export const OTHER_TWEAKS: Tweak[] = [
       content: adminBat(
         "System Restore point",
         String.raw`echo  Creating a restore point, please wait...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Enable-ComputerRestore -Drive '%SystemDrive%\' -ErrorAction Stop; Checkpoint-Computer -Description 'RustFlow - before tweaks' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop; Write-Host '  Restore point created.' -ForegroundColor Green } catch { Write-Host ('  Failed: ' + $_.Exception.Message) -ForegroundColor Red }"`,
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Enable-ComputerRestore -Drive '%SystemDrive%\' -ErrorAction Stop; Checkpoint-Computer -Description 'RustFlow - before tweaks' -RestorePointType 'MODIFY_SETTINGS' -WarningAction Stop -ErrorAction Stop; Write-Host '  Restore point created.' -ForegroundColor Green } catch { Write-Host ('  Failed: ' + $_.Exception.Message) -ForegroundColor Red }"`,
         "Finished.",
       ),
     },
   },
   {
     slug: "clean-temp-cache",
-    title: "Очистка временных файлов и кэша шейдеров",
-    tagline: "Чистый старт после обновления драйвера или игры",
+    title: "Временные файлы и кэш шейдеров",
+    tagline: "Почему не стоит чистить кэш каждый день",
     category: "prep",
     phase: 1,
     order: 2,
-    risk: "safe",
-    impact: { fps: 0, smooth: 1, latency: 0 },
+    risk: "moderate",
+    riskLevel: "caution",
+    evidence: "conditional",
+    excludeFromPack: true,
+    impact: { fps: 0, smooth: 0, latency: 0 },
     admin: false,
-    restart: "none",
-    time: "1 мин",
+    restart: "game",
+    time: "По ситуации",
     os: OS_ALL,
-    what: "Удаляет временные файлы пользователя (%TEMP%) и кэши шейдеров DirectX, NVIDIA и AMD в папке %LOCALAPPDATA%. Файлы игры и настройки не затрагиваются.",
-    why: "Устаревший кэш шейдеров после обновления драйвера или крупного патча Rust — частая причина рывков при повороте камеры. Очистка заставляет драйвер собрать кэш заново. Делать это постоянно не нужно: только после обновлений или при появлении необъяснимых подёргиваний.",
+    what: "Удаление прогретого кэша вынуждает игру компилировать шейдеры заново. Очистка не возвращает прежние файлы, поэтому автоматического удаления в ZIP нет.",
+    why: "Изолируйте сбой после обновления драйвера и сравните несколько прогонов до диагностики.",
     steps: [
-      "Полностью закройте Rust.",
-      ...STEP.batUser,
-      "Дождитесь сообщения «Finished» и закройте окно.",
+      "Закройте игру. При диагностированном повреждении кэша пользуйтесь только штатной очисткой DirectX в разделе временных файлов Windows; не отмечайте загрузки и другие папки.",
     ],
-    check: "Win + R → %TEMP% — папка почти пуста (останутся только файлы, занятые запущенными программами).",
+    check: "Повторите маршрут после прогрева кэша.",
     revertSteps: [
-      "Откат не нужен: временные файлы и кэши создаются заново автоматически.",
-    ],
-    warnings: [
-      "Первые несколько минут после очистки в игре возможны короткие подгрузки, пока драйвер заново собирает шейдеры. Это нормально и проходит само.",
+      "Удалённый кэш нельзя вернуть кнопкой: драйвер создаёт его заново. Свои файлы восстанавливайте из копии.",
     ],
     file: {
-      name: "rustflow-clean-temp-cache.bat",
-      kind: "bat",
-      content: userBat(
-        "Clean temp files and shader caches",
-        String.raw`tasklist /fi "imagename eq RustClient.exe" 2>nul | find /i "RustClient.exe" >nul
-if not errorlevel 1 (
-  echo  Rust is running. Close the game and run this file again.
-  goto end
-)
-echo  Cleaning user temp files...
-del /f /s /q "%TEMP%\*" >nul 2>&1
-for /d %%D in ("%TEMP%\*") do rd /s /q "%%D" >nul 2>&1
-echo  Cleaning DirectX, NVIDIA and AMD shader caches...
-for %%P in ("%LOCALAPPDATA%\D3DSCache" "%LOCALAPPDATA%\NVIDIA\DXCache" "%LOCALAPPDATA%\NVIDIA\GLCache" "%LOCALAPPDATA%\AMD\DxCache" "%LOCALAPPDATA%\AMD\DxcCache") do (
-  if exist "%%~P" del /f /s /q "%%~P\*" >nul 2>&1
-)
-:end`,
-        "Finished.",
-      ),
+      kind: "txt",
+      name: "shader-cache-guide.txt",
+      content:
+        "Кэш не нужно чистить регулярно. После очистки драйвер заново компилирует шейдеры. Сравните повторные проходы и оставьте штатное управление кэшем.",
     },
   },
   {
     slug: "hardware-checklist",
     title: "Чек-лист железа: герцовка, XMP, температура",
-    tagline: "Пять проверок, которые важнее любого твика реестра",
+    tagline: "Пять проверок до системных изменений",
     category: "prep",
     phase: 1,
     order: 3,
-    risk: "moderate",
-    impact: { fps: 3, smooth: 3, latency: 2 },
+    risk: "safe",
+    impact: { fps: 0, smooth: 0, latency: 0 },
     admin: false,
-    restart: "reboot",
+    restart: "none",
     time: "10 мин",
     os: "Любая ОС",
     featured: true,
-    what: "Чек-лист проверок, которые нельзя сделать файлом: частота обновления монитора, профиль памяти XMP / DOCP / EXPO в BIOS, двухканальный режим, Resizable BAR и температуры.",
-    why: "Самые большие потери производительности в Rust прячутся здесь. Память, работающая на 2133 МГц вместо паспортных 3200+, одна планка вместо двух, монитор 144 Гц в режиме 60 Гц, перегрев процессора — каждая из этих проблем отнимает больше, чем дают все системные твики вместе взятые.",
+    what: "Проверьте частоту монитора, режим памяти, версии прошивки и драйвера, нагрев и накопитель. Этот TXT не меняет BIOS и не включает разгон.",
+    why: "Сначала установите, какой узел ограничен. Переход с 60 на 144 Гц меняет вывод монитора, но сам по себе не ускоряет рендер кадров.",
     steps: [
       ...STEP.txt,
-      "Пройдите разделы «Монитор» и «Оперативная память» — они проверяются прямо из Windows.",
-      "Для пунктов BIOS перезагрузите ПК и войдите в BIOS клавишей Del или F2.",
-      "После включения профиля памяти убедитесь в Диспетчере задач, что «Скорость» выросла.",
+      "Запишите герцовку, скорость и режим каналов памяти. Сверьте с паспортом устройств.",
+      "Проверьте частоты и температуру после прогрева. При подгрузке карты посмотрите занятость игрового диска.",
     ],
-    check: "Диспетчер задач → Производительность → Память: «Скорость» совпадает с паспортной частотой ваших планок.",
-    revertSteps: [
-      "Профиль памяти отключается в том же меню BIOS.",
-      "Если компьютер не запускается после включения XMP / EXPO, сбросьте BIOS: кнопка или перемычка Clear CMOS на материнской плате.",
-    ],
-    warnings: [
-      "Профили XMP / EXPO — заводские, но формально это разгон памяти. На редких связках плата + память он нестабилен: если появились синие экраны или вылеты, отключите профиль.",
-    ],
+    check: "В журнале теста указаны комплектующие, частота дисплея, режим памяти, тип диска и условия прогона.",
+    revertSteps: ["Проверка не меняет систему. Если меняли герцовку, верните записанную частоту дисплея."],
     file: { name: "rustflow-hardware-checklist.txt", kind: "txt", content: HARDWARE_TXT },
   },
 
@@ -265,10 +211,9 @@ for %%P in ("%LOCALAPPDATA%\D3DSCache" "%LOCALAPPDATA%\NVIDIA\DXCache" "%LOCALAP
       "На вкладке «Программные настройки» добавьте RustClient.exe и выставьте пункты из чек-листа.",
       "Нажмите «Применить» и перезапустите игру.",
     ],
-    check: "В панели NVIDIA на вкладке «Программные настройки» у RustClient.exe изменённые пункты выделены жирным.",
-    revertSteps: [
-      "Панель NVIDIA → Программные настройки → RustClient.exe → кнопка «Восстановить».",
-    ],
+    check:
+      "В панели NVIDIA на вкладке «Программные настройки» у RustClient.exe изменённые пункты выделены жирным.",
+    revertSteps: ["Панель NVIDIA → Программные настройки → RustClient.exe → кнопка «Восстановить»."],
     file: { name: "rustflow-nvidia-checklist.txt", kind: "txt", content: NVIDIA_TXT },
   },
   {
@@ -300,50 +245,36 @@ for %%P in ("%LOCALAPPDATA%\D3DSCache" "%LOCALAPPDATA%\NVIDIA\DXCache" "%LOCALAP
   {
     slug: "nic-power",
     title: "Энергосбережение сетевого адаптера",
-    tagline: "Адаптер не засыпает и не теряет пакеты",
+    tagline: "Проверка одного адаптера при обрывах после сна",
     category: "network",
     phase: 6,
     order: 400,
     risk: "moderate",
-    impact: { fps: 0, smooth: 1, latency: 1 },
+    evidence: "conditional",
+    impact: { fps: 0, smooth: 0, latency: 0 },
     admin: true,
     restart: "none",
-    time: "1 мин",
+    time: "По ситуации",
     os: OS_ALL,
-    what: "Отключает функции управления питанием на активных физических сетевых адаптерах командой Disable-NetAdapterPowerManagement.",
-    why: "Энергосберегающие режимы адаптера могут давать редкие скачки пинга и короткие потери связи, особенно на Wi-Fi и ноутбуках. Если соединение у вас и так стабильное, разницы не будет. Средний пинг до сервера твик не снижает — он зависит от маршрута провайдера.",
+    what: "У некоторых драйверов доступен переключатель отключения устройства для экономии энергии. Это тест при обрывах соединения, не способ снизить пинг.",
+    why: "Глобальная правка всех адаптеров затрагивает Wake-on-LAN и батарею. Проверяйте только адаптер с воспроизводимой проблемой.",
     steps: [
-      ...STEP.batAdmin,
-      "Соединение может пропасть на 2–5 секунд, пока адаптер перезапускается — не запускайте скрипт во время игры.",
+      "В диспетчере устройств откройте свойства нужного адаптера → Управление электропитанием. Запишите состояние флажка отключения устройства для экономии энергии. Если вкладки нет, не меняйте реестр.",
+      "При проблеме после сна сравните один цикл с выключенным флажком. Не меняйте пробуждение по сети.",
     ],
-    check:
-      "Диспетчер устройств → Сетевые адаптеры → ваш адаптер → Управление электропитанием: галочка «Разрешить отключение этого устройства для экономии энергии» снята.",
-    revertSteps: ["Запустите файл отката — он снова включит управление питанием адаптера."],
-    warnings: [
-      "Отключается и пробуждение по сети (Wake-on-LAN). Если вы им пользуетесь, не применяйте твик.",
-      "На ноутбуке немного вырастет расход батареи.",
-    ],
+    check: "Повторите выход из сна и соединение с тем же шлюзом. Проверьте потери и восстановление связи.",
+    revertSteps: ["Верните исходное состояние только этого флажка для того же адаптера."],
     file: {
-      name: "rustflow-nic-power-off.bat",
-      kind: "bat",
-      content: adminBat(
-        "Network adapter power saving OFF",
-        String.raw`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { Write-Host ('  Adapter: ' + $_.Name); Disable-NetAdapterPowerManagement -Name $_.Name -ErrorAction SilentlyContinue }"`,
-        "Done.",
-      ),
-    },
-    revert: {
-      name: "rustflow-nic-power-REVERT.bat",
-      kind: "bat",
-      content: adminBat(
-        "Network adapter power saving ON",
-        String.raw`powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { Write-Host ('  Adapter: ' + $_.Name); Enable-NetAdapterPowerManagement -Name $_.Name -ErrorAction SilentlyContinue }"`,
-        "Done.",
-      ),
+      name: "rustflow-nic-power.txt",
+      kind: "txt",
+      content:
+        "При обрывах после сна запишите состояние управления питанием одного адаптера. Если флажок «Разрешить отключение этого устройства для экономии энергии» доступен, сравните один цикл без него. Верните исходный выбор после проверки. Wake-on-LAN не меняйте.",
     },
   },
   {
     slug: "network-reset",
+    excludeFromPack: true,
+    evidence: "conditional",
     title: "Сброс DNS и Winsock",
     tagline: "Ремонтный набор при проблемах с подключением",
     category: "network",

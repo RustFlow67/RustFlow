@@ -1,12 +1,12 @@
+import LiquidGlass from "@/components/LiquidGlass";
 import { ArrowRight, Compass } from "lucide-react";
 import Link from "@/components/RouteLink";
-import type { CSSProperties } from "react";
 
 export default function NotFound() {
   return (
     <div className="grid min-h-[60vh] place-items-center">
-      <div className="glass pop-in max-w-lg p-8 text-center sm:p-12">
-        <span className="icon-tile mx-auto" style={{ "--c1": "#ffb15c", "--c2": "#ff4d2e" } as CSSProperties}>
+      <LiquidGlass className="glass pop-in max-w-lg p-8 text-center sm:p-12">
+        <span className="icon-tile mx-auto">
           <Compass aria-hidden="true" />
         </span>
         <p className="display mt-6 text-[5rem] text-glow">404</p>
@@ -23,7 +23,7 @@ export default function NotFound() {
             На главную
           </Link>
         </div>
-      </div>
+      </LiquidGlass>
     </div>
   );
 }

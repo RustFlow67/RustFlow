@@ -7,6 +7,7 @@ import { MYTHS } from "@/lib/content";
 import { grantAchievements, QUIZ_LENGTH, useProgress } from "@/lib/addons/progress";
 import { shareText } from "@/lib/addons/share-text";
 import { useToast } from "@/components/ui/Toast";
+import { Meter } from "../ui";
 import Panel from "./Panel";
 import styles from "./addons.module.css";
 
@@ -78,7 +79,7 @@ export default function MythQuiz() {
             <span className={styles.capsule}>Вопрос {index + 1} из {QUESTIONS.length}</span>
             <span className={styles.pill}>Верно: {score}</span>
           </div>
-          <progress className={styles.meter} max={QUESTIONS.length} value={answers.length} aria-label="Сколько вопросов отвечено" />
+          <Meter percent={100 * answers.length / QUESTIONS.length} label="Сколько вопросов отвечено" />
           <p className={`${styles.inset} text-base font-bold`} aria-live="polite">{question.claim}</p>
           <div className={styles.actions}>
             <button type="button" className={styles.action} aria-pressed={answer === false} disabled={answer !== undefined}

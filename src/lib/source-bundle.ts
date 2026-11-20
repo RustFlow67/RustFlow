@@ -12,12 +12,10 @@ import { createZip, type ZipEntry } from "@/lib/zip";
  * @font-face в src/app/globals.css и с разметкой страниц.
  */
 export const REQUIRED_BINARY_ASSETS = [
-  "public/fonts/manrope-cyrillic-wght-normal.woff2",
-  "public/fonts/manrope-latin-wght-normal.woff2",
+  "public/fonts/inter-cyrillic-wght-normal.woff2",
+  "public/fonts/inter-latin-wght-normal.woff2",
   "public/fonts/unbounded-cyrillic-wght-normal.woff2",
   "public/fonts/unbounded-latin-wght-normal.woff2",
-  "public/fonts/jetbrains-mono-cyrillic-wght-normal.woff2",
-  "public/fonts/jetbrains-mono-latin-wght-normal.woff2",
   "public/images/wallpaper.jpg",
   "public/icon.svg",
   "public/icons/rustflow-192.png",

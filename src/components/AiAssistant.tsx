@@ -1,14 +1,20 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { ArrowUpRight, LoaderCircle, MessageCircle, Send, Square, Trash2, X } from "lucide-react";
 import Link from "@/components/RouteLink";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { useAnchoredPopup } from "@/components/fx/useAnchoredPopup";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import type { PopupSource } from "./fx/popupGeometry";
+import { useHeaderAnchor } from "./fx/useHeaderAnchor";
+import { guardKeys } from "./fx/dialogKeys";
+import { usePopupMotion } from "@/components/fx/usePopupMotion";
 import { RiskLevelBadge } from "@/components/Badges";
 import { apiUrl } from "@/lib/api-base";
-import { assistantBuild, currentAssistantBuild } from "@/lib/assistant/context";
-import { CONTEXT_ANSWER, CONTEXT_TURNS, MAX_ANSWER, MAX_QUESTION, isAdminCommand, truncateQuestion, streamLines, type AssistantEvent } from "@/lib/assistant/protocol";
+import { calculatorDraft } from "@/lib/storage/calculator-draft";
+import { assistantBuild } from "@/lib/assistant/context";
+import { ASSISTANT_UNAVAILABLE, CONTEXT_ANSWER, CONTEXT_TURNS, MAX_ANSWER, MAX_QUESTION, isAdminCommand, truncateQuestion, streamLines, type AssistantEvent } from "@/lib/assistant/protocol";
 import { KNOWLEDGE_BASE, knowledgeHref } from "@/lib/knowledge-base";
 import { makeId } from "@/lib/models/common";
 import { storage } from "@/lib/storage/adapter";
@@ -18,7 +24,7 @@ const ENDPOINT = apiUrl("assistant");
 const HISTORY_KEY = "rf.assistant.history";
 const HISTORY_LIMIT = 24;
 const HISTORY_SIZE = 256000;
-const SUGGESTIONS = ["gc.buffer", "Просадки при повороте мыши", "Rust завис на Done"];
+const SUGGESTIONS = ["Почему игра дёргается при повороте мыши?", "Как выбрать gc.buffer под мою память?", "Rust завис на Done"];
 const ENTRIES = new Map(KNOWLEDGE_BASE.map((entry) => [entry.id, entry]));
 const NETWORK_ERROR = "Связь с помощником прервалась. Попробуйте ещё раз.";
 type Turn = { id: string; question: string; answer: string; entryId: string | null };
@@ -54,8 +60,8 @@ function saveTurn(turn: Turn, fallback: Turn[]): Turn[] {
 }
 
 function selectedBuild(pathname: string | null) {
-  const draft = pathname === "/benchmark" ? currentAssistantBuild() : undefined;
-  if (draft !== undefined) return draft;
+  const draft = pathname === "/benchmark" ? calculatorDraft() : undefined;
+  if (draft) return assistantBuild(draft.input);
   const { builds, activeBuildId } = storage.getState();
   const active = assistantBuild(builds.find((record) => record?.id === activeBuildId)?.input);
   if (active) return active;
@@ -71,16 +77,19 @@ async function responseError(response: Response) {
   return typeof json?.error === "string" ? json.error : NETWORK_ERROR;
 }
 
-export default function AiAssistant({ open, onClose, opener }: {
-  opener: RefObject<HTMLElement | null>; open: boolean; onClose: (refocus?: boolean) => void;
+export default function AiAssistant({ isOpen, closing, onExited, onClose, source, anchor }: {
+  anchor: React.RefObject<HTMLButtonElement | null>;
+  source: React.RefObject<PopupSource>; isOpen: boolean; closing: boolean; onExited: () => void; onClose: (refocus?: boolean) => void;
 }) {
   const pathname = usePathname();
-  const { present, panelRef } = useAnchoredPopup<HTMLElement>(open, opener);
+  const open = isOpen && !closing;
   const dock = useRef<HTMLDivElement>(null);
+  useHeaderAnchor(anchor, dock, "left", open, source);
+  const panelRef = usePopupMotion<HTMLElement>(isOpen, closing, onExited, source, anchor);
   const [query, setQuery] = useState("");
   const [history, setHistory] = useState<Turn[]>(() => readHistory() ?? []);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [configurationError, setConfigurationError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [admin, setAdmin] = useState(false);
   const [commandBusy, setCommandBusy] = useState(false);
   const [commandMessage, setCommandMessage] = useState<string | null>(null);
@@ -92,7 +101,6 @@ export default function AiAssistant({ open, onClose, opener }: {
   const panelId = "rustflow-assistant-dialog";
   const titleId = useId();
   const pending = draft?.status === "streaming";
-  const commandReady = isAdminCommand(query);
   const isSecret = /^\s*\/admin\s/i.test(query);
 
   function requestHeaders() {
@@ -109,31 +117,14 @@ export default function AiAssistant({ open, onClose, opener }: {
 
   useEffect(() => {
     if (!open) return;
-    function escape(event: KeyboardEvent) {
-      // A modal above the modeless assistant gets Escape first.
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || document.querySelector("[data-rf-modal][data-open]")) return;
-      event.preventDefault();
-      onClose();
-    }
-    function outside(event: PointerEvent) {
-      const target = event.target;
-      // Modeless: let the very same pointer gesture activate the underlying control.
-      // The dock trigger handles its own toggle; do not close and immediately reopen it.
-      if (target instanceof Element && !dock.current?.contains(target) && !target.closest("[data-assistant-trigger]")) onClose(false);
-    }
-    document.addEventListener("keydown", escape);
-    document.addEventListener("pointerdown", outside, true);
-    return () => {
-      document.removeEventListener("keydown", escape);
-      document.removeEventListener("pointerdown", outside, true);
-    };
-  }, [open, onClose]);
+    if (panelRef.current) return guardKeys(panelRef.current, onClose);
+  }, [open, onClose, panelRef]);
 
   useEffect(() => {
     if (!open || !log.current) return;
-    if (configurationError) log.current.scrollTop = 0;
+    if (unavailable) log.current.scrollTop = 0;
     else if (follow.current) log.current.scrollTop = log.current.scrollHeight;
-  }, [open, history, draft, configurationError]);
+  }, [open, history, draft, unavailable]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
@@ -160,34 +151,15 @@ export default function AiAssistant({ open, onClose, opener }: {
     follow.current = true;
     // Check configuration without sending a prompt, history or build.
     const update = () => void fetch(ENDPOINT, { signal: controller.signal, cache: "no-store", redirect: "error" }).then(async (response) => {
-      if (!response.ok) return;
-      const status = await response.json() as { configured?: boolean; error?: unknown; admin?: boolean };
+      if (!response.ok) throw new Error();
+      const status = await response.json() as { configured?: boolean; admin?: boolean };
       if (controller.signal.aborted) return;
-      setConfigurationError(status?.configured === false && typeof status.error === "string" ? status.error : null);
+      setUnavailable(status?.configured === false);
       setAdmin(status?.admin === true);
-    }).catch(() => { /* Submit will show a network error if still offline. */ });
+    }).catch(() => { if (!controller.signal.aborted) setUnavailable(true); });
     update();
     window.addEventListener("rustflow:admin-change", update);
     return () => { controller.abort(); window.removeEventListener("rustflow:admin-change", update); };
-  }, [open]);
-
-  useEffect(() => {
-    const node = dock.current;
-    const viewport = window.visualViewport;
-    if (!open || !node || !viewport) return;
-    // Keep the composer above the on-screen keyboard without changing the site's viewport.
-    const fit = () => {
-      node.style.setProperty("--assistant-height", `${viewport.height}px`);
-      node.style.setProperty("--assistant-top", `${viewport.offsetTop}px`);
-      node.style.setProperty("--assistant-keyboard", `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px`);
-    };
-    viewport.addEventListener("resize", fit);
-    viewport.addEventListener("scroll", fit);
-    fit();
-    return () => {
-      viewport.removeEventListener("resize", fit);
-      viewport.removeEventListener("scroll", fit);
-    };
   }, [open]);
 
   async function runCommand(text: string) {
@@ -213,12 +185,13 @@ export default function AiAssistant({ open, onClose, opener }: {
     finally { setCommandBusy(false); }
   }
 
-  async function ask(question: string) {
+  async function ask(question: string, suggestion = false) {
     const raw = question.trim();
     if (isAdminCommand(raw)) { await runCommand(raw); return; }
     const text = truncateQuestion(raw);
-    if (!text || request.current || commandBusy || configurationError) return;
+    if (!text || request.current || commandBusy) return;
     setCommandMessage(null);
+    setUnavailable(false); // An explicit send also retries a previously unavailable provider.
     const base = readHistory() ?? history;
     const recent = base.filter((turn) => turn.answer).slice(-CONTEXT_TURNS).map(({ question, answer }) => (
       { question, answer: answer.slice(0, CONTEXT_ANSWER) }
@@ -228,7 +201,7 @@ export default function AiAssistant({ open, onClose, opener }: {
     request.current = controller;
     follow.current = true;
     setDraft({ ...turn, status: "streaming" });
-    setQuery("");
+    setQuery(suggestion ? text : "");
     input.current?.focus({ preventScroll: true });
 
     let error = NETWORK_ERROR;
@@ -238,13 +211,13 @@ export default function AiAssistant({ open, onClose, opener }: {
         body: JSON.stringify({ question: text, history: recent, build: selectedBuild(pathname) }),
       });
       if (!response.ok) {
-        error = await responseError(response);
-        if (response.status === 503 && request.current === controller) {
-          setConfigurationError(error);
+        if ((response.status === 503 || response.status === 502) && request.current === controller) {
+          setUnavailable(true);
           setQuery(text);
           setDraft(null);
           return;
         }
+        error = await responseError(response);
         throw new Error();
       }
       if (!response.body || !response.headers.get("content-type")?.includes("application/x-ndjson")) throw new Error();
@@ -264,6 +237,7 @@ export default function AiAssistant({ open, onClose, opener }: {
       if (request.current !== controller) return;
       if (!complete || !turn.answer.trim()) throw new Error();
       setHistory(saveTurn(turn, base));
+      if (suggestion) setQuery((value) => value === text ? "" : value);
       setDraft(null);
     } catch {
       if (request.current === controller) {
@@ -291,36 +265,38 @@ export default function AiAssistant({ open, onClose, opener }: {
     input.current?.focus({ preventScroll: true });
   }
 
-  if (!present) return null;
+  if (!isOpen) return null;
   const messages = draft ? [...history, draft] : history;
-  return (
-    <div ref={dock} className={styles.dock} data-rf-assistant={open ? "open" : "closing"} inert={!open} aria-hidden={!open || undefined}>
-      <section ref={panelRef} className={`glass rf-anchored-popup ${styles.panel}`} id={panelId} role="dialog" aria-labelledby={titleId} data-open={open ? "" : undefined}>
+  return createPortal(<>
+    <div aria-hidden="true" className="assistant-scrim" onClick={() => onClose()} data-open={open ? "" : undefined} />
+    <div ref={dock} data-header-slot="left" className={styles.dock} data-rf-assistant={open ? "open" : "closing"} inert={!open} aria-hidden={!open || undefined}>
+      <LiquidGlass as="section" ref={panelRef} className={`glass rf-dialog-surface ${styles.panel}`} id={panelId} role="dialog" aria-modal={open || undefined} aria-labelledby={titleId} data-open={open ? "" : undefined}>
+        <div className={styles.chatScroll}>
         <header className={styles.header}>
           <span className={styles.mark} aria-hidden="true"><MessageCircle /></span>
           <div className={styles.identity}>
             <h2 id={titleId} ref={title} tabIndex={-1}>ИИ-ассистент RustFlow</h2>
             <p>{admin ? <span className={styles.adminBadge}>ADMIN</span> : "ИИ-помощник по Rust"}</p>
           </div>
-          {messages.length > 0 && <button type="button" className={styles.iconButton} onClick={clear}
-            aria-label="Очистить историю чата" title="Очистить историю"><Trash2 aria-hidden="true" /></button>}
-          <button type="button" className={styles.iconButton} onClick={() => onClose()}
-            aria-label="Свернуть RustFlow Assistant" title="Свернуть чат"><X aria-hidden="true" /></button>
+          {messages.length > 0 && <LiquidGlass as="button" shape="pill" type="button" className={`lg-surface ${styles.iconButton}`} onClick={clear}
+            aria-label="Очистить историю чата" title="Очистить историю"><Trash2 aria-hidden="true" /></LiquidGlass>}
+          <LiquidGlass as="button" shape="pill" type="button" className={`lg-surface ${styles.iconButton}`} onClick={() => onClose()}
+            aria-label="Свернуть RustFlow Assistant" title="Свернуть чат"><X aria-hidden="true" /></LiquidGlass>
         </header>
         <div ref={log} className={styles.log} role="log" aria-label="История чата" aria-busy={pending || commandBusy}
           onScroll={(event) => {
             const node = event.currentTarget;
             follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 36;
           }}>
-          {configurationError && <p className={`${styles.answer} ${styles.configuration}`} role="status">
-            {configurationError} <Link href="/guide" className={styles.link} onNavigate={() => onClose(false)}>Открыть базу знаний</Link>
-          </p>}
+          {unavailable && <LiquidGlass as="p" className={`lg-surface ${styles.answer} ${styles.configuration}`} role="status">
+            {ASSISTANT_UNAVAILABLE} <Link href="/benchmark#build-config" className={styles.link} onNavigate={() => onClose(false)}>Перейти в Сборку ↗</Link>
+          </LiquidGlass>}
           {messages.length === 0 ? (
             <div className={styles.welcome}>
-              <p className={styles.kicker}>Помощь с настройкой Rust</p>
-              <p>Спросите о Windows, настройках игры, драйверах, биндах или ошибке.</p>
+              <p className={`rubric ${styles.kicker}`}>Помощь с настройкой Rust</p>
+              <p>Опишите один симптом своими словами — например, что происходит у большой базы. Если знаете, добавьте модель ПК. Не присылайте пароли или ключи.</p>
               <div className={styles.suggestions} aria-label="Примеры вопросов">
-                {SUGGESTIONS.map((text) => <button key={text} type="button" disabled={Boolean(configurationError)} onClick={() => void ask(text)}>{text}</button>)}
+                {SUGGESTIONS.map((text) => <LiquidGlass as="button" shape="pill" key={text} type="button" className="lg-surface" disabled={commandBusy} onClick={() => void ask(text, true)}>{text}</LiquidGlass>)}
               </div>
             </div>
           ) : (
@@ -330,8 +306,8 @@ export default function AiAssistant({ open, onClose, opener }: {
                 const { id, question, answer, entryId } = turn;
                 const entry = entryId && !live ? ENTRIES.get(entryId) : undefined;
                 return <li key={`${id}-${index}`} className={styles.turn}>
-                  <p className={styles.question}><span className="sr-only">Вы: </span>{question}</p>
-                  <div className={styles.answer}>
+                  <LiquidGlass as="p" className={`lg-surface ${styles.question}`}><span className="sr-only">Вы: </span>{question}</LiquidGlass>
+                  <LiquidGlass className={`lg-surface ${styles.answer}`}>
                     {answer && <p className={styles.answerText}>{answer}</p>}
                     {!answer && !live && <p className={styles.note}>Ответ из предыдущей версии не сохранён.</p>}
                     {live?.status === "streaming" && <p className={styles.loading}><LoaderCircle aria-hidden="true" />
@@ -341,11 +317,11 @@ export default function AiAssistant({ open, onClose, opener }: {
                     {live?.status === "failed" && <p className={styles.note} role="status">{live.message}</p>}
                     {entry && <div className={styles.topic}>
                       <Link href={knowledgeHref(entry.id)} prefetch={false} onNavigate={() => onClose(false)} className={styles.link}>
-                        В базе знаний: {entry.title} <ArrowUpRight aria-hidden="true" />
+                        К инструкции: {entry.title} <ArrowUpRight aria-hidden="true" />
                       </Link>
                       {entry.risk === "caution" && <RiskLevelBadge level="caution" />}
                     </div>}
-                  </div>
+                  </LiquidGlass>
                 </li>;
               })}
             </ol>
@@ -364,7 +340,7 @@ export default function AiAssistant({ open, onClose, opener }: {
             </button>
           ) : (
             <button type="submit" className={`btn btn-primary ${styles.send}`} aria-label="Отправить вопрос"
-              disabled={!query.trim() || commandBusy || Boolean(configurationError && !commandReady)}>
+              disabled={!query.trim() || commandBusy}>
               <Send aria-hidden="true" />
             </button>
           )}
@@ -373,7 +349,8 @@ export default function AiAssistant({ open, onClose, opener }: {
             В API модели отправляются вопрос, недавние сообщения и параметры сборки. История хранится в браузере.
           </p>
         </form>
-      </section>
+        </div>
+      </LiquidGlass>
     </div>
-  );
+  </>, document.body);
 }

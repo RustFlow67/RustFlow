@@ -1,6 +1,8 @@
 "use client";
 
+import LiquidGlass from "@/components/LiquidGlass";
 import { Check, ChevronDown, Search } from "lucide-react";
+import { useLiquidLens } from "./fx/useLiquidLens";
 import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
@@ -30,7 +32,6 @@ export default function Combobox({
   const rootRef = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -63,10 +64,12 @@ export default function Combobox({
 
   const safeActive = Math.min(active, Math.max(0, filtered.length - 1));
 
+  const { list: listRef, lens } = useLiquidLens(safeActive, filtered.length, { enabled: open, continuous: true });
+
   useEffect(() => {
     if (!open) return;
     listRef.current?.querySelector("[data-active]")?.scrollIntoView({ block: "nearest" });
-  }, [active, open]);
+  }, [active, open, listRef]);
 
   function choose(item: ComboItem) {
     onChange(item.id);
@@ -107,7 +110,7 @@ export default function Combobox({
         aria-expanded={open}
         aria-labelledby={`${id}-label`}
         onClick={() => {
-          setActive(0);
+          setActive(Math.max(0, filtered.findIndex(item => item.id === value)));
           setOpen((v) => !v);
         }}
       >
@@ -122,7 +125,7 @@ export default function Combobox({
       </button>
 
       <OriginDisclosure open={open} className="pointer-events-none absolute inset-x-0 top-full z-40 mt-2">
-        <div className="popover pointer-events-auto p-2">
+        <LiquidGlass className="popover pointer-events-auto p-2">
           <div className="relative">
             <Search
               className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3"
@@ -145,7 +148,8 @@ export default function Combobox({
               aria-label={`${label}: поиск`}
             />
           </div>
-          <div ref={listRef} id={`${id}-list`} role="listbox" className="mt-2 max-h-72 overflow-y-auto pr-1">
+          <div ref={listRef} id={`${id}-list`} role="listbox" className="liquid-options relative mt-2 max-h-72 overflow-y-auto pr-1">
+            <LiquidGlass as="span" shape="pill" className="lens liquid-lens" ref={lens} aria-hidden="true" />
             {filtered.length === 0 && (
               <p className="px-3 py-6 text-center text-sm leading-relaxed text-ink-3">
                 Такой модели нет в списке. Выберите ближайшую по классу.
@@ -163,14 +167,11 @@ export default function Combobox({
                   )}
                   <button
                     type="button"
-                    role="option"
+                    role="option" data-liquid-item=""
                     aria-selected={isSelected}
                     data-active={i === safeActive ? "" : undefined}
                     className="option"
                     onClick={() => choose(item)}
-                    onPointerMove={() => {
-                      if (active !== i) setActive(i);
-                    }}
                   >
                     <span className="truncate">{item.name}</span>
                     {isSelected && <Check className="h-4 w-4 flex-none text-accent-hi" aria-hidden="true" />}
@@ -179,7 +180,7 @@ export default function Combobox({
               );
             })}
           </div>
-        </div>
+        </LiquidGlass>
       </OriginDisclosure>
     </div>
   );

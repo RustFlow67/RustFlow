@@ -1,0 +1,27 @@
+/* Honest FLIP: the button keeps its glass, ink and hit box at all times.
+   Windows morph from the source rect with their own glass; the source is
+   never borrowed, hidden or restyled. These rules only draw the resting
+   button: a transparent shell, a home for its skin, and the ink layout.
+   Keep the 1px optical edge inside the original border box. */
+:root[data-material] [data-island-button] {
+  position:relative; isolation:isolate; box-sizing:border-box; overflow:visible; background:transparent; border:1px solid transparent;
+  box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+:root[data-material] [data-island-button]::before {content:none;}
+:root[data-material] [data-island-button="round"] {border-radius:50%;}
+[data-island-button] > [data-island-home] {position:absolute;inset:-1px;pointer-events:none;border-radius:inherit;}
+[data-island-ink] {position:relative;display:inline-flex;align-items:center;justify-content:center;gap:inherit;min-width:0;max-width:100%;}
+/* Whole-card invokers keep their grid/block layout inside the ink. */
+.discovery-item > [data-island-ink] {display:grid;align-content:start;justify-items:start;gap:6px;min-width:0;}
+.category-card > [data-island-ink] {display:block;}
+/* Sample the moving wallpaper once per pane, not again for each button on
+   it — the same .btn carve-out the panes already use. Tiles and cards keep
+   their blur. */
+:is(.glass,.modal-panel,.popover) [data-island-button].btn > [data-island-home] > .island-skin {
+  -webkit-backdrop-filter:none;backdrop-filter:none;}
+:root[data-material] .island-skin {position:absolute;inset:0;display:block;border-radius:inherit;pointer-events:none;will-change:transform,opacity,filter;
+  background:var(--lg-coat),var(--island-button-color,var(--bar-tint));box-shadow:var(--hud-panel-shadow,var(--lg-shadow));}
+:root[data-lite] .island-skin {background:var(--surface-solid-fallback);}
+:root:is([data-lite],[data-motion="reduced"],[data-engine-motion="instant"]) :is(.island-skin,[data-island-ink]) {transition:none !important;}
+
+:root[data-material="pearl"][data-scrolled] :is(.profile-trigger,[data-header-slot="right"]) {--island-button-color:rgb(34 54 78 / .78);}
