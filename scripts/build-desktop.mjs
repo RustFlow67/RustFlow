@@ -15,9 +15,13 @@ for (const route of ['api', 'admin']) rmSync(path.join(stage, 'src/app', route),
 // render bodies so deep links behave the same without a Next server.
 for (const name of ['benchmark', 'presets', 'tweaker']) {
   const file = path.join(stage, 'src/app', name, 'page.tsx');
-  let code = readFileSync(file, 'utf8');
+  // Git for Windows commonly checks out CRLF. Normalize before transforming.
+  let code = readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
   code = code.replace(/import type \{ Metadata \} from "next";\n/, '');
   code = code.replace(/export const metadata: Metadata = \{[\s\S]*?\n\};\n/, '');
+  if (/export\s+(?:const\s+metadata|(?:async\s+)?function\s+generateMetadata)\b/.test(code)) {
+    throw new Error(`Move metadata out of the desktop client page: ${file}`);
+  }
   const start = code.indexOf('export default async function ');
   const body = code.indexOf('\n  const ', start);
   if (start < 0 || body < 0) throw new Error(`Unexpected ${name} page structure`);

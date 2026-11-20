@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import ReadingCatalog from "@/components/catalog/ReadingCatalog";
 import TweakerTabs from "@/components/TweakerTabs";
 import { DockIntro } from "@/components/DockIntro";
@@ -12,11 +11,6 @@ import { TWEAK_GROUPS } from "@/lib/models/tweak";
 import { isPackRam, isPlanVram, isSupersededTweak, isTweakerVendor } from "@/lib/tweaker";
 import { TWEAKS, toLite } from "@/lib/tweaks";
 
-export const metadata: Metadata = {
-  title: "Твикер",
-  description:
-    "Четыре графических профиля Rust и шесть категорий настроек. Соберите свой client.cfg и ZIP с точными шагами и откатом.",
-};
 
 export default async function TweakerPage({
   searchParams,
