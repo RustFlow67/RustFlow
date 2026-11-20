@@ -1466,3 +1466,11 @@ html[data-engine-motion="instant"] :not(.wallpaper-scene, .wallpaper-scene *)::a
     animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; transition-delay: 0ms !important; animation-delay: 0ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* Native shell chrome is mounted only in the desktop build. */
+body:has(.desktop-titlebar) { --chrome-top: 48px; }
+.desktop-titlebar { position: fixed; z-index: 100; inset: 0 0 auto; height: 38px; display: flex; align-items: center; justify-content: space-between; padding-left: 16px; color: var(--ink-2); font-size: 12px; user-select: none; }
+.desktop-window-controls { display: flex; align-items: center; margin-right: 8px; overflow: hidden; }
+.desktop-window-controls button { display: grid; place-items: center; width: 38px; height: 32px; color: var(--ink); }
+.desktop-window-controls button:hover { background: rgb(255 255 255 / .12); }
+.desktop-window-controls button:last-child:hover { background: #b72d2d; }

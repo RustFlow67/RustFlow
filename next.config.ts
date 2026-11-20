@@ -25,7 +25,9 @@ function apiBase(raw: string | undefined) {
 const publicApiBase = apiBase(process.env.VITE_API_BASE_URL);
 const previewId = process.env.E2B_SANDBOX_ID;
 
+const desktop = process.env.TAURI_ENV === "true";
 const nextConfig: NextConfig = {
+  ...(desktop ? { output: "export", trailingSlash: true, images: { unoptimized: true } } : {}),
   compress: true,
   poweredByHeader: false,
   // Permit loopback and this sandbox's preview to hydrate and connect to HMR.
@@ -41,6 +43,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  ...(desktop ? {} : {
   async redirects() {
     return [
       { source: "/windows", destination: WINDOWS_TAB_HREF, permanent: true },
@@ -121,6 +124,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  }),
 };
 
 export default nextConfig;

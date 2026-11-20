@@ -21,6 +21,7 @@ import Effects from "@/components/Effects";
 import PaletteMount from "@/components/addons/PaletteMount";
 import Footer from "@/components/Footer";
 import Nav from "@/components/Nav";
+import DesktopTitlebar from "@/components/DesktopTitlebar";
 import PwaRegistration from "@/components/PwaRegistration";
 import { RouteScroll, RouteSurface } from "@/components/RouteLink";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -81,6 +82,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <body className="antialiased">
       <script dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOT }} />
       <a href="#main-content" className="skip-link">Перейти к содержимому</a>
+      <DesktopTitlebar />
       <VelocityFilters />
       <LiquidGlassFilters />
       <BlobWallpaper />

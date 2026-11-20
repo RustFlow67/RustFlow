@@ -1,6 +1,9 @@
 "use client";
 
 import LiquidGlass from "@/components/LiquidGlass";
+import { useSystemPlan } from "@/components/catalog/SystemPlan";
+import { IS_DESKTOP_APP } from "@/lib/config";
+import { getSystemBridge } from "@/services/systemBridge";
 import AdaptiveActions from "./AdaptiveActions";
 import { DockIntro } from "./DockIntro";
 import BuildInsight from "./BuildInsight";
@@ -95,8 +98,19 @@ export default function BenchmarkTool({ accountBuild, ...props }: Props) {
 
 function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
   const { state, hydrated, storage } = useRustFlowStore();
+  const [detected, setDetected] = useState<{ cpu: string; gpu: string; ramGb: number; ramMhz?: number; os?: string }>();
+  useEffect(() => {
+    if (!IS_DESKTOP_APP) return;
+    let active = true;
+    const host = getSystemBridge();
+    void Promise.all([host.readHardware(), host.readOperatingSystem()]).then(([hardware, os]) => {
+      if (active && hardware.status === "ok") setDetected({ ...hardware.value, os: os.status === "ok" ? os.value.name : undefined });
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const cloudFallback = useAccount().session?.user?.build;
+  const { detectedInput } = useSystemPlan();
   const initialSeed = useMemo<{ input: BuildInput; id?: string }>(() => {
     if (presetInput) return { input: presetInput };
     const active =
@@ -105,6 +119,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
       state?.builds[0];
     if (active) return { input: active.input, id: active.id };
     if (cloudFallback) return { input: cloudFallback };
+    if (detectedInput) return { input: detectedInput };
     return {
       input: {
         name: "Моя сборка",
@@ -117,7 +132,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
         resolution: "1080p",
       },
     };
-  }, [state, presetInput, savedId, cloudFallback]);
+  }, [state, presetInput, savedId, cloudFallback, detectedInput]);
 
   const [draft, setDraft] = useState<{ input: BuildInput; id?: string } | null>(null);
   const current = draft ?? initialSeed;
@@ -201,6 +216,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
       </DockIntro>
       <LiquidGlass className="glass build-workspace">
         <section id="build-config" className="build-inputs" aria-labelledby="computer-heading">
+          {detected && <p role="status" className="text-sm text-ink-2">Обнаружено: {detected.cpu} · {detected.gpu} · {detected.ramGb} ГБ ОЗУ{detected.ramMhz ? `, ${detected.ramMhz} МТ/с` : ""}{detected.os ? ` · ${detected.os}` : ""}{detectedInput && input === detectedInput ? ". Разрешение 1080p и тайминг RAM заданы приблизительно; проверьте их." : detectedInput ? ". Сохранённая или выбранная сборка сохранена без изменений." : ". Не удалось однозначно заполнить все поля; проверьте комплектующие ниже."}</p>}
           <header className="work-heading">
             <small className="rubric">01 / Комплектующие</small>
             <h2 id="computer-heading">Ваш компьютер</h2>

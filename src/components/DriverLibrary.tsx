@@ -22,6 +22,7 @@ import {
   type FamilyId,
 } from "@/lib/drivers";
 import AdaptiveActions from "./AdaptiveActions";
+import { getSystemBridge } from "@/services/systemBridge";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import { Modal } from "./ui/Modal";
 import { usePopupState } from "./fx/usePopupMotion";
@@ -56,6 +57,22 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
     </li>
   );
 }
+function NativeSupport({ family }: { family: FamilyId }) {
+  const [message, setMessage] = useState("");
+  const gpu = family === "nvidia" || family === "radeon" || family === "arc";
+  if (!gpu) return null;
+  async function open(kind: "ddu" | "nvidia" | "radeon" | "arc") {
+    const openSupport = getSystemBridge().openOfficialSupport;
+    if (!openSupport) { setMessage("Открытие официального сайта недоступно."); return; }
+    const result = await openSupport(kind);
+    setMessage(result.status === "ok" ? "Открыт официальный сайт. Выберите и проверьте файл перед запуском." : "Не удалось открыть официальный сайт.");
+  }
+  return <div className="driver-downloads">
+    <button className="btn btn-sm" type="button" onClick={() => void open(family as "nvidia" | "radeon" | "arc")}>Открыть официальный подбор драйвера ↗</button>
+    <button className="btn btn-sm" type="button" onClick={() => void open("ddu")}>Открыть официальный сайт DDU ↗</button>
+    <span role="status">{message}</span>
+  </div>;
+}
 function Instructions({ family, model }: { family: FamilyId; model: string }) {
   const r = driverChoice(family, model)!;
   const gpu = family === "nvidia" || family === "radeon" || family === "arc";
@@ -82,6 +99,7 @@ function Instructions({ family, model }: { family: FamilyId; model: string }) {
           </AdaptiveActions>
         </div>
       )}
+      {IS_DESKTOP_APP && <NativeSupport family={family} />}
       <h3 className="install-heading">{gpu ? "Как установить без лишнего" : "Как установить и проверить"}</h3>
       {gpu ? (
         <>

@@ -13,6 +13,8 @@ import { isValidBuildInput } from "@/lib/models/build";
 import { formatBuildResolution } from "@/lib/models/build-resolution";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import { getSystemBridge } from "@/services/systemBridge";
+import { detectedBuild } from "@/lib/native-hardware";
+import type { BuildInput } from "@/lib/models/build";
 import { isWindows, type WindowsVersion } from "@/lib/models/build-settings";
 import { planWindows, withHostWindows } from "@/lib/plan-windows";
 import { systemPlan, systemPlanHref, type PlanIndex } from "@/lib/catalog/system-plan";
@@ -22,6 +24,7 @@ const Context = createContext<{
   href: string;
   index: PlanIndex;
   hostWindows?: WindowsVersion;
+  detectedInput?: BuildInput;
 } | null>(null);
 export function SystemPlanProvider({ index, children }: { index: PlanIndex; children: ReactNode }) {
   const { state } = useRustFlowStore(),
@@ -31,7 +34,8 @@ export function SystemPlanProvider({ index, children }: { index: PlanIndex; chil
     state?.builds.find((b) => b.id === state.activeBuildId)?.input ??
     state?.builds[0]?.input ??
     session?.user?.build;
-  const input = draft && isValidBuildInput(draft.input) ? draft.input : saved;
+  const [detectedInput, setDetectedInput] = useState<BuildInput>();
+  const input = draft && isValidBuildInput(draft.input) ? draft.input : saved ?? detectedInput;
   const mode =
     input === draft?.input ? (draft?.mode ?? "competitive") : (input?.graphicsProfile ?? "competitive");
   const live =
@@ -43,7 +47,10 @@ export function SystemPlanProvider({ index, children }: { index: PlanIndex; chil
     if (!IS_DESKTOP_APP) return;
     let active = true;
     const read = async () => {
-      const result = await getSystemBridge().readOperatingSystem();
+      const host = getSystemBridge();
+      const [result, hardware] = await Promise.all([host.readOperatingSystem(), host.readHardware()]);
+      if (active && result.status === "ok" && hardware.status === "ok")
+        setDetectedInput(detectedBuild({ ...hardware.value, windowsVersion: result.value.windowsVersion }));
       if (active && result.status === "ok" && isWindows(result.value.windowsVersion))
         setHostWindows(result.value.windowsVersion);
     };
@@ -59,10 +66,11 @@ export function SystemPlanProvider({ index, children }: { index: PlanIndex; chil
     return {
       index,
       hostWindows,
+      detectedInput,
       plan: rig ? systemPlan(rig, mode, index) : null,
       href: rig ? systemPlanHref(rig, mode, live) : "/benchmark",
     };
-  }, [input, mode, live, index, hostWindows]);
+  }, [input, mode, live, index, hostWindows, detectedInput]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export const useSystemPlan = () => useContext(Context)!;
@@ -185,7 +193,7 @@ export function PlanCard({ home = false, preview }: { home?: boolean; preview?: 
               <code>gc.buffer {plan.gc}</code>.
             </p>
             <PlanActions plan={plan} href={href} />
-            <small>Подбор отмечает шаги в пакете, но не запускает их на ПК.</small>
+            <small>Подбор отмечает шаги в пакете, но не запускает их на ПК.{!preview && plan.input === active.detectedInput ? " Разрешение 1080p и тайминг RAM — предположения, проверьте их в сборке." : ""}</small>
           </>
         ) : (
           <>
