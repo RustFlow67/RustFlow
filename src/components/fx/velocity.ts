@@ -4,12 +4,14 @@ type Channel = "motion-blur-x" | "motion-blur-y";
 const stopByChannel = new Map<Channel, () => void>();
 export const quietMotion = () => document.hidden || document.documentElement.matches('[data-motion="reduced"], [data-lite], [data-engine-motion="instant"]');
 
-/** Bidirectional flight blur + vector stretch for dialog shells. Peak sits at
- * 40% of the trajectory (inside the 25–55% window); both ends are sharp
- * (blur 0, scale 1). The dominant travel axis picks the stretch direction so
- * a vertical morph elongates vertically and a horizontal one sideways.
- * WAAPI `filter`/`scale` never touch the FLIP `transform`/`clip-path`/
- * `opacity`/`backdrop-filter` timelines the tests seek. */
+/** Bidirectional flight blur + vector stretch for dialog shells. The blur
+ * rises to its peak at 40% of the trajectory, holds through 80%, then fades
+ * smoothly across the final fifth so the shell lands sharp with no click or
+ * flicker on the source button. The dominant travel axis picks the stretch
+ * direction so a vertical morph elongates vertically and a horizontal one
+ * sideways. WAAPI `filter`/`scale` never touch the FLIP `transform`/
+ * `clip-path`/`opacity`/`backdrop-filter` timelines the tests seek; the FLIP
+ * itself runs on GPU-composited transform/clip-path/opacity only. */
 export function pulseFlight(targets: readonly HTMLElement[], dx: number, dy: number, duration: number) {
   if (quietMotion() || !targets.length || !duration || duration <= 0) return;
   const mag = Math.hypot(dx, dy);
@@ -26,6 +28,7 @@ export function pulseFlight(targets: readonly HTMLElement[], dx: number, dy: num
           [
             { filter: "blur(0px)", scale: "1 1", offset: 0 },
             { filter: `blur(${blurPeak}px)`, scale: `${sx} ${sy}`, offset: 0.4 },
+            { filter: `blur(${blurPeak}px)`, scale: `${sx} ${sy}`, offset: 0.8 },
             { filter: "blur(0px)", scale: "1 1", offset: 1 },
           ],
           { duration, easing: "linear", fill: "none" },

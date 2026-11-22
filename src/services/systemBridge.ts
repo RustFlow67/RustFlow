@@ -168,12 +168,34 @@ type WindowsInfo = HardwareProfile & {
   windowsVersion: WindowsVersion;
 };
 
-async function windowsInfo(): Promise<SystemResult<WindowsInfo>> {
-  try {
-    return { status: "ok", value: await invoke<WindowsInfo>("read_windows_info") };
-  } catch {
-    return { status: "unavailable" };
+/**
+ * `readHardware` and `readOperatingSystem` share one native command. Components
+ * mount together (calculator + plan strip) and used to fire the identical
+ * `invoke()` twice per mount. Deduplicate in-flight calls and cache the
+ * settled result briefly so a remount within the window costs no IPC.
+ */
+let windowsInfoInflight: Promise<SystemResult<WindowsInfo>> | null = null;
+let windowsInfoCache: { at: number; result: SystemResult<WindowsInfo> } | null = null;
+const WINDOWS_INFO_TTL_MS = 30_000;
+
+function windowsInfo(): Promise<SystemResult<WindowsInfo>> {
+  const now = Date.now();
+  if (windowsInfoCache && now - windowsInfoCache.at < WINDOWS_INFO_TTL_MS) {
+    return Promise.resolve(windowsInfoCache.result);
   }
+  if (windowsInfoInflight) return windowsInfoInflight;
+  windowsInfoInflight = (async (): Promise<SystemResult<WindowsInfo>> => {
+    try {
+      return { status: "ok", value: await invoke<WindowsInfo>("read_windows_info") };
+    } catch {
+      return { status: "unavailable" };
+    }
+  })().then((result) => {
+    windowsInfoCache = { at: Date.now(), result };
+    windowsInfoInflight = null;
+    return result;
+  });
+  return windowsInfoInflight;
 }
 
 async function runNativePack(

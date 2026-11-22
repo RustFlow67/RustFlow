@@ -118,6 +118,17 @@
 }
 [data-header-slot="right"] {--edge-gutter:max(6px,env(safe-area-inset-left,0px));left:auto;right:var(--anchor-inset);}
 [data-header-slot] > .rf-dialog-surface {max-height:var(--popover-height);overscroll-behavior:contain;}
+/* Centered dialogs cap to the viewport so tall content scrolls inside the
+   panel (.dialog-scroll) instead of overflowing past the top/bottom edges
+   on short windows (Tauri 1280x800, landscape phones). Header popovers use
+   --popover-height above and are excluded here. */
+.modal-backdrop:not(.header-backdrop) .rf-dialog-surface {max-height:calc(100dvh - 2rem);}
+/* Sample the wallpaper once per pane: small nested surfaces reuse the parent
+   pane's backdrop-filtered image instead of blurring it a second time.
+   Specificity (0,4,0) beats the material recipe (0,3,0) above; the earlier
+   globals.css exclusion lost the cascade and double-blurred every button. */
+:root[data-material] :is(.glass,.modal-panel,.popover,.rf-dialog-surface) :is(.btn,.well,.tile,.chip,.segmented,.field,.info-more,.favorite-drop) {
+  -webkit-backdrop-filter:none;backdrop-filter:none;}
 @container header-slot (max-width:330px) {
   .studio-panel .dialog-scroll {padding:12px;}
   .studio-panel .segmented {width:100%;}
@@ -303,7 +314,7 @@ details[open]::details-content {block-size:auto;}
 /* The optical aperture never scrolls. Its border and its one top reflection
    move together; the scrollport is inside, so neither can cross the text. */
 .modal-panel.rf-dialog-surface {overflow:hidden;}
-.dialog-scroll {max-height:inherit;overflow:hidden auto;overscroll-behavior:contain;border-radius:inherit;}
+.dialog-scroll {max-height:inherit;overflow:hidden auto;overscroll-behavior:contain;border-radius:inherit;scroll-padding:6px;}
 :root[data-material] :is(.lg-surface,.favorite-drop,.info-more,.family-switch,.device-dock,.liquid-lens) {backface-visibility:hidden;-webkit-backface-visibility:hidden;isolation:isolate;}
 :root[data-material] :is(.lg-surface,.favorite-drop,.info-more) {transform:translateZ(0);}
 .rf-dialog-surface:not([data-ready])::after {transition:none;}

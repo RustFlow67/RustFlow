@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import AccordionBody from "./ui/AccordionBody";
 import BoundedNumber from "./ui/BoundedNumber";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { EvidenceBadge, RiskLevelBadge } from "@/components/Badges";
 import CategoryIcon from "@/components/CategoryIcon";
 import { Badge, Switch } from "@/components/ui";
@@ -30,8 +30,10 @@ import type { TweakLite } from "@/lib/tweaks/types";
  * Карточка твика: что делает, категория, риск (безопасно/осторожно/вредно),
  * бейдж «замерено/миф», раскрывающиеся шаги, поля FPS до/после с дельтой %,
  * переключатель «применено» и скачивание файла.
+ * Memoized: the explorer re-renders on every keystroke/filter change, but a
+ * card only needs to repaint when its own tweak or user record changes.
  */
-export default function TweakCard({
+const TweakCard = memo(function TweakCard({
   tweak,
   record,
   interactive = true,
@@ -302,6 +304,8 @@ export default function TweakCard({
       />
     </>
   );
-}
+});
+
+export default TweakCard;
 
     

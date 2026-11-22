@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "@/components/RouteLink";
-import { startTransition, useEffect,useLayoutEffect,useRef, useMemo, useState } from "react";
+import { memo, startTransition, useCallback, useEffect,useLayoutEffect,useRef, useMemo, useState } from "react";
 import AdaptiveActions from "./AdaptiveActions";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import CodeBlock from "@/components/CodeBlock";
@@ -98,6 +98,141 @@ function CfgDownload({preset}:{preset:PresetView}) {
     <Download aria-hidden="true"/> Скачать client.cfg</a></AdaptiveActions>;
 }
 
+/** projectPreset is a pure function of (preset, mode, target) and presets are
+ * static catalog data, so projections can be shared across mounts. This keeps
+ * PresetView identities stable and lets the memoized cards skip repaints. */
+const viewsCache = new Map<string, PresetView>();
+
+/** Heavy preset card, memoized: filter keystrokes and sibling mode changes
+ * must not repaint every card. Props are primitives + a cached PresetView. */
+const PresetCard = memo(function PresetCard({
+  p, isRecommended, isFavorite, inCompare, onModeChange, onDetails, onCompare,
+}: {
+  p: PresetView;
+  isRecommended: boolean;
+  isFavorite: boolean;
+  inCompare: boolean;
+  onModeChange: (id: string, mode: GraphicsProfileId) => void;
+  onDetails: (id: string, from: HTMLElement) => void;
+  onCompare: (from: HTMLElement, id: string) => void;
+}) {
+  return (
+    <LiquidGlass as="article"
+      id={`preset-${p.slug}`}
+      style={{ scrollMarginTop: "7rem" }}
+      className={`glass glass-hover liquid-glass-card preset-card flex h-full flex-col p-4 sm:p-6 ${
+        p.featured ? "glass-accent" : ""
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone="accent">{classLabel(p)}</Badge>
+          {isRecommended && <Badge tone="safe">Рекомендовано для вашей системы</Badge>}
+          <Badge>{p.resolutionLabel}</Badge>
+          <Badge tone="accent">{p.purpose}</Badge>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <FavoriteButton kind="preset" slug={p.slug} title={p.title} active={isFavorite} />
+        </div>
+      </div>
+
+      <h2 className="mt-3.5 text-xl font-bold tracking-tight text-ink">{p.title}</h2>
+
+      {/* Комплектующие */}
+      <dl className="mt-3 grid gap-1.5 text-[13px] text-ink-2 sm:grid-cols-2">
+        <div className="flex items-center gap-2">
+          <Cpu className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
+          <dt className="sr-only">Процессор</dt>
+          <dd className="min-w-0">{p.cpu}</dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <Monitor className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
+          <dt className="sr-only">Видеокарта</dt>
+          <dd className="min-w-0">{p.gpu}</dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <MemoryStick className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
+          <dt className="sr-only">Память</dt>
+          <dd className="min-w-0">{p.ram}</dd>
+        </div>
+        <div className="flex items-center gap-2">
+          <HardDrive className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
+          <dt className="sr-only">Накопитель</dt>
+          <dd className="min-w-0">{p.storage}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+        {SERVERS.map((server) => (
+          <LiquidGlass className="well p-3.5" key={server.label}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className={`text-[11.5px] font-bold tracking-wider ${server.tone}`}>
+                {server.label}
+              </span>
+              <span className="text-[11.5px] tabular-nums text-ink-3" title="Время кадра">
+                <span className="sr-only">Время кадра: </span><AnimatedNumber value={p[server.ms]} digits={1} /> мс
+              </span>
+            </div>
+            <p className="mt-1 font-display text-2xl font-extrabold tabular-nums tracking-tight text-accent-hi">
+              <AnimatedNumber value={p[server.range][0]} />–<AnimatedNumber value={p[server.range][1]} />{" "}
+              <span className="font-sans text-[12.5px] font-semibold text-ink-3">FPS</span>
+            </p>
+            <Meter
+              percent={Math.min(100, (p[server.range][1] / 240) * 100)}
+              className="mt-2"
+            />
+            <p className="mt-1.5 text-[12px] text-ink-2">
+              1% low: <strong className="font-display tabular-nums text-accent-hi"><AnimatedNumber value={p[server.low]} /></strong> FPS
+            </p>
+          </LiquidGlass>
+        ))}
+      </div>
+
+      <div className="mt-3.5">
+        <GraphicsPicker value={p.mode} label={`Графика: ${p.title}`} onChange={(value) => onModeChange(p.id, value)} />
+      </div>
+      {/* Ключевые настройки */}
+      <div className="mt-3.5 flex flex-wrap gap-1.5 text-[12px]">
+        <Badge className="chip-command">Draw {p.settings.drawDistance}</Badge>
+        <Badge className="chip-command">Shader {p.settings.shaderLevel}</Badge>
+        <Badge className="chip-command">Water {p.settings.waterQuality}</Badge>
+        <Badge className="chip-command">gc.buffer {p.settings.gcBuffer}</Badge>
+      </div>
+
+      <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{p.bottleneckNote}</p>
+      <p className="mt-1 text-[11.5px] text-ink-3">
+        {"Сценарий оценки: "}{p.testScene}
+      </p>
+
+      {/* Действия */}
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+        <CfgDownload preset={p}/>
+        <Button island variant="secondary" size="sm" onClick={e => onDetails(p.id, e.currentTarget)} aria-haspopup="dialog">
+          <Eye aria-hidden="true" />
+          Детали
+        </Button>
+        <Button
+          variant={inCompare ? "secondary" : "ghost"}
+          size="sm"
+          onClick={e => onCompare(e.currentTarget, p.id)}
+          aria-haspopup="dialog"
+          style={
+            inCompare
+              ? { boxShadow: "var(--lg-bevel), 0 0 8px -4px var(--theme-glow)" }
+              : undefined
+          }
+        >
+          <GitCompareArrows
+            className={inCompare ? "text-accent-hi" : ""}
+            aria-hidden="true"
+          />
+          {inCompare ? "В сравнении" : "Сравнить"}
+        </Button>
+      </div>
+    </LiquidGlass>
+  );
+});
+
 const SERVERS = [
   { label: PRESET_SERVER.modded, range: "fpsModded", low: "low1Modded", ms: "frametimeModdedMs", tone: "text-accent-hi" },
   { label: PRESET_SERVER.official, range: "fpsOfficial", low: "low1Official", ms: "frametimeOfficialMs", tone: "text-accent-hi" },
@@ -144,7 +279,20 @@ export default function PresetsExplorer({
   const [dimensions, setDimensions] = useState(DEFAULT_SIZE);
   const {width,height}=dimensions;
   const target = useMemo<BuildResolution>(()=>res==="custom"?{resolution:res,customResolution:dimensions}:{resolution:res==="all"?"1080p":res},[res,dimensions]);
-  const views = useMemo(() => presets.map((p) => projectPreset(p, cardModes[p.id] ?? globalMode, target)), [presets, target, cardModes, globalMode]);
+  // Per-preset projection cache: changing one card's graphics mode must not
+  // re-project (and re-render) every other card. Keyed by preset+mode+target.
+  const views = useMemo(() => {
+    const targetKey = JSON.stringify(target);
+    return presets.map((p) => {
+      const mode = cardModes[p.id] ?? globalMode;
+      const key = `${p.id}|${mode}|${targetKey}`;
+      const cached = viewsCache.get(key);
+      if (cached) return cached;
+      const view = projectPreset(p, mode, target);
+      viewsCache.set(key, view);
+      return view;
+    });
+  }, [presets, target, cardModes, globalMode]);
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [includeMyBuild, setIncludeMyBuild] = useState(false);
   const comparison = usePopupState<true>();
@@ -212,13 +360,21 @@ export default function PresetsExplorer({
     [compareIds, views],
   );
 
-  function openComparison(from: HTMLElement, id?: string) {
+  const openComparison = useCallback((from: HTMLElement, id?: string) => {
     if (id && !compareIds.includes(id)) {
       if (compareIds.length >= 3) toast({ title: "Максимум 3 пресета", description: "Заменили первый выбранный пресет.", tone: "info" });
       setCompareIds([...compareIds.slice(-2), id]);
     }
     comparison.show(true, from);
-  }
+  }, [compareIds, comparison, toast]);
+
+  const handleModeChange = useCallback((id: string, mode: GraphicsProfileId) => {
+    setCardModes((previous) => ({ ...previous, [id]: mode }));
+  }, []);
+  const handleDetails = useCallback((id: string, from: HTMLElement) => {
+    showDetail(id, from);
+    record(presets.find((p) => p.id === id)?.slug ?? "");
+  }, [showDetail, record, presets]);
 
   function resetFilters() {
     setQuery("");
@@ -333,122 +489,17 @@ export default function PresetsExplorer({
             if (index >= cardBudget && p.id !== initial) return <LiquidGlass as="article" key={p.id} id={`preset-${p.slug}`} aria-busy="true" className="glass preset-card preset-preview p-4 sm:p-6">
               <h2 className="text-xl font-bold">{p.title}</h2><p className="mt-3 text-sm text-ink-2">{p.cpu} · {p.gpu}</p>
             </LiquidGlass>;
-            const inCompare = compareIds.includes(p.id);
             return (
-              <LiquidGlass as="article"
+              <PresetCard
                 key={p.id}
-                id={`preset-${p.slug}`}
-                style={{ scrollMarginTop: "7rem" }}
-                className={`glass glass-hover liquid-glass-card preset-card flex h-full flex-col p-4 sm:p-6 ${
-                  p.featured ? "glass-accent" : ""
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tone="accent">{classLabel(p)}</Badge>
-                    {plan?.best.slug===p.slug && <Badge tone="safe">Рекомендовано для вашей системы</Badge>}
-                    <Badge>{p.resolutionLabel}</Badge>
-                    <Badge tone="accent">{p.purpose}</Badge>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <FavoriteButton kind="preset" slug={p.slug} title={p.title} active={favorites.includes(p.slug)} />
-                  </div>
-                </div>
-
-                <h2 className="mt-3.5 text-xl font-bold tracking-tight text-ink">{p.title}</h2>
-
-                {/* Комплектующие */}
-                <dl className="mt-3 grid gap-1.5 text-[13px] text-ink-2 sm:grid-cols-2">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
-                    <dt className="sr-only">Процессор</dt>
-                    <dd className="min-w-0">{p.cpu}</dd>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Monitor className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
-                    <dt className="sr-only">Видеокарта</dt>
-                    <dd className="min-w-0">{p.gpu}</dd>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MemoryStick className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
-                    <dt className="sr-only">Память</dt>
-                    <dd className="min-w-0">{p.ram}</dd>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="h-3.5 w-3.5 flex-none text-accent-hi" aria-hidden="true" />
-                    <dt className="sr-only">Накопитель</dt>
-                    <dd className="min-w-0">{p.storage}</dd>
-                  </div>
-                </dl>
-
-                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                  {SERVERS.map((server) => (
-                    <LiquidGlass className="well p-3.5" key={server.label}>
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className={`text-[11.5px] font-bold tracking-wider ${server.tone}`}>
-                          {server.label}
-                        </span>
-                        <span className="text-[11.5px] tabular-nums text-ink-3" title="Время кадра">
-                          <span className="sr-only">Время кадра: </span><AnimatedNumber value={p[server.ms]} digits={1} /> мс
-                        </span>
-                      </div>
-                      <p className="mt-1 font-display text-2xl font-extrabold tabular-nums tracking-tight text-accent-hi">
-                        <AnimatedNumber value={p[server.range][0]} />–<AnimatedNumber value={p[server.range][1]} />{" "}
-                        <span className="font-sans text-[12.5px] font-semibold text-ink-3">FPS</span>
-                      </p>
-                      <Meter
-                        percent={Math.min(100, (p[server.range][1] / 240) * 100)}
-                        className="mt-2"
-                      />
-                      <p className="mt-1.5 text-[12px] text-ink-2">
-                        1% low: <strong className="font-display tabular-nums text-accent-hi"><AnimatedNumber value={p[server.low]} /></strong> FPS
-                      </p>
-                    </LiquidGlass>
-                  ))}
-                </div>
-
-                <div className="mt-3.5">
-                  <GraphicsPicker value={p.mode} label={`Графика: ${p.title}`} onChange={(value) => setCardModes((previous) => ({ ...previous, [p.id]: value }))} />
-                </div>
-                {/* Ключевые настройки */}
-                <div className="mt-3.5 flex flex-wrap gap-1.5 text-[12px]">
-                  <Badge className="chip-command">Draw {p.settings.drawDistance}</Badge>
-                  <Badge className="chip-command">Shader {p.settings.shaderLevel}</Badge>
-                  <Badge className="chip-command">Water {p.settings.waterQuality}</Badge>
-                  <Badge className="chip-command">gc.buffer {p.settings.gcBuffer}</Badge>
-                </div>
-
-                <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{p.bottleneckNote}</p>
-                <p className="mt-1 text-[11.5px] text-ink-3">
-                  {"Сценарий оценки: "}{p.testScene}
-                </p>
-
-                {/* Действия */}
-                <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                  <CfgDownload preset={p}/>
-                  <Button island variant="secondary" size="sm" onClick={e => {detail.show(p.id,e.currentTarget);record(p.slug);}} aria-haspopup="dialog">
-                    <Eye aria-hidden="true" />
-                    Детали
-                  </Button>
-                  <Button
-                    variant={inCompare ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={e => openComparison(e.currentTarget, p.id)}
-                    aria-haspopup="dialog"
-                    style={
-                      inCompare
-                        ? { boxShadow: "var(--lg-bevel), 0 0 8px -4px var(--theme-glow)" }
-                        : undefined
-                    }
-                  >
-                    <GitCompareArrows
-                      className={inCompare ? "text-accent-hi" : ""}
-                      aria-hidden="true"
-                    />
-                    {inCompare ? "В сравнении" : "Сравнить"}
-                  </Button>
-                </div>
-              </LiquidGlass>
+                p={p}
+                isRecommended={plan?.best.slug === p.slug}
+                isFavorite={favorites.includes(p.slug)}
+                inCompare={compareIds.includes(p.id)}
+                onModeChange={handleModeChange}
+                onDetails={handleDetails}
+                onCompare={openComparison}
+              />
             );
           })}
         </div>

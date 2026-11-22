@@ -370,7 +370,10 @@ html[data-rfx-paused] :is([data-dock-glyph], [data-dock-glyph] [data-part]) { an
   }
 
   .modal-backdrop, .assistant-scrim { position: fixed; inset: 0; z-index: var(--dialog-layer); }
-  .modal-backdrop { display: grid; place-items: center; padding: clamp(8px, 2.6vw, 1rem); overflow: clip auto; isolation: isolate; }
+  /* margin:auto (not place-items:center): an oversized dialog overflows to the
+     bottom and stays reachable by scroll instead of losing its top edge. */
+  .modal-backdrop { display: grid; padding: clamp(8px, 2.6vw, 1rem); overflow: clip auto; isolation: isolate; }
+  .modal-backdrop > * { margin: auto; }
   .assistant-scrim:not([data-open]), .modal-backdrop:not([data-open]) { pointer-events: none; }
   /* The backdrop material fades separately — never its tree of live glass controls. */
   .modal-backdrop::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
@@ -1469,7 +1472,9 @@ html[data-engine-motion="instant"] :not(.wallpaper-scene, .wallpaper-scene *)::a
 
 /* Native shell chrome is mounted only in the desktop build. */
 body:has(.desktop-titlebar) { --chrome-top: 48px; }
-.desktop-titlebar { position: fixed; z-index: 100; inset: 0 0 auto; height: 38px; display: flex; align-items: center; justify-content: space-between; padding-left: 16px; color: var(--ink-2); font-size: 12px; user-select: none; }
+/* Native window chrome stays above every dialog layer: a modal scrim must
+   never cover the minimize/maximize/close controls or the drag region. */
+.desktop-titlebar { position: fixed; z-index: calc(var(--dialog-layer) + 3); inset: 0 0 auto; height: 38px; display: flex; align-items: center; justify-content: space-between; padding-left: 16px; color: var(--ink-2); font-size: 12px; user-select: none; }
 .desktop-titlebar-drag { align-self: stretch; flex: 1; }
 .desktop-window-controls { display: flex; align-items: center; margin-right: 8px; padding: 2px; border-radius: 9999px; overflow: hidden; }
 .desktop-window-controls button { display: grid; place-items: center; width: 38px; height: 32px; border-radius: 9999px; color: var(--ink); }

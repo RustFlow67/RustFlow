@@ -27,9 +27,9 @@ windows-sys = { version = "0.59", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+# Deliberately not size-golfed: keep symbols for informative stack traces and
+# a normal-weight binary. The bundle weight comes from the bundled WebView2
+# Fixed Version Runtime (see tauri.conf.json), not from stripped Rust code.
 [profile.release]
-panic = "abort"
-codegen-units = 1
-lto = true
-opt-level = "s"
-strip = true
+opt-level = 2
+strip = false

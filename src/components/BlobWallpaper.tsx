@@ -20,6 +20,7 @@ export default function BlobWallpaper() {
       flat: Renderer | null = null;
     let triedGL = false,
       pageHidden = false,
+      windowBlurred = false,
       disposed = false,
       frame = 0,
       last = 0,
@@ -72,7 +73,7 @@ export default function BlobWallpaper() {
     }
     function paint(now: number) {
       frame = 0;
-      if (disposed || pageHidden || document.hidden || !width || !height) return;
+      if (disposed || pageHidden || windowBlurred || document.hidden || !width || !height) return;
       const renderer = select(),
         isGpu = !!renderer && renderer === gpuRenderer;
       if (!renderer) {
@@ -115,8 +116,8 @@ export default function BlobWallpaper() {
       lite = root.hasAttribute("data-lite");
       mode = root.dataset.wallpaper || "drift";
       still = lite || getMotionReduced() || mode === "still";
-      host.dataset.playback = pageHidden || document.hidden ? "paused" : still ? "still" : mode;
-      if (disposed || document.hidden || pageHidden) return;
+      host.dataset.playback = pageHidden || windowBlurred || document.hidden ? "paused" : still ? "still" : mode;
+      if (disposed || document.hidden || pageHidden || windowBlurred) return;
       const next = lighting(root);
       if (still || !host.dataset.renderer) {
         light = target = next; mixStart = null;
@@ -148,6 +149,16 @@ export default function BlobWallpaper() {
         pageHidden = false;
         refresh();
       };
+    // Minimizing the Tauri window (or switching apps) fires blur without a
+    // reliable visibilitychange in WebView2: stop the GPU loop entirely.
+    const blur = () => {
+        windowBlurred = true;
+        refresh();
+      },
+      focus = () => {
+        windowBlurred = false;
+        refresh();
+      };
     const size = new ResizeObserver(refresh),
       policy = new MutationObserver(refresh);
     gpu.addEventListener("webglcontextlost", lost);
@@ -155,6 +166,8 @@ export default function BlobWallpaper() {
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("pagehide", hide);
     window.addEventListener("pageshow", show);
+    window.addEventListener("blur", blur);
+    window.addEventListener("focus", focus);
     size.observe(host);
     policy.observe(root, {
       attributes: true,
@@ -169,6 +182,8 @@ export default function BlobWallpaper() {
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("pagehide", hide);
       window.removeEventListener("pageshow", show);
+      window.removeEventListener("blur", blur);
+      window.removeEventListener("focus", focus);
       gpu.removeEventListener("webglcontextlost", lost);
       gpu.removeEventListener("webglcontextrestored", restored);
       gpuRenderer?.dispose();
