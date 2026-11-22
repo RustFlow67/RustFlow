@@ -1,7 +1,8 @@
 "use client";
 
 import LiquidGlass from "@/components/LiquidGlass";
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   AudioLines,
   CircuitBoard,
@@ -21,7 +22,7 @@ import {
   driverChoice,
   type FamilyId,
 } from "@/lib/drivers";
-import { getSystemBridge } from "@/services/systemBridge";
+import { getSystemBridge, type DetectedInstaller } from "@/services/systemBridge";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import { Modal } from "./ui/Modal";
 import { usePopupState } from "./fx/usePopupMotion";
@@ -56,8 +57,12 @@ function Step({ n, title, children }: { n: string; title: string; children: Reac
     </li>
   );
 }
-function NativeSupport({ family }: { family: FamilyId }) {
+const subscribeNoop = () => () => {};
+
+function NativeSupport({ family, model }: { family: FamilyId; model: string }) {
   const [message, setMessage] = useState("");
+  const [installers, setInstallers] = useState<DetectedInstaller[] | null>(null);
+  const tauri = useSyncExternalStore(subscribeNoop, () => isTauri(), () => false);
   const gpu = family === "nvidia" || family === "radeon" || family === "arc";
   if (!gpu) return null;
   async function open(kind: "ddu" | "nvidia" | "radeon" | "arc" | "nvcleanstall") {
@@ -68,10 +73,45 @@ function NativeSupport({ family }: { family: FamilyId }) {
       setMessage(result.status === "ok" ? "Открыта официальная страница загрузки. При необходимости сначала удалите старый драйвер через DDU." : "Не удалось открыть официальный сайт.");
     } catch { setMessage("Не удалось открыть официальный сайт."); }
   }
+  async function scanDownloads() {
+    const finder = getSystemBridge().findDriverInstallers;
+    if (!finder) { setMessage("Поиск скачанных установщиков доступен в десктопном приложении."); return; }
+    const res = await finder(family);
+    if (res.status === "ok") {
+      setInstallers(res.value);
+      setMessage(res.value.length > 0 ? `Найдено установщиков в «Загрузках»: ${res.value.length}.` : "Подходящие установщики драйвера или DDU в папке «Загрузки» не найдены.");
+    } else {
+      setMessage(res.status === "error" ? res.message : "Не удалось просканировать папку «Загрузки».");
+    }
+  }
+  async function runInstaller(installerPath: string) {
+    const res = await getSystemBridge().installCleanDriver({ family, model, installerPath });
+    if (res.status === "ok") {
+      setMessage(res.value?.message || "Установщик запущен с правами администратора (UAC).");
+    } else if (res.status === "cancelled") {
+      setMessage("Запуск установщика отменён пользователем.");
+    } else {
+      setMessage(res.status === "error" ? res.message : "Не удалось запустить установщик.");
+    }
+  }
   return <div className="driver-downloads">
     <button className="btn btn-sm" type="button" onClick={() => void open(family as "nvidia" | "radeon" | "arc")}>{family === "nvidia" ? "Скачать чистый драйвер ↗" : "Открыть официальный подбор драйвера ↗"}</button>
     <button className="btn btn-sm" type="button" onClick={() => void open("ddu")}>Скачать DDU (удаление старого драйвера) ↗</button>
     {family === "nvidia" && <button className="btn btn-sm" type="button" onClick={() => void open("nvcleanstall")}>Скачать NVCleanstall ↗</button>}
+    {tauri && (
+      <button className="btn btn-sm" type="button" onClick={() => void scanDownloads()}>
+        Запустить скачанный установщик / DDU (UAC)
+      </button>
+    )}
+    {installers && installers.length > 0 && (
+      <div className="driver-downloads">
+        {installers.map((item) => (
+          <button key={item.fullPath} className="btn btn-primary btn-sm" type="button" onClick={() => void runInstaller(item.fullPath)}>
+            Запустить {item.fileName} (UAC)
+          </button>
+        ))}
+      </div>
+    )}
     <span role="status">{message}</span>
   </div>;
 }
@@ -101,7 +141,7 @@ function Instructions({ family, model }: { family: FamilyId; model: string }) {
           </>}
         </div>
       )}
-      {IS_DESKTOP_APP && (gpu ? <NativeSupport family={family} /> : r.url && <p>Найдите драйвер для точной модели на сайте производителя устройства.</p>)}
+      {IS_DESKTOP_APP && (gpu ? <NativeSupport family={family} model={model} /> : r.url && <p>Найдите драйвер для точной модели на сайте производителя устройства.</p>)}
       <h3 className="install-heading">{gpu ? "Как установить без лишнего" : "Как установить и проверить"}</h3>
       {gpu ? (
         <>
