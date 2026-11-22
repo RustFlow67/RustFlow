@@ -2,10 +2,18 @@
 
 import { Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect } from "react";
 import LiquidGlass from "@/components/LiquidGlass";
 import { IS_DESKTOP_APP } from "@/lib/config";
+import { initSystemBridge } from "@/services/systemBridge";
 
 export default function DesktopTitlebar() {
+  useEffect(() => {
+    if (IS_DESKTOP_APP) {
+      initSystemBridge();
+    }
+  }, []);
+
   if (!IS_DESKTOP_APP) return null;
   const run = (action: "minimize" | "toggleMaximize" | "close") => {
     void getCurrentWindow()[action]().catch(() => {});
