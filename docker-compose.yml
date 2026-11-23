@@ -26,6 +26,12 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://postgres:change_me_strong_password@db:5432/rustflow
+      AI_API_KEY: "${AI_API_KEY:-}"
+      AI_API_BASE_URL: "${AI_API_BASE_URL:-}"
+      AI_MODEL: "${AI_MODEL:-}"
+      AI_API_FORMAT: "${AI_API_FORMAT:-}"
+      STEAM_API_KEY: "${STEAM_API_KEY:-}"
+      NEXT_PUBLIC_SITE_URL: "${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}"
       RUSTFLOW_LLM_API_KEY: "${RUSTFLOW_LLM_API_KEY:-}"
       RUSTFLOW_LLM_ENDPOINT: "${RUSTFLOW_LLM_ENDPOINT:-}"
       RUSTFLOW_ADMIN_TOKEN: "${RUSTFLOW_ADMIN_TOKEN:-}"

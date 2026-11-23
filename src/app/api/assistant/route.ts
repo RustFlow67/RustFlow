@@ -70,14 +70,21 @@ async function* providerEvents(body: ReadableStream<Uint8Array>): AsyncGenerator
 }
 
 function configuration() {
-  const key = process.env.RUSTFLOW_LLM_API_KEY?.trim();
-  const model = "gpt-4o-mini";
+  const key = (process.env.AI_API_KEY || process.env.RUSTFLOW_LLM_API_KEY)?.trim();
   if (!key) return { error: ASSISTANT_UNAVAILABLE } as const;
   try {
-    const endpoint = new URL(process.env.RUSTFLOW_LLM_ENDPOINT?.trim() || "https://api.openai.com/v1/chat/completions");
+    const raw = process.env.AI_API_BASE_URL?.trim() || process.env.RUSTFLOW_LLM_ENDPOINT?.trim() || "https://api.openai.com/v1";
+    const endpoint = new URL(raw);
     const loopback = endpoint.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname);
-    if ((!loopback && endpoint.protocol !== "https:") || endpoint.username || endpoint.password) throw new Error();
-    return { key, endpoint, model };
+    if ((!loopback && endpoint.protocol !== "https:") || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error();
+    const format = process.env.AI_API_FORMAT?.trim() || (endpoint.hostname === "api.anthropic.com" ? "anthropic" : "openai");
+    if (format !== "openai" && format !== "anthropic") throw new Error();
+    const suffix = format === "anthropic" ? "/messages" : "/chat/completions";
+    const path = endpoint.pathname.replace(/\/+$/, "");
+    if (!path.endsWith(suffix)) endpoint.pathname = `${path || "/v1"}${suffix}`;
+    const model = process.env.AI_MODEL?.trim() || (format === "anthropic" ? "claude-sonnet-4-5" : "gpt-4o-mini");
+    if (model.length > 200) throw new Error();
+    return { key, endpoint, model, format };
   } catch {
     return { error: ASSISTANT_UNAVAILABLE } as const;
   }
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
   const question = truncateQuestion(text);
   const config = configuration();
   if (config.error) return fail(503, config.error);
-  const { endpoint, key, model } = config;
+  const { endpoint, key, model, format } = config;
   const build = assistantBuild(payload?.build);
   if (payload?.build != null && !build) return fail(400, "Некорректные параметры сборки.");
 
@@ -146,12 +153,17 @@ export async function POST(request: Request) {
   const timeoutMessage = "ИИ не успел ответить. Попробуйте ещё раз.";
   let upstream: Response;
   try {
+    const system = `${SYSTEM_PROMPT}\n\n${describe(build)}${grounding}`;
+    const messages = [...conversation, { role: "user", content: question }];
     upstream = await fetch(endpoint, {
-      method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ model, stream: true, max_tokens: admin ? 1500 : 450, messages: [
-        { role: "system", content: `${SYSTEM_PROMPT}\n\n${describe(build)}${grounding}` },
-        ...conversation, { role: "user", content: question },
-      ] }), cache: "no-store", redirect: "error", signal,
+      method: "POST",
+      headers: format === "anthropic"
+        ? { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json", Accept: "text/event-stream" }
+        : { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify(format === "anthropic"
+        ? { model, stream: true, max_tokens: admin ? 1500 : 450, system, messages }
+        : { model, stream: true, max_tokens: admin ? 1500 : 450, messages: [{ role: "system", content: system }, ...messages] }),
+      cache: "no-store", redirect: "error", signal,
     });
   } catch {
     active--;
@@ -177,12 +189,14 @@ export async function POST(request: Request) {
         let finished = false;
         for await (const data of providerEvents(body)) {
           if (data === "[DONE]") { finished = true; break; }
-          const chunk = JSON.parse(data) as { error?: unknown; choices?: { delta?: { content?: unknown }; finish_reason?: string }[] };
-          if (chunk.error) throw new Error();
+          const chunk = JSON.parse(data) as { type?: string; error?: unknown; delta?: { type?: string; text?: unknown }; choices?: { delta?: { content?: unknown }; finish_reason?: string }[] };
+          if (chunk.error || chunk.type === "error") throw new Error();
           const choice = chunk.choices?.[0];
-          if (choice?.finish_reason === "stop" || choice?.finish_reason === "length") finished = true;
-          if (typeof choice?.delta?.content !== "string") continue;
-          const text = choice.delta.content.slice(0, MAX_ANSWER - length);
+          if (choice?.finish_reason === "stop" || choice?.finish_reason === "length" || chunk.type === "message_stop") finished = true;
+          const content = format === "anthropic" && chunk.type === "content_block_delta" && chunk.delta?.type === "text_delta"
+            ? chunk.delta.text : choice?.delta?.content;
+          if (typeof content !== "string") continue;
+          const text = content.slice(0, MAX_ANSWER - length);
           if (text) emit({ type: "delta", text });
           length += text.length;
           if (length >= MAX_ANSWER) { finished = true; break; }

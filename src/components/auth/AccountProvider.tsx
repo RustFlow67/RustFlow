@@ -20,7 +20,7 @@ interface AccountContext {
 }
 
 const Account = createContext<AccountContext | null>(null);
-const EMPTY: SessionView = { user: null, admin: false, passwordEnabled: false, googleEnabled: false, secureOrigin: false };
+const EMPTY: SessionView = { user: null, admin: false, passwordEnabled: false, googleEnabled: false, steamEnabled: false, secureOrigin: false };
 const NETWORK_ERROR = "Сервер аккаунтов недоступен. Можно использовать локальный профиль.";
 class AccountError extends Error {
   constructor(message: string, readonly status = 0) { super(message); }

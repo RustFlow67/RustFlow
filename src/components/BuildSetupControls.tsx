@@ -218,7 +218,7 @@ export function PersonalBuildSettings({ input, patch }: InputProps) {
           options={PLAY_OPTIONS.gcBuffer}
           value={input.gcBuffer ?? PLAY_DEFAULTS.gcBuffer}
           onChange={(gcBuffer) => patch({ gcBuffer })}
-          hint={`gc.buffer задаёт запас памяти между её очистками: слишком частая очистка может ощущаться как рывок. В client.cfg: gc.buffer ${gc.mb}. ${gc.mb > gc.auto ? "Выше автоматического значения: проверьте запас ОЗУ и подкачку." : "Авто учитывает объём памяти после вычета фоновой нагрузки."}`}
+          hint={`gc.buffer задаёт запас памяти между её очистками: слишком частая очистка может ощущаться как рывок. В client.cfg: gc.buffer ${gc.mb}. ${gc.mb > gc.auto ? "Выше автоматического значения: проверьте запас ОЗУ и подкачку." : "Авто выбирается по установленной ОЗУ; проверьте запас для фоновых программ."}`}
         />
         <PlayControl
           n="05"
@@ -240,7 +240,7 @@ export function PersonalBuildSettings({ input, patch }: InputProps) {
           className="build-profile-picker"
         />
         <p className="mt-1.5 text-xs text-ink-3">
-          Меняет сглаживание сетевых позиций в client.cfg, а не пинг или FPS.
+          Справочный выбор: сетевые команды не записываются в client.cfg.
         </p>
       </div>
     </>

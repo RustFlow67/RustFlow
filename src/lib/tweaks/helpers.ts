@@ -128,40 +128,46 @@ const PS_APPLY = String.raw`function Main {
   Write-Host ''
   $cfg = Get-RustCfg
   if (-not $cfg) { return }
-  $lines = @()
+  Write-Host '  This changes client.cfg. Close Rust and keep a backup before proceeding.' -ForegroundColor Yellow
+  if ((Read-Host '  Type YES to continue') -cne 'YES') { Write-Host '  Cancelled. Nothing was changed.'; return }
+  $content = ''
+  $hasBom = $false
   if (Test-Path -LiteralPath $cfg) {
     $backup = $cfg + '.rustflow-backup'
-    if (-not (Test-Path -LiteralPath $backup)) {
-      Copy-Item -LiteralPath $cfg -Destination $backup
-      Write-Host ('  Backup saved: ' + $backup)
-    }
-    $lines = @(Get-Content -LiteralPath $cfg)
+    if (-not (Test-Path -LiteralPath $backup)) { Copy-Item -LiteralPath $cfg -Destination $backup }
+    $bak = $cfg + '.bak'
+    if (-not (Test-Path -LiteralPath $bak)) { Copy-Item -LiteralPath $cfg -Destination $bak }
+    $bytes = [System.IO.File]::ReadAllBytes($cfg)
+    $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+    $offset = if ($hasBom) { 3 } else { 0 }
+    $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    $content = $utf8.GetString($bytes, $offset, $bytes.Length - $offset)
+    if ($content.Contains([char]0)) { throw 'Config contains NUL bytes; nothing changed.' }
   }
-  $out = New-Object System.Collections.Generic.List[string]
+  $newline = if ($content.Contains(([string][char]13 + [char]10))) { ([string][char]13 + [char]10) } else { ([string][char]10) }
   $seen = @{}
-  $changed = 0
-  foreach ($line in $lines) {
-    $key = ($line.Trim() -split '\s+', 2)[0]
-    if ($key -and $Settings.Contains($key)) {
-      if (-not $seen.ContainsKey($key)) {
-        $new = $key + ' "' + $Settings[$key] + '"'
-        if ($new -ne $line.Trim()) { $changed++ }
-        $out.Add($new)
-        $seen[$key] = $true
-      }
-    } else {
-      $out.Add($line)
-    }
-  }
+  $changed = [int[]]@(0)
+  $pattern = '(?m)^([ \t]*)([a-zA-Z0-9_.]+)([ \t]+)("[^"\r\n]*"|[^\s\r\n]+)([^\r\n]*)'
+  $content = [regex]::Replace($content, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{
+    param($m)
+    $key = $m.Groups[2].Value
+    if (-not $Settings.Contains($key)) { return $m.Value }
+    $seen[$key] = $true
+    $newValue = '"' + $Settings[$key] + '"'
+    if ($m.Groups[4].Value -ne $newValue) { $changed[0]++ }
+    return $m.Groups[1].Value + $key + $m.Groups[3].Value + $newValue + $m.Groups[5].Value
+  })
   foreach ($key in $Settings.Keys) {
     if (-not $seen.ContainsKey($key)) {
-      $out.Add($key + ' "' + $Settings[$key] + '"')
-      $changed++
+      if ($content.Length -gt 0 -and -not $content.EndsWith(([string][char]10)) -and -not $content.EndsWith(([string][char]13))) { $content += $newline }
+      $content += $key + ' "' + $Settings[$key] + '"' + $newline
+      $changed[0]++
     }
   }
-  [System.IO.File]::WriteAllLines($cfg, $out)
+  $encoding = New-Object System.Text.UTF8Encoding($hasBom, $true)
+  [System.IO.File]::WriteAllText($cfg, $content, $encoding)
   Write-Host ('  File: ' + $cfg)
-  Write-Host ('  Settings in preset: ' + $Settings.Count + ', changed: ' + $changed) -ForegroundColor Green
+  Write-Host ('  Settings in preset: ' + $Settings.Count + ', changed: ' + $changed[0]) -ForegroundColor Green
   Write-Host '  Done. Start Rust - the new settings are loaded on launch.' -ForegroundColor Green
 }
 

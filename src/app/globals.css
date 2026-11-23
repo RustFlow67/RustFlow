@@ -879,7 +879,7 @@ html[data-rfx-paused] :is([data-dock-glyph], [data-dock-glyph] [data-part]) { an
     margin: 0 auto; padding: var(--dock-padding); --glass-tint: var(--bar-tint);
     box-shadow: var(--glass-lift), inset 0 8px 12px -10px var(--theme-glow);
   }
-  .dock-items { position: relative; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: var(--dock-gap); }
+  .dock-items { position: relative; display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: var(--dock-gap); }
   .dock-tab-face { display: flex; flex-direction: column; align-items: center; gap: inherit; transition: transform 230ms var(--ios-open); }
   .dock-tab-face { pointer-events: none; }
   .dock-glyph-wrap { display: grid; place-items: center; transform: translateY(var(--lift, 0px)) scale(var(--mag, 1)); transition: transform 130ms var(--ease-out); }

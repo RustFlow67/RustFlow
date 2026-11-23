@@ -189,3 +189,8 @@
 :global(:root[data-material]) .primary { background:var(--lg-coat),var(--theme-accent-gradient); color:var(--on-accent); }
 .compactRadar,.openRadar {margin-top:16px;}
 .compactRadar,.openRadar,.radarCanvas { background:transparent!important; border:none!important; box-shadow:none!important; -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
+
+/* Inner controls inherit the panel's glass instead of blurring it a second time. */
+:global(:root[data-material]) .panel :is(.inset,.input,.emblem,.action,.chart) {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}

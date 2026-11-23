@@ -1,10 +1,11 @@
 import { Cpu, PanelsTopLeft, Settings, ShieldAlert } from "lucide-react";
 
-export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield" | "chip" | "window";
+export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield" | "chip" | "window" | "windows";
 
 /** Move the page, needle, or knob itself instead of rotating the whole glyph. */
 export default function DockIcon({ glyph }: { glyph: DockGlyph }) {
   const attrs = { "data-dock-glyph": glyph, "aria-hidden": true } as const;
+  if (glyph === "windows") return <svg {...attrs} viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" /></svg>;
   if (glyph === "chip") return <Cpu {...attrs} data-part="chip" />;
   if (glyph === "window") return <PanelsTopLeft {...attrs} data-part="window" />;
   if (glyph === "gear") return <Settings {...attrs} />;

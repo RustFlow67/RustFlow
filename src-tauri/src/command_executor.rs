@@ -169,51 +169,74 @@ pub fn parse_cfg_entries(raw: &str) -> Result<Vec<CfgKeyValue>, String> {
     Ok(entries)
 }
 
-/// Безопасно обновляет заданные параметры внутри существующего `client.cfg`,
-/// не удаляя остальные пользовательские настройки и привязки клавиш.
+/// Allow only the graphics keys emitted by the frontend. A graphics preset
+/// cannot modify FOV, binds, audio, HUD, network, GC or FPS limits.
+pub fn is_graphics_cfg_key(key: &str) -> bool {
+    matches!(key.to_ascii_lowercase().as_str(),
+        "graphics.drawdistance" | "graphics.shaderlod" | "graphics.shadowquality" | "graphics.shadowmode" |
+        "graphics.shadowcascades" | "graphics.shadowdistance" | "graphics.shadowlights" | "graphics.grassshadows" |
+        "graphics.contactshadows" | "graphics.af" | "graphics.parallax" | "graphics.branding" |
+        "graphics.reflexmode" | "graphics.vsync" | "graphics.renderscale" | "water.quality" | "water.reflections" |
+        "grass.quality" | "grass.displace" | "tree.quality" | "tree.meshes" | "terrain.quality" |
+        "mesh.quality" | "decor.quality" | "particle.quality" | "effects.maxgibs" | "effects.ao" |
+        "effects.bloom" | "effects.motionblur" | "effects.antialiasing")
+}
+
+/// Keep every unrelated byte, comment and line ending. Update duplicate
+/// target keys in place, rather than deleting or reordering any lines.
 pub fn merge_cfg_content(existing: &str, updates: &[CfgKeyValue]) -> (String, usize) {
-    let mut map: BTreeMap<String, String> = BTreeMap::new();
+    let mut map = BTreeMap::new();
     for item in updates {
-        let k = item.key.trim();
-        if !is_valid_cfg_key(k) {
-            continue;
-        }
-        let v = item.value.replace(['"', '\r', '\n', '\0'], "");
-        map.insert(k.to_string(), v);
+        let key = item.key.trim().to_ascii_lowercase();
+        if !is_graphics_cfg_key(&key) || !item.value.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.+-".contains(&b)) { continue; }
+        map.insert(key, item.value.clone());
     }
-
-    let mut out_lines: Vec<String> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-    let mut changed = 0usize;
-
-    for line in existing.lines() {
-        let key = line.split_whitespace().next().unwrap_or("");
-        if let Some(new_val) = map.get(key) {
-            if seen.insert(key.to_string()) {
-                let formatted = format!("{key} \"{new_val}\"");
-                if formatted != line.trim() {
-                    changed += 1;
+    let mut out = String::new();
+    let mut seen = HashSet::new();
+    let mut changed = 0;
+    let bytes = existing.as_bytes();
+    let mut pos = 0;
+    while pos < bytes.len() {
+        let start = pos;
+        while pos < bytes.len() && bytes[pos] != b'\r' && bytes[pos] != b'\n' { pos += 1; }
+        let end = pos;
+        if pos < bytes.len() && bytes[pos] == b'\r' { pos += 1; }
+        if pos < bytes.len() && bytes[pos] == b'\n' { pos += 1; }
+        let line = &existing[start..end];
+        let b = line.as_bytes();
+        let mut i = if line.starts_with('\u{feff}') { 3 } else { 0 };
+        while i < b.len() && (b[i] == b' ' || b[i] == b'\t') { i += 1; }
+        let key_start = i;
+        while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'.' || b[i] == b'_') { i += 1; }
+        let key = line[key_start..i].to_ascii_lowercase();
+        if let Some(value) = map.get(&key) {
+            let key_end = i;
+            while i < b.len() && (b[i] == b' ' || b[i] == b'\t') { i += 1; }
+            if i > key_end && i < b.len() {
+                let value_start = i;
+                if b[i] == b'"' {
+                    i += 1;
+                    while i < b.len() && b[i] != b'"' { i += 1; }
+                    if i < b.len() { i += 1; } else { out.push_str(&existing[start..pos]); continue; }
+                } else {
+                    while i < b.len() && b[i] != b' ' && b[i] != b'\t' { i += 1; }
                 }
-                out_lines.push(formatted);
+                let replacement = format!("\"{value}\"");
+                if line[value_start..i] != replacement { changed += 1; }
+                out.push_str(&line[..value_start]); out.push_str(&replacement); out.push_str(&line[i..]);
+                out.push_str(&existing[end..pos]); seen.insert(key); continue;
             }
-        } else {
-            out_lines.push(line.to_string());
         }
+        out.push_str(&existing[start..pos]);
     }
-
-    for (key, val) in &map {
+    let newline = if existing.contains("\r\n") { "\r\n" } else if existing.contains('\r') && !existing.contains('\n') { "\r" } else { "\n" };
+    for (key, value) in &map {
         if !seen.contains(key) {
-            out_lines.push(format!("{key} \"{val}\""));
-            changed += 1;
+            if !out.is_empty() && !out.ends_with('\n') && !out.ends_with('\r') { out.push_str(newline); }
+            out.push_str(&format!("{key} \"{value}\"{newline}")); changed += 1;
         }
     }
-
-    let body = if out_lines.is_empty() {
-        String::new()
-    } else {
-        format!("{}\r\n", out_lines.join("\r\n"))
-    };
-    (body, changed)
+    (out, changed)
 }
 
 /// Команда безопасного обновления параметров в `client.cfg` или `keys.cfg`.
@@ -239,7 +262,7 @@ impl ClientCfgCommand {
     ) -> Result<Self, String> {
         let valid: Vec<CfgKeyValue> = entries
             .into_iter()
-            .filter(|e| is_valid_cfg_key(e.key.trim()))
+            .filter(|e| match target { CfgTarget::Client => is_graphics_cfg_key(e.key.trim()), CfgTarget::Keys => false })
             .collect();
         if valid.is_empty() {
             return Err("Список корректных параметров конфигурации пуст.".into());
@@ -328,6 +351,12 @@ impl TweakCommand for ClientCfgCommand {
             String::new()
         };
 
+        // Keep a readily accessible first backup beside the config as well as
+        // the per-operation snapshot managed above. Never overwrite an old .bak.
+        if target_path.is_file() {
+            let bak = target_path.with_file_name("client.cfg.bak");
+            if !bak.exists() { fs::copy(&target_path, &bak).map_err(|e| format!("Не удалось создать client.cfg.bak: {e}"))?; }
+        }
         let (merged, changed_count) = merge_cfg_content(&existing, &self.entries);
         write_atomic_bytes(&target_path, merged.as_bytes())?;
         self.backup_manager
@@ -1674,20 +1703,33 @@ mod tests {
         let original = "graphics.quality \"3\"\r\ngc.buffer \"256\"\r\ninput.sensitivity \"0.5\"\r\n";
         let updates = vec![
             CfgKeyValue {
-                key: "gc.buffer".into(),
-                value: "2048".into(),
+                key: "graphics.drawdistance".into(),
+                value: "1200".into(),
             },
             CfgKeyValue {
-                key: "lerp.smoothing".into(),
-                value: "0.2".into(),
+                key: "water.quality".into(),
+                value: "0".into(),
             },
         ];
         let (merged, changed) = merge_cfg_content(original, &updates);
         assert_eq!(changed, 2);
         assert!(merged.contains("graphics.quality \"3\""));
-        assert!(merged.contains("gc.buffer \"2048\""));
+        assert!(merged.contains("gc.buffer \"256\""));
         assert!(merged.contains("input.sensitivity \"0.5\""));
-        assert!(merged.contains("lerp.smoothing \"0.2\""));
+        assert!(merged.contains("water.quality \"0\""));
+    }
+
+    #[test]
+    fn graphics_merge_never_alters_protected_lines() {
+        let original = "\u{feff}// note\r\nbind q forward;sprint\r\ngraphics.fov \"90\"\r\naudio.master \"0.5\"\r\nlerp.smoothing \"0.2\"\r\ngraphics.drawdistance \"2500\" // keep\r\n";
+        let updates = vec![
+            CfgKeyValue { key: "graphics.fov".into(), value: "60".into() },
+            CfgKeyValue { key: "graphics.drawdistance".into(), value: "1200".into() },
+            CfgKeyValue { key: "gc.buffer".into(), value: "4096".into() },
+        ];
+        let (merged, changed) = merge_cfg_content(original, &updates);
+        assert_eq!(changed, 1);
+        assert_eq!(merged, original.replace("graphics.drawdistance \"2500\"", "graphics.drawdistance \"1200\""));
     }
 
     #[test]
@@ -1703,8 +1745,8 @@ mod tests {
         let cmd = ClientCfgCommand::with_explicit_path(
             cfg_path.clone(),
             vec![CfgKeyValue {
-                key: "gc.buffer".into(),
-                value: "4096".into(),
+                key: "graphics.drawdistance".into(),
+                value: "1200".into(),
             }],
             backup_id.clone(),
             Arc::clone(&mgr),
@@ -1714,7 +1756,7 @@ mod tests {
         let applied = cmd.apply().unwrap();
         assert_eq!(applied.changed_count, 1);
         let after = fs::read_to_string(&cfg_path).unwrap();
-        assert!(after.contains("gc.buffer \"4096\""));
+        assert!(after.contains("graphics.drawdistance \"1200\""));
         assert!(after.contains("custom.bind \"x\""));
 
         cmd.rollback().unwrap();

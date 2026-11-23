@@ -17,6 +17,7 @@ import { Button, Input } from "../ui";
 import { useToast } from "../ui/Toast";
 import LiquidSelect from "../LiquidSelect";
 import ProfileBuilds from "./ProfileBuilds";
+import FavoritesSync from "./FavoritesSync";
 
 export function Avatar({ user, identity, large }: { user: PlayerAccount; identity: Identity; large?: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -106,6 +107,7 @@ export default function PlayerCabinet({ user, cabinet, active, open, close, bind
       <p>В аккаунте: {user.build?.name ?? "Ещё не привязана"}</p>
       {active && (!live || live.id === active.id) && <Button size="sm" loading={binding} disabled={busy} onClick={() => void bind()}><Link2 /> {user.build ? "Обновить из браузера" : "Привязать локальную сборку"}</Button>}
       {active && user.build && <Link className="link" href="/benchmark?account=1#build-config" onNavigate={close}>Открыть привязанную версию</Link>}
+      {user.kind === "cloud" && <FavoritesSync accountId={user.id} />}
       <ProfileBuilds open={open} onNavigate={close} />
       <button type="button" className="cabinet-backup" aria-haspopup="dialog" onClick={e => backup(e.currentTarget)}><Archive size={15} /> Резервная копия браузера <ArrowUpRight size={15} /></button>
       </div></details>

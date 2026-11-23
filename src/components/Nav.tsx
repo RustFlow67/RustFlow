@@ -22,6 +22,7 @@ const DOCK_ITEMS: { href: DockPath; label: string; glyph: DockGlyph }[] = [
   { href: "/presets", label: "Пресеты", glyph: "gear" },
   { href: "/tweaker", label: "Твикер", glyph: "sliders" },
   { href: "/drivers", label: "Драйверы", glyph: "chip" },
+  { href: "/knowledge", label: "Знания", glyph: "windows" },
 ];
 
 function isActive(pathname: string, href: string) {

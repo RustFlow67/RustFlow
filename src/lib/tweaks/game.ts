@@ -1,110 +1,18 @@
+import { graphicsCommands } from "../graphics-profiles";
 import { OS_ALL, STEP } from "./common";
 import { cfgInstaller, cfgInstallerDynamic, cfgRestore, consoleList } from "./helpers";
 import type { Tweak, TweakFile } from "./types";
 
-/* Convars below are the same keys the game itself writes to cfg\client.cfg. */
-
-const COMPETITIVE: Record<string, string> = {
-  "fps.limit": "0",
-  "graphics.vsync": "0",
-  "graphics.shadowmode": "1",
-  "graphics.shadowquality": "0",
-  "graphics.shadowcascades": "1",
-  "graphics.shadowdistance": "50",
-  "graphics.shadowlights": "0",
-  "graphics.drawdistance": "1500",
-  "graphics.lodbias": "1",
-  "graphics.shaderlod": "100",
-  "graphics.af": "1",
-  "graphics.parallax": "0",
-  "graphics.dof": "False",
-  "graphics.contactshadows": "False",
-  "graphics.grassshadows": "False",
-  "graphics.impostorshadows": "False",
-  "grass.displacement": "False",
-  "grass.quality": "0",
-  "tree.quality": "0",
-  "tree.meshes": "50",
-  "terrain.quality": "0",
-  "water.quality": "0",
-  "water.reflections": "0",
-  "effects.antialiasing": "0",
-  "effects.ao": "False",
-  "effects.bloom": "False",
-  "effects.lensdirt": "False",
-  "effects.motionblur": "False",
-  "effects.shafts": "False",
-  "effects.sharpen": "True",
-  "effects.vignet": "False",
-  "effects.maxgibs": "0",
+// One source of truth for exported configs and script installers. GC is
+// installed separately because these generic scripts do not know the PC RAM.
+const asStrings = (id: "competitive" | "balanced" | "quality") => {
+  const { "gc.buffer": _gc, "fps.limit": _fps, ...commands } = graphicsCommands(id, 16);
+  void _gc; void _fps;
+  return Object.fromEntries(Object.entries(commands).map(([key, value]) => [key, String(value)]));
 };
-
-const BALANCED: Record<string, string> = {
-  "fps.limit": "0",
-  "graphics.vsync": "0",
-  "graphics.shadowmode": "2",
-  "graphics.shadowquality": "1",
-  "graphics.shadowcascades": "1",
-  "graphics.shadowdistance": "150",
-  "graphics.shadowlights": "1",
-  "graphics.drawdistance": "2000",
-  "graphics.lodbias": "2",
-  "graphics.shaderlod": "300",
-  "graphics.af": "4",
-  "graphics.parallax": "0",
-  "graphics.dof": "False",
-  "graphics.contactshadows": "False",
-  "graphics.grassshadows": "False",
-  "graphics.impostorshadows": "False",
-  "grass.displacement": "False",
-  "grass.quality": "50",
-  "tree.quality": "100",
-  "tree.meshes": "100",
-  "terrain.quality": "50",
-  "water.quality": "1",
-  "water.reflections": "0",
-  "effects.antialiasing": "3",
-  "effects.ao": "False",
-  "effects.bloom": "False",
-  "effects.lensdirt": "False",
-  "effects.motionblur": "False",
-  "effects.shafts": "False",
-  "effects.sharpen": "True",
-  "effects.vignet": "False",
-  "effects.maxgibs": "0",
-};
-
-const QUALITY: Record<string, string> = {
-  "fps.limit": "0",
-  "graphics.vsync": "0",
-  "graphics.shadowmode": "2",
-  "graphics.shadowquality": "2",
-  "graphics.shadowdistance": "400",
-  "graphics.shadowlights": "3",
-  "graphics.drawdistance": "2500",
-  "graphics.lodbias": "3",
-  "graphics.shaderlod": "600",
-  "graphics.af": "16",
-  "graphics.parallax": "2",
-  "graphics.dof": "False",
-  "graphics.contactshadows": "True",
-  "graphics.grassshadows": "True",
-  "grass.displacement": "True",
-  "grass.quality": "100",
-  "tree.quality": "200",
-  "tree.meshes": "100",
-  "terrain.quality": "100",
-  "water.quality": "2",
-  "water.reflections": "2",
-  "effects.antialiasing": "3",
-  "effects.ao": "True",
-  "effects.bloom": "True",
-  "effects.lensdirt": "False",
-  "effects.motionblur": "False",
-  "effects.shafts": "True",
-  "effects.sharpen": "True",
-  "effects.vignet": "False",
-};
+const COMPETITIVE = asStrings("competitive");
+const BALANCED = asStrings("balanced");
+const QUALITY = asStrings("quality");
 
 const RESTORE_FILE: TweakFile = {
   name: "rustflow-restore-client-cfg.bat",
@@ -128,7 +36,7 @@ const MANUAL_NOTE =
 const GC_CODE = String.raw`$ramGb = 16
 try { $ramGb = [int][math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1GB) } catch { }
 if ($env:RUSTFLOW_RAM_GB) { $ramGb = [int]$env:RUSTFLOW_RAM_GB }
-if ($ramGb -ge 30) { $buf = '4096' } elseif ($ramGb -ge 15) { $buf = '2048' } elseif ($ramGb -ge 11) { $buf = '1024' } else { $buf = '256' }
+if ($ramGb -ge 30) { $buf = '4096' } elseif ($ramGb -ge 15) { $buf = '2048' } else { $buf = '1024' }
 Write-Host ('  Detected RAM: ' + $ramGb + ' GB, gc.buffer will be set to ' + $buf)
 $Settings = [ordered]@{ 'gc.buffer' = $buf }`;
 
@@ -312,8 +220,8 @@ export const GAME_TWEAKS: Tweak[] = [
     time: "1 мин",
     os: OS_ALL,
     featured: true,
-    what: `Установщик записывает ${Object.keys(COMPETITIVE).length} настроек графики в файл cfg\\client.cfg: минимальные тени, вода и трава, отключённые постэффекты, дальность прорисовки 1500 и отключённые обломки (maxgibs 0). Остальные строки файла не меняются.`,
-    why: "Настройки графики — самый сильный рычаг в Rust: именно здесь выигрываются десятки кадров, а не в реестре. Пресет рассчитан на слабые и средние ПК и на тех, кому важнее всего видимость противника. Картинка станет проще, зато кадры — выше и стабильнее, особенно в рейдах.",
+    what: `Установщик записывает ${Object.keys(COMPETITIVE).length} настроек графики в файл cfg\\client.cfg: минимальные тени, вода и трава, отключённые постэффекты, дальность прорисовки 1200 и отключённые обломки (maxgibs 0). Остальные строки файла не меняются.`,
+    why: "Низкие настройки могут уменьшить нагрузку на GPU, но результат зависит от исходных настроек, сервера и процессора. Сравните FPS и 1% low в одинаковой сцене и верните резервную копию, если результат ухудшился.",
     steps: [...STEP.cfg, "Запустите Rust и проверьте настройки в меню «Графика»."],
     check: "В игре: F1 → введите graphics.shadowdistance — консоль покажет значение 50.",
     revertSteps: PRESET_REVERT,
@@ -339,10 +247,10 @@ export const GAME_TWEAKS: Tweak[] = [
     restart: "game",
     time: "1 мин",
     os: OS_ALL,
-    what: `Установщик записывает ${Object.keys(BALANCED).length} настроек в cfg\\client.cfg: средние тени и растительность, сглаживание TSSAA, дальность 2000, отключены самые дорогие постэффекты (AO, bloom, лучи, размытие в движении).`,
+    what: `Установщик записывает ${Object.keys(BALANCED).length} настроек в cfg\\client.cfg: средние тени и растительность, сглаживание TSSAA, дальность 1600, отключены самые дорогие постэффекты (AO, bloom, лучи, размытие в движении).`,
     why: "Для средних и хороших ПК. Отключены эффекты, которые стоят много кадров и мешают видеть противника, но мир остаётся объёмным и приятным. Хорошая отправная точка: дальше можно поднимать отдельные настройки и смотреть на счётчик FPS.",
     steps: [...STEP.cfg, "Запустите Rust и проверьте настройки в меню «Графика»."],
-    check: "В игре: F1 → введите graphics.drawdistance — консоль покажет значение 2000.",
+    check: "В игре: F1 → введите graphics.drawdistance — консоль покажет значение 1600.",
     revertSteps: PRESET_REVERT,
     warnings: PRESET_WARNINGS,
     file: {
@@ -369,7 +277,7 @@ export const GAME_TWEAKS: Tweak[] = [
     what: `Установщик записывает ${Object.keys(QUALITY).length} настроек в cfg\\client.cfg: высокие тени, вода с отражениями, максимальная растительность, AO, bloom и объёмные лучи. Отключены только размытие в движении, виньетка и «грязь» на линзе.`,
     why: "Этот пресет не про прирост FPS — он про красивую картинку без откровенно лишнего. Подходит, если по оценке ПК у вас большой запас по видеокарте. Мусорные эффекты, которые ухудшают видимость и ничего не дают картинке, всё равно отключены.",
     steps: [...STEP.cfg, "Запустите Rust и проверьте настройки в меню «Графика»."],
-    check: "В игре: F1 → введите graphics.drawdistance — консоль покажет значение 2500.",
+    check: "В игре: F1 → введите graphics.drawdistance — консоль покажет значение 2200.",
     revertSteps: PRESET_REVERT,
     warnings: PRESET_WARNINGS,
     file: {

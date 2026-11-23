@@ -405,10 +405,10 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
             <AdaptiveActions action={{kind:"cfg",cfg}}>
             <a
               className="btn btn-primary mt-3"
-              download="client.cfg"
+              download="rustflow-graphics-fragment.cfg"
               href={`data:text/plain;charset=utf-8,${encodeURIComponent(cfg + "\n")}`}
             >
-              Скачать client.cfg
+              Скачать фрагмент настроек
             </a>
             </AdaptiveActions>
           </>

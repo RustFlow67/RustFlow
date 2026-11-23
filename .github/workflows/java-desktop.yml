@@ -1,0 +1,24 @@
+name: Java desktop
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Build JavaFX application
+        working-directory: desktop-java
+        run: mvn --batch-mode clean package
+      - name: Test config protection and backup
+        working-directory: desktop-java
+        shell: pwsh
+        run: java -cp "target/classes;target/test-classes" app.rustflow.ConfigEditorSelfTest

@@ -7,13 +7,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { accounts, accountSessions } from "@/db/schema";
 import { adminOrigin, isAdminSession } from "@/lib/admin-session";
+import { steamOrigin } from "./steam-config";
 import { googleSettings } from "./google-config";
 import type { PlayerAccount, SessionView } from "./types";
 
 export const NO_STORE = { "Cache-Control": "private, no-store" };
 const LIFETIME = 14 * 24 * 60 * 60;
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
-const BODY_MAX = 4096;
+const BODY_MAX = 16384;
 
 export class AuthError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
@@ -95,7 +96,7 @@ export async function accountFor(request: NextRequest, origin: URL | null) {
 
 export async function sessionView(user: PlayerAccount | null, origin: URL | null): Promise<SessionView> {
   const passwordEnabled = Boolean(origin && process.env.DATABASE_URL?.trim());
-  return { user:user ? {...user,build:readSavedBuild(user.build)} : null, admin: await isAdminSession(), passwordEnabled, googleEnabled: passwordEnabled && Boolean(googleSettings(origin)), secureOrigin: Boolean(origin) };
+  return { user:user ? {...user,build:readSavedBuild(user.build)} : null, admin: await isAdminSession(), passwordEnabled, googleEnabled: passwordEnabled && Boolean(googleSettings(origin)), steamEnabled: Boolean(steamOrigin(origin)), secureOrigin: Boolean(origin) };
 }
 
 export function putCookie(response: NextResponse, name: string, value: string, origin: URL, maxAge: number, partitioned = false) {

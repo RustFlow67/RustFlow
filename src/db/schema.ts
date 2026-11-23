@@ -42,7 +42,9 @@ export const accounts = pgTable("rf_accounts", {
   passwordHash: varchar("password_hash", { length: 160 }),
   avatarUrl: varchar("avatar_url", { length: 512 }),
   googleSub: varchar("google_sub", { length: 255 }).unique(),
+  steamSub: varchar("steam_sub", { length: 20 }).unique(),
   activeBuild: jsonb("active_build").$type<BuildInput>(),
+  favorites: jsonb("favorites").$type<{ tweak: string[]; preset: string[] }>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

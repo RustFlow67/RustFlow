@@ -66,11 +66,11 @@ export default function PlayerProfile() {
     // OAuth returns to the same site's dialog without leaving an error/status in its URL.
     const frame = requestAnimationFrame(() => {
       const hash = window.location.hash;
-      if (hash !== "#profile=google-ok" && hash !== "#profile=google-error") return;
+      if (!/^#profile=(google|steam)-(ok|error)$/.test(hash)) return;
       window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
       present(true, trigger.current);
       if (hash.endsWith("ok")) { signOutLocal(); refresh(); }
-      if (hash.endsWith("error")) setError("Не удалось войти через Google. Попробуйте ещё раз или войдите с паролем.");
+      if (hash.endsWith("error")) setError("Не удалось войти через выбранный сервис. Попробуйте ещё раз или войдите с паролем.");
     });
     return () => cancelAnimationFrame(frame);
   }, [present, refresh]);
@@ -153,6 +153,12 @@ export default function PlayerProfile() {
         <div className="profile-or" aria-hidden="true">или</div>
         <button type="button" className="btn btn-sm google-button" disabled={Boolean(busy) || !session} onClick={google} aria-describedby="rf-google-mode"><GoogleIcon /> Продолжить через Google{session && !session.googleEnabled && <small>Демо</small>}</button>
         <p className="profile-auth-note" id="rf-google-mode">{session?.googleEnabled ? "Безопасный переход к выбору аккаунта Google." : "Демо-вход на этом устройстве: без проверки Google и без облачной синхронизации."}</p>
+        <button type="button" className="btn btn-sm google-button" disabled={Boolean(busy) || !session?.steamEnabled} onClick={() => {
+          const url = new URL(apiUrl("auth/steam"), window.location.href);
+          if (url.origin !== location.origin) { setError("Для Steam нужен API на том же домене."); return; }
+          if (self !== top) window.open(url.href, "_blank", "noopener,noreferrer"); else window.location.assign(url.href);
+        }}>Продолжить через Steam</button>
+        {!session?.steamEnabled && <p className="profile-auth-note">Steam доступен после настройки сервера.</p>}
         <p className="mt-3 text-center text-xs text-ink-3">{session?.passwordEnabled ? "Гостевая сборка останется в браузере после входа." : "Новый логин создаёт локальный профиль. При следующем входе понадобится тот же пароль."}</p>
       </>}
       {error && <p role="alert" className="mt-3 text-sm leading-relaxed text-danger">{error}</p>}
