@@ -38,8 +38,7 @@
     ],
     "windows": {
       "webviewInstallMode": {
-        "type": "fixedRuntime",
-        "path": "./webview-fixed-runtime/"
+        "type": "downloadBootstrapper"
       },
       "nsis": {
         "installerIcon": "icons/icon.ico",

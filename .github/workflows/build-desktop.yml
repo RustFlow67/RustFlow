@@ -26,26 +26,6 @@ jobs:
         run: npm ci
       - name: Export desktop frontend
         run: npm run build:desktop
-      # Bundle Microsoft's signed WebView2 Fixed Version Runtime so the app
-      # runs on custom gaming Windows builds without a preinstalled Edge.
-      # ~130-180 MB of official Microsoft binaries, fetched from Microsoft.
-      - name: Download WebView2 Fixed Version Runtime (x64)
-        shell: pwsh
-        run: |
-          $cab = "webview2-fixed.cab"
-          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2150126" -OutFile $cab
-          $extract = "webview2-extract"
-          New-Item -ItemType Directory -Force -Path $extract | Out-Null
-          & "$env:SystemRoot\System32\expand.exe" -F:* $cab "$extract\"
-          $runtime = Get-ChildItem -Path $extract -Directory | Select-Object -First 1
-          if (-not $runtime) { throw "WebView2 runtime folder not found after expand" }
-          $dest = "src-tauri/webview-fixed-runtime"
-          if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
-          Move-Item -Path $runtime.FullName -Destination $dest
-          Remove-Item -Recurse -Force $extract, $cab
-          $exe = Get-ChildItem -Path $dest -Recurse -Filter "msedgewebview2.exe" | Select-Object -First 1
-          if (-not $exe) { throw "msedgewebview2.exe missing in $dest" }
-          Write-Host "WebView2 fixed runtime ready: $($exe.FullName)"
       - name: Test native code
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Build NSIS installer
