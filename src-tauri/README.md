@@ -22,7 +22,9 @@ On a push to `main`, or via Actions → Build Windows installer → Run workflow
 GitHub Actions builds an x64 NSIS installer on Windows and uploads the
 `RustFlow-Windows-x64-setup` artifact for 30 days. Download and extract the
 artifact ZIP to obtain the setup EXE. It is not code-signed; Windows may display
-SmartScreen warnings. WebView2 may require a network connection during setup.
+SmartScreen warnings. The installer uses the Evergreen WebView2 Runtime if
+already installed; otherwise it downloads the Microsoft bootstrapper during
+setup, which requires a network connection. The runtime is not bundled.
 The workflow definition must first exist on the repository's default branch.
 
 In desktop mode, saving the tweak package creates a new subfolder under the

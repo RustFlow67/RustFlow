@@ -22,3 +22,10 @@ jobs:
         working-directory: desktop-java
         shell: pwsh
         run: java -cp "target/classes;target/test-classes" app.rustflow.ConfigEditorSelfTest
+      - name: Upload Java desktop JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: RustFlow-Java-desktop-jar
+          path: desktop-java/target/rustflow-desktop-*.jar
+          if-no-files-found: error
+          retention-days: 30

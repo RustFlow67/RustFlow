@@ -8,7 +8,13 @@ mvn clean package
 mvn javafx:run
 ```
 
-JAR в `target/` **не включает** JavaFX; для запуска вручную потребуются JavaFX SDK и `--module-path <javafx-sdk>/lib --add-modules javafx.controls`. Для распространения используйте `jpackage` с полноценным JDK и JavaFX SDK на Windows; например после установки SDK:
+Workflow «Java desktop» собирает JAR на Windows и публикует артефакт `RustFlow-Java-desktop-jar` на 30 дней. Этот JAR и JAR в `target/` **не включают** JavaFX или JRE. Для запуска на Windows установите Java 17+ и JavaFX SDK, задайте `PATH_TO_FX` как путь к папке `lib` SDK и выполните из `desktop-java`:
+
+```powershell
+java --module-path "$env:PATH_TO_FX" --add-modules javafx.controls -cp target/rustflow-desktop-0.1.0.jar app.rustflow.RustFlowApp
+```
+
+Для скачанного артефакта укажите фактический путь к JAR. Для распространения используйте `jpackage` с полноценным JDK и JavaFX SDK на Windows; например после установки SDK:
 
 ```powershell
 jpackage --type exe --name RustFlow --input target --main-jar rustflow-desktop-0.1.0.jar --main-class app.rustflow.RustFlowApp --module-path "$env:PATH_TO_FX" --add-modules javafx.controls
