@@ -1,3 +1,4 @@
+import { graphicsCommands, profileCfg, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import { getCpu, getGpu } from "@/lib/hardware";
 import { evaluateBuild10 } from "./build";
 import { type UserOwnedRecord } from "./common";
@@ -97,39 +98,8 @@ function makeCfg(s: {
   gc: number;
   reflex: number;
 }): string {
-  return [
-    `fps.limit "0"`,
-    `graphics.vsync "0"`,
-    `graphics.screenmode "0"`,
-    `graphics.drawdistance "${s.draw}"`,
-    `graphics.shadowmode "${s.shadowMode}"`,
-    `graphics.shadowquality "${s.shadowQuality}"`,
-    `graphics.shadowcascades "${s.cascades}"`,
-    `graphics.shadowdistance "${s.shadowDist}"`,
-    `graphics.shadowlights "0"`,
-    `graphics.shaderlod "${s.shader}"`,
-    `graphics.lodbias "${s.lodbias}"`,
-    `graphics.af "${s.af}"`,
-    `graphics.dof "False"`,
-    `graphics.contactshadows "False"`,
-    `graphics.grassshadows "False"`,
-    `graphics.reflexmode "${s.reflex}"`,
-    `water.quality "${s.water}"`,
-    `water.reflections "${s.refl}"`,
-    `tree.quality "${s.tree}"`,
-    `tree.meshes "${s.meshes}"`,
-    `grass.quality "${s.grass}"`,
-    `grass.displacement "False"`,
-    `effects.antialiasing "${s.aa}"`,
-    `effects.ao "False"`,
-    `effects.bloom "False"`,
-    `effects.motionblur "False"`,
-    `effects.shafts "False"`,
-    `effects.vignet "False"`,
-    `effects.sharpen "True"`,
-    `effects.maxgibs "0"`,
-    `gc.buffer "${s.gc}"`,
-  ].join("\n");
+  const mode: GraphicsProfileId = s.shader >= 600 ? "realistic" : s.shader >= 350 ? "quality" : s.shader >= 225 ? "balanced" : "competitive";
+  return profileCfg(mode, s.gc >= 4096 ? 32 : 16);
 }
 
 type EstimateFields = Pick<HardwarePreset, "fpsSource" | "fpsModded" | "fpsOfficial" | "low1Modded" | "low1Official" | "frametimeModdedMs" | "frametimeOfficialMs" | "score10" | "testScene">;
@@ -641,7 +611,15 @@ export const HARDWARE_PRESETS: HardwarePreset[] = catalog.map((p) => {
     ramMhz: p.ramMhz, ramCl: p.ramCl, storage: p.storageId, nvmeGen: p.nvmeGen, resolution: "1080p" }, "competitive");
   if (!build) throw new Error(`Invalid preset hardware: ${p.slug}`);
   const { fpsModded: m, fpsOfficial: o } = build;
-  return { ...p, fpsSource: "estimate", fpsModded: [m.min, m.max], fpsOfficial: [o.min, o.max],
+  // Legacy catalog rows contain older command sets. Rebuild every downloadable
+  // config from the shared profile, including the reference presets.
+  const mode: GraphicsProfileId = p.settings.shaderLevel >= 600 ? "realistic" : p.settings.shaderLevel >= 350 ? "quality" : p.settings.shaderLevel >= 225 ? "balanced" : "competitive";
+  const c = graphicsCommands(mode, p.ramGb);
+  return { ...p, cfgText: profileCfg(mode, p.ramGb), settings: { ...p.settings, graphicsQuality: mode === "competitive" ? "Комбат" : mode === "balanced" ? "Баланс" : mode === "quality" ? "Качество" : "Реалистичность",
+    drawDistance: c["graphics.drawdistance"], shaderLevel: c["graphics.shaderlod"], waterQuality: c["water.quality"],
+    shadowQuality: c["graphics.shadowquality"], shadowCascades: String(c["graphics.shadowcascades"]),
+    treeQuality: c["tree.quality"], maxGibs: c["effects.maxgibs"], gcBuffer: c["gc.buffer"] },
+    fpsSource: "estimate", fpsModded: [m.min, m.max], fpsOfficial: [o.min, o.max],
     low1Modded: m.low1, low1Official: o.low1, frametimeModdedMs: frameMs(m), frametimeOfficialMs: frameMs(o),
     score10: build.score10, testScene: PRESET_SCENE };
 });

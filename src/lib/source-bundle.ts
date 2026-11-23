@@ -111,6 +111,8 @@ const ROOT_ALLOWLIST = [
   "docker-compose.yml",
   "docs/production-audit.md",
   "docs/addons.md",
+  "docs/deployment.md",
+  "docs/measurement-method.md",
 ] as const;
 
 const DIR_ALLOWLIST = ["src", "public"] as const;

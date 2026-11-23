@@ -1,0 +1,14 @@
+.root { -fx-font-family: "Segoe UI", "Arial"; -fx-base: #171a21; -fx-background-color: transparent; -fx-text-fill: #f7f4ef; }
+.shell { -fx-background-color: linear-gradient(to bottom right, rgba(33,38,46,.98), rgba(12,14,20,.99)); -fx-background-radius: 25; -fx-border-radius: 25; -fx-border-color: rgba(255,255,255,.18); -fx-border-width: 1; }
+.glass { -fx-background-color: linear-gradient(to bottom right, rgba(255,255,255,.12), rgba(255,255,255,.035)); -fx-background-radius: 19; -fx-border-radius: 19; -fx-border-color: rgba(255,255,255,.17); -fx-padding: 18; }
+.title { -fx-text-fill: #fff7e8; -fx-font-size: 28px; -fx-font-weight: bold; }
+.subtitle { -fx-text-fill: #c4c3c0; -fx-font-size: 13px; }
+.metric { -fx-text-fill: #ffbd79; -fx-font-size: 25px; -fx-font-weight: bold; }
+.label, .check-box { -fx-text-fill: #f3f1ee; }
+.button { -fx-background-color: rgba(255,255,255,.10); -fx-background-radius: 16; -fx-border-radius: 16; -fx-border-color: rgba(255,255,255,.19); -fx-text-fill: #fff6eb; -fx-padding: 9 15; -fx-cursor: hand; }
+.button:hover { -fx-background-color: rgba(255,169,93,.26); -fx-border-color: rgba(255,190,117,.6); }
+.primary { -fx-background-color: #e99859; -fx-text-fill: #1a100c; -fx-font-weight: bold; }
+.text-field, .text-area, .combo-box { -fx-background-color: rgba(15,17,22,.8); -fx-background-radius: 10; -fx-text-fill: white; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; }
+.progress-bar > .bar { -fx-background-color: #e99859; -fx-background-radius: 5; }
+.progress-bar > .track { -fx-background-color: rgba(255,255,255,.10); -fx-background-radius: 5; }

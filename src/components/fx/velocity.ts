@@ -18,7 +18,8 @@ export function pulseFlight(targets: readonly HTMLElement[], dx: number, dy: num
   const vertical = Math.abs(dy) >= Math.abs(dx);
   const sx = vertical ? 0.985 : 1.03;
   const sy = vertical ? 1.03 : 0.985;
-  const blurPeak = mag < 40 ? 4 : mag < 160 ? 6 : 8;
+  // Cap raster blur on full dialog surfaces to preserve readability and limit paint cost.
+  const blurPeak = mag < 40 ? 1 : mag < 160 ? 2 : 3;
   const running: Animation[] = [];
   for (const el of targets) {
     if (!el.isConnected || typeof el.animate !== "function") continue;

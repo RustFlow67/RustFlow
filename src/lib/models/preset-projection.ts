@@ -17,11 +17,12 @@ const PURPOSE: Record<GraphicsProfileId, string> = {
   balanced: "Универсальный баланс",
   quality: "Высокая детализация",
   realistic: "Детализация и съёмка",
+  potato: "Слабый ПК",
 };
 
 function anchorMode(preset: HardwarePreset): GraphicsProfileId {
   const shader = preset.settings.shaderLevel;
-  return shader >= 600 ? "realistic" : shader >= 350 ? "quality" : shader >= 225 ? "balanced" : "competitive";
+  return shader >= 600 ? "realistic" : shader >= 400 ? "quality" : shader >= 300 ? "balanced" : "competitive";
 }
 
 /** Every catalog estimate uses the same hardware model as the calculator. */
@@ -44,13 +45,13 @@ export function projectPreset(preset: HardwarePreset, mode: GraphicsProfileId | 
       ? after.notes[0] ?? preset.bottleneckNote : preset.bottleneckNote,
     fpsModded: [modded.min, modded.max], low1Modded: modded.low1, frametimeModdedMs: frameMs(modded),
     fpsOfficial: [official.min, official.max], low1Official: official.low1, frametimeOfficialMs: frameMs(official),
-    cfgText: profile ? profileCfg(profile.id, preset.ramGb, preset.cfgText) : preset.cfgText,
+    cfgText: profile ? profileCfg(profile.id, preset.ramGb) : preset.cfgText,
     settings: profile && commands ? {
       ...preset.settings, graphicsQuality: profile.short, drawDistance: profile.draw,
       shaderLevel: profile.shader, waterQuality: profile.water, shadowQuality: profile.shadows,
       shadowCascades: `${commands["graphics.shadowcascades"]}`, treeQuality: commands["tree.quality"],
       upscaler: profile.shadows > 0 ? "Нативное разрешение · TSSAA" : "Нативное разрешение · AA выкл.",
-      gcBuffer: commands["gc.buffer"],
+      maxGibs: commands["effects.maxgibs"], gcBuffer: commands["gc.buffer"],
     } : preset.settings,
   };
 }

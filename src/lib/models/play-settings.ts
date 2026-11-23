@@ -42,7 +42,7 @@ export const backgroundBudget = (s?: PlaySettings) => PLAY_OPTIONS.backgroundLoa
 export const gcForMemory = (gb: number) => gb >= 32 ? 4096 : gb >= 16 ? 2048 : 1024;
 export function gcBudget(ram: number, s?: PlaySettings) {
   const available = Math.max(1, ram - backgroundBudget(s).reserveGb);
-  const auto = gcForMemory(available);
+  const auto = gcForMemory(ram);
   const mb = s?.gcBuffer === "4096" ? 4096 : s?.gcBuffer === "2048" ? 2048 : auto;
   return { available, auto, mb };
 }

@@ -190,7 +190,7 @@
 /* HUD placement is a layout preference, independent from the player's finish. */
 .settings-body { display:grid; gap:14px; }.settings-body h3 { margin-bottom:7px; font-size:.9rem; }.settings-dock-options { width:100%;grid-template-columns:repeat(2,minmax(0,1fr)); }.settings-dock-options .segmented-item { white-space:normal; font-size:.76rem; line-height:1.35;min-height:44px; }
 :root[data-dock="left"] { --notice-bottom:max(16px,env(safe-area-inset-bottom)); }
-:root[data-dock="left"] { --side-tab:clamp(24px,calc((100dvh - 40px)/5),44px); --side-clear:calc(var(--capsule-size) + var(--dock-left) + 12px); }
+:root[data-dock="left"] { --side-tab:clamp(24px,calc((100dvh - 40px)/6),44px); --side-clear:calc(var(--capsule-size) + var(--dock-left) + 12px); }
 :root[data-dock="left"] body { padding-inline-start:var(--side-clear); }
 :root[data-dock="left"] .nav-capsules { left:var(--side-clear);width:min(892px,calc((100% - var(--side-clear) - var(--dock-right)) / var(--hud-scroll-zoom))); }
 :root[data-dock="left"] .tabbar-bottom { top:0;bottom:0;left:var(--dock-left);right:auto;margin:auto 0;width:var(--capsule-size);height:fit-content;padding:4px;border-radius:var(--hud-radius);overflow:visible; }
@@ -205,7 +205,7 @@
 /* One oval at any width. Preserve natural label and hit widths; narrow
    devices pan inside the rail instead of flattening five controls into a box. */
 :root:not([data-dock="left"]) .tabbar-bottom {padding:var(--dock-padding);}
-:root:not([data-dock="left"]) .dock-items {grid-template-columns:repeat(5,minmax(54px,1fr));}
+:root:not([data-dock="left"]) .dock-items {grid-template-columns:repeat(6,minmax(48px,1fr));}
 :root[data-material] :is(.tabbar-bottom,.dock-lens) {border-radius:9999px;border:1px solid var(--lg-edge);box-shadow:var(--lg-shadow);}
 :root[data-material] .dock-lens {background:var(--lg-coat),color-mix(in srgb,var(--theme-accent) 18%,transparent);box-shadow:var(--lg-bevel);}
 .tabbar-bottom .nav-item {white-space:nowrap;font-size:clamp(11px,1vw,13px);}

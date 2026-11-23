@@ -127,7 +127,7 @@ test("two persisted Dock positions keep native hits, safe content and correct le
     await expect(root).toHaveAttribute("data-dock", position);
     await expect(nav).toHaveAttribute("data-hud", position);
     expect(await page.evaluate((key) => localStorage.getItem(key), DOCK_KEY)).toBe(position);
-    await expect(nav.getByRole("link")).toHaveCount(5);
+    await expect(nav.getByRole("link")).toHaveCount(6);
     const r = (await nav.boundingBox())!,
       vp = page.viewportSize()!;
     const card = (await page.locator(".section-title").first().boundingBox())!;

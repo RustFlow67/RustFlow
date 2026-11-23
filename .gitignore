@@ -14,3 +14,4 @@ playwright-report/
 /.desktop-build/
 # Downloaded in CI (Microsoft.WebView2.FixedVersionRuntime), never committed.
 /src-tauri/webview-fixed-runtime/
+/desktop-java/target/

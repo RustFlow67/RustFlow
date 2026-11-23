@@ -6,7 +6,7 @@ import { PLAY_DEFAULTS, readPlaySettings, type PlaySettings } from "@/lib/models
 import { localPack } from "@/lib/local-pack";
 import { personalPlanHref, packHref } from "@/lib/tweaker";
 
-test("each workload dimension alters estimated FPS, lows and real cfg commands", () => {
+test("workload changes estimates without inventing unnecessary cfg commands", () => {
   const input = QUICK_SAMPLE_BUILDS[0].input;
   const base = evaluateBuild10(input)!;
   const cfg = (settings: PlaySettings) => profileCfg("competitive", input.ramGb, "", 1, settings, "nvidia");
@@ -19,8 +19,10 @@ test("each workload dimension alters estimated FPS, lows and real cfg commands",
       expect(ev[key].low1).not.toBe(base[key].low1);
       expect(ev[key].low1).toBeLessThanOrEqual(ev[key].min);
     }
-    expect(cfg(modified)).not.toEqual(cfg(PLAY_DEFAULTS));
   }
+  expect(cfg({ ...PLAY_DEFAULTS, latencyMode: "on" })).toContain('graphics.reflexmode "1"');
+  expect(cfg({ ...PLAY_DEFAULTS, gcBuffer: "2048" })).toContain('gc.buffer "2048"');
+  expect(cfg({ ...PLAY_DEFAULTS, backgroundLoad: "stream" })).toEqual(cfg(PLAY_DEFAULTS));
   expect(isValidBuildInput({ ...input, gcBuffer: "9999" } as unknown as typeof input)).toBe(false);
 });
 

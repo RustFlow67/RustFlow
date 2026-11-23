@@ -8,6 +8,7 @@ import { PageHeader } from "./PageHeader";
 // Same banner on first paint and on an optimistic Dock transition. Large route
 // tools own their interactive action; the pending banner cannot open a stale rig.
 const intros = {
+  "/knowledge": { eyebrow: "Полезные знания", title: "Команды и механики Rust", text: "Справочные карточки: проверяйте команды и актуальность механик на своей версии игры." },
   "/guide": {
     eyebrow: "С чего начать",
     title: "Пять шагов к настройке Rust",
@@ -38,6 +39,7 @@ const intros = {
 } as const;
 export type DockPath = "/" | keyof typeof intros;
 const actions = {
+  "/knowledge": ["#knowledge", "К карточкам"],
   "/guide": ["#roadmap", "К моей дорожной карте"],
   "/drivers": ["#driver-selector","Выбрать устройство"],
   "/windows": ["#measure","К протоколу замера"],

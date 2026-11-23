@@ -494,8 +494,7 @@ function TweakerForm({
               <strong className="text-accent-hi">Персональный конфиг</strong> ·{" "}
               {systemOs && `Windows ${systemOs} · `}
               {ram} ГБ ОЗУ · {vram !== undefined ? `${vram} ГБ VRAM` : "VRAM не указана для выбранной GPU"} ·{" "}
-              <code>gc.buffer {gcBudget(ram, tuning).mb}</code> · текстуры:{" "}
-              {mip === undefined ? "выбрать в игре" : mip === 0 ? "полные" : mip === 1 ? "средние" : "лёгкие"}.
+              <code>gc.buffer {gcBudget(ram, tuning).mb}</code> · текстуры выбираются в игре.
               Ничего не применяется автоматически.
             </p>
           )}
@@ -508,8 +507,7 @@ function TweakerForm({
               )}
               {connection && (
                 <span>
-                  Сеть: {connection.label}. Больше сглаживания даёт более позднее отображение сетевых позиций, а
-                  не меньший пинг.{" "}
+                  Сеть: {connection.label}. Конфиг не изменяет сетевые параметры или пинг.{" "}
                 </span>
               )}
               <button

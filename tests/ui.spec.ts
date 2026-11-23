@@ -10,7 +10,7 @@ test("synchronized chrome, anchored profile and click-through after dismissal", 
   await page.goto("/");
   await expect(page.locator(".dock-lens[data-positioned]")).toBeVisible();
   const dock = page.getByRole("navigation", { name: "Основная навигация" });
-  await expect(dock.locator("[data-tab]")).toHaveCount(5);
+  await expect(dock.locator("[data-tab]")).toHaveCount(6);
   await expect(page.locator("html")).toHaveAttribute("data-motion", "full");
   await expect(page.locator("main")).toHaveCSS("transform", "none");
   await expect(page.locator("main")).toHaveCSS("filter", "none");
@@ -315,7 +315,7 @@ test("guest edits survive reload as one build and drive the actual config", asyn
   expect(store.builds).toHaveLength(1);
   expect(store.activeBuildId).toBe(store.builds[0].id);
   await activate(page.getByText("Предпросмотр client.cfg", { exact: true }));
-  for (const line of ['gc.buffer "4096"', 'graphics.reflexmode "2"', 'graphics.drawdistance "1600"', 'graphics.shaderlod "50"', 'graphics.shadowdistance "30"'])
+  for (const line of ['gc.buffer "4096"', 'graphics.reflexmode "2"', 'graphics.drawdistance "1200"', 'graphics.shaderlod "200"', 'graphics.shadowdistance "50"'])
     await expect(page.locator("[data-build-cfg]")).toContainText(line);
   const cfg = await page.locator("[data-build-cfg]").innerText();
   await page.keyboard.press("Escape");await expect(page.getByRole("dialog")).toHaveCount(0);

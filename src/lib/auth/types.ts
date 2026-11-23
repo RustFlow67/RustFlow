@@ -14,5 +14,6 @@ export interface SessionView {
   admin: boolean;
   passwordEnabled: boolean;
   googleEnabled: boolean;
+  steamEnabled: boolean;
   secureOrigin: boolean;
 }

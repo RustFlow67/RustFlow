@@ -12,7 +12,7 @@ const jwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/ce
 const cookie = (origin: URL) => secureCookieName("rustflow-oauth", origin);
 const random = () => randomBytes(32).toString("base64url");
 const result = (origin: URL, status: string) => NextResponse.redirect(new URL(`/#profile=${status}`, origin), { status: 303, headers: NO_STORE });
-const unavailable = () => authJson({ error: "Добавьте VITE_GOOGLE_CLIENT_ID в .env для входа через Google" }, 503);
+const unavailable = () => authJson({ error: "Добавьте GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET в .env для входа через Google" }, 503);
 
 function googleAvatar(input: unknown) {
   if (typeof input !== "string" || input.length > 512) return null;

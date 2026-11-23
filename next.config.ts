@@ -41,7 +41,7 @@ export default function createNextConfig(phase: string): NextConfig {
     compress: true,
     poweredByHeader: false,
     // Permit loopback and this sandbox's preview to hydrate and connect to HMR.
-    allowedDevOrigins: ["127.0.0.1", ...(previewId ? [`3000-${previewId}.e2b.app`] : [])],
+    allowedDevOrigins: ["127.0.0.1", ...(previewId ? [`3000-${previewId}.e2b.app`, `3002-${previewId}.e2b.app`] : [])],
     devIndicators: false,
     env: { VITE_API_BASE_URL: publicApiBase },
     experimental: {
@@ -58,7 +58,7 @@ export default function createNextConfig(phase: string): NextConfig {
               "./README.md",
               "./package.json",
               "./package-lock.json",
-              "./docs/{production-audit,addons}.md",
+              "./docs/{production-audit,addons,deployment,measurement-method}.md",
               "./tsconfig.json",
               "./next.config.ts",
               "./postcss.config.mjs",

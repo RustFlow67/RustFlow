@@ -94,8 +94,8 @@ const byPrice = (a: HardwarePreset, b: HardwarePreset) =>
 
 // Web: download the displayed cfg without clipboard permission or a Blob URL.
 function CfgDownload({preset}:{preset:PresetView}) {
-  return <AdaptiveActions action={{kind:"cfg",cfg:preset.cfgText}}><a className="btn btn-sm btn-primary" download="client.cfg" href={`data:text/plain;charset=utf-8,${encodeURIComponent(preset.cfgText + "\n")}`}>
-    <Download aria-hidden="true"/> Скачать client.cfg</a></AdaptiveActions>;
+  return <AdaptiveActions action={{kind:"cfg",cfg:preset.cfgText}}><a className="btn btn-sm btn-primary" title="Перед заменой сохраните исходный client.cfg. Скопируйте только выбранные строки при закрытой игре." download="rustflow-graphics-fragment.cfg" href={`data:text/plain;charset=utf-8,${encodeURIComponent(preset.cfgText + "\n")}`}>
+    <Download aria-hidden="true"/> Скачать фрагмент настроек</a></AdaptiveActions>;
 }
 
 /** projectPreset is a pure function of (preset, mode, target) and presets are
