@@ -6,7 +6,6 @@ import {
   type BuildInput,
   type UserBuild,
 } from "@/lib/models/build";
-import { countBuild, countTweak, resetCabinetTweaks } from "@/lib/auth/cabinet";
 import { LOCAL_OWNER_ID, makeId, nowIso, SCHEMA_VERSION } from "@/lib/models/common";
 import { SAMPLE_LOGS, TEST_PROTOCOL_STEPS, type BenchmarkLog, type NewBenchmarkLog } from "@/lib/models/log";
 import type { UserTweakRecord } from "@/lib/models/tweak";
@@ -14,10 +13,11 @@ import { readTweakerPreferences, type TweakerPreferences } from "@/lib/tweaker";
 import { createExtensionState, type ExtensionState } from "./extension-state";
 
 // Keep v1 identifiers so earlier builds and tweak markers remain readable.
-const STORE_KEY = "rustflow:store:v1";
+const STORE_KEY = "shift:store:v1";
+const PREVIOUS_STORE_KEY = "rustflow:store:v1";
 const LEGACY_RATING_KEY = "rustflow:rating";
 const LEGACY_SETUP_KEY = "rustflow:setup";
-const CHANGE_EVENT = "rustflow:store-change";
+const CHANGE_EVENT = "shift:store-change";
 
 export interface PersistedState {
   schemaVersion: number;
@@ -32,7 +32,7 @@ export interface PersistedState {
 
 /** Формат экспорта/импорта JSON «моя сборка + применённые твики + настройки Твикера». */
 export interface ExportBundle {
-  app: "RustFlow";
+  app: "SHIFT";
   schemaVersion: number;
   exportedAt: string;
   ownerId: string;
@@ -281,7 +281,7 @@ class LocalStorageAdapter implements StorageAdapter {
     if (typeof window === "undefined") return defaultState();
     if (this.cache) return this.cache;
     try {
-      const raw = window.localStorage.getItem(STORE_KEY);
+      const raw = window.localStorage.getItem(STORE_KEY) ?? window.localStorage.getItem(PREVIOUS_STORE_KEY);
       if (!raw) {
         const migrated = migrateLegacy(defaultState());
         this.persist(migrated, false);
@@ -341,7 +341,6 @@ class LocalStorageAdapter implements StorageAdapter {
       activeBuildId: record.id,
       builds,
     });
-    if (!prev) countBuild(record.id);
     return record;
   }
 
@@ -383,7 +382,6 @@ class LocalStorageAdapter implements StorageAdapter {
     const state = this.getState();
     const prev = this.getOrCreateTweak(state, slug);
     const updated: UserTweakRecord = { ...prev, applied, updatedAt: nowIso() };
-    countTweak(slug, applied);
     this.persist({
       ...state,
       tweaks: { ...state.tweaks, [slug]: updated },
@@ -409,7 +407,6 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   resetTweakProgress(): void {
-    resetCabinetTweaks();
     const state = this.getState();
     this.persist({ ...state, tweaks: {} });
   }
@@ -464,7 +461,7 @@ class LocalStorageAdapter implements StorageAdapter {
       (t) => t.applied || t.fpsBefore !== null || t.fpsAfter !== null || Boolean(t.note),
     );
     return {
-      app: "RustFlow",
+      app: "SHIFT",
       schemaVersion: SCHEMA_VERSION,
       exportedAt: nowIso(),
       ownerId: state.ownerId,
@@ -495,8 +492,8 @@ class LocalStorageAdapter implements StorageAdapter {
       return { ok: false, error: "Синтаксическая ошибка JSON. Проверьте скобки и кавычки." };
     }
 
-    if (parsed.app !== "RustFlow") {
-      return { ok: false, error: "Это не файл RustFlow (ожидается поле \"app\": \"RustFlow\")." };
+    if (parsed.app !== "SHIFT" && parsed.app !== "RustFlow") {
+      return { ok: false, error: "Это не файл резервной копии SHIFT." };
     }
 
     const ownerId =
@@ -568,7 +565,7 @@ class LocalStorageAdapter implements StorageAdapter {
     const myBuild = validBuilds.find((b) => b.id === activeId) ?? validBuilds[0] ?? null;
 
     const bundle: ExportBundle = {
-      app: "RustFlow",
+      app: "SHIFT",
       schemaVersion: SCHEMA_VERSION,
       exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : nowIso(),
       ownerId,
@@ -637,7 +634,6 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   resetAll(): void {
-    resetCabinetTweaks();
     this.addons.clear();
     if (typeof window !== "undefined") {
       try {

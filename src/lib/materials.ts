@@ -25,7 +25,7 @@ export const WALLPAPERS = [
   { value: "drift", label: "Спокойный дрейф" }, { value: "fusion", label: "Активное слияние капель" }, { value: "still", label: "Статичный фон" },
 ] as const;
 export interface Engine { blur: number; shine: number; motion: typeof ANIMATIONS[number]["value"]; wallpaper: typeof WALLPAPERS[number]["value"] }
-export const DEFAULT_ENGINE: Engine = { blur: 28, shine: 100, motion: "standard", wallpaper: "drift" };
+export const DEFAULT_ENGINE: Engine = { blur: 20, shine: 100, motion: "spring", wallpaper: "still" };
 export type Studio = Engine & { vip: MaterialId | null };
 export const defaultStudio: Studio = { ...DEFAULT_ENGINE, vip: null };
 export function parseStudio(raw: string | null): Studio {

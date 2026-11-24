@@ -2,7 +2,7 @@
    diffusion and specular energy belong to Studio. Never filter a layout root. */
 :root, :root[data-material] {
   --lg-diffusion: blur(var(--rf-blur,28px)) saturate(165%);
-  --lg-blur: blur(var(--lg-native-blur,16px)) saturate(1.7) brightness(1.08);
+  --lg-blur: blur(var(--lg-native-blur,20px)) saturate(160%);
   --lg-edge: rgba(255,255,255,.14);
   --lg-bevel: inset 0 1px 1px rgb(255 255 255 / calc(.30 * var(--rf-shine))),
     inset 0 -1px 0 rgb(255 255 255 / calc(.10 * var(--rf-shine))),
@@ -19,13 +19,8 @@
 }
 :root[data-material="pearl"] { --lg-glass: rgb(252 253 255 / .48); --lg-shadow: var(--lg-bevel),0 10px 30px -8px rgb(37 51 74 / .17); }
 :root[data-material="liquid"] { --lg-tint:transparent; --lg-glass: rgb(255 255 255 / .035); --lg-raised: rgb(29 29 29 / .88); }
-/* Bevel maps bend the entire sampled colour together. The fallback uses the
-   same diffuse coat and mirror rim on engines without SVG backdrop support. */
-:root[data-refraction]:not([data-lite]) { --lg-blur: var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08); }
-:root[data-refraction] :is(.btn,.chip,.info-more,.favorite-drop,.nav-pill,.liquid-lens,.field) { --lg-blur: var(--lg-diffusion) url(#rf-liquid-pill) brightness(1.08); }
-:root[data-refraction] :is(.studio-trigger,.assistant-trigger,.btn-icon,.favorite-drop) { --lg-blur: var(--lg-diffusion) url(#rf-liquid-round) brightness(1.08); }
-:root[data-refraction] .tabbar-bottom { --lg-blur: var(--lg-diffusion) url(#rf-liquid-rail) brightness(1.08); }
-:root[data-refraction][data-dock="left"] .tabbar-bottom { --lg-blur: var(--lg-diffusion) url(#rf-liquid-side) brightness(1.08); }
+/* Refraction is confined to compact moving lenses, never cards or dialogs. */
+:root[data-refraction]:not([data-lite]) .liquid-lens { --lg-blur: blur(12px) saturate(160%) url(#rf-liquid-pill); }
 :root[data-lite] { --lg-diffusion: none; --lg-blur: none; --crystal-blur: none; --lg-glass: var(--surface-solid-fallback); --lg-raised: var(--surface-solid-fallback); }
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   :root[data-material] { --lg-glass: var(--surface-solid-fallback); --lg-raised: var(--surface-solid-fallback); }
@@ -34,9 +29,6 @@
    its children or baking a finish into the displacement bitmap. */
 [data-liquid-glass] {--lg-coat:linear-gradient(180deg,rgb(255 255 255 / calc(.075 * var(--rf-shine,1))),rgb(255 255 255 / .018)),linear-gradient(var(--lg-tint),var(--lg-tint));}
 :root[data-material="liquid"] [data-liquid-glass] {--lg-tint:transparent !important;}
-:root[data-refraction] [data-liquid-glass="pill"] {--lg-blur:var(--lg-diffusion) url(#rf-liquid-pill) brightness(1.08);}
-:root[data-refraction] [data-liquid-glass="round"] {--lg-blur:var(--lg-diffusion) url(#rf-liquid-round) brightness(1.08);}
-:root[data-refraction] [data-liquid-glass="pane"] {--lg-blur:var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);}
 :root[data-material] :is([data-liquid-glass],.glass,.tile,.well,.field,.segmented,.modal-panel,.rf-dialog-surface,.popover,.info-more,.favorite-drop,.btn,.toast-card,.pro-teaser,.material-tile,
   .lg-surface,.cabinet-person,.cabinet-widget,.cabinet-edit,.rig-showcase,.warmup-readout,.brief-example,.upgrade-row,.report-pick,
   :where(.rig-parts > div,.upgrade-alts > div,.brand-faq section,textarea,input:not([type]),input:is([type="search"],[type="text"],[type="number"],[type="email"],[type="password"]))) {
@@ -48,25 +40,20 @@
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   :root:not([data-lite]) :where([data-liquid-glass],.glass,.tile,.well,.btn,.chip,.segmented,.lg-surface,.favorite-drop,.info-more,.material-tile,.popover,.liquid-lens):not(.rf-dialog-surface)::before {
     content:""; pointer-events:none; position:absolute; inset:0; z-index:1; padding:1.25px; border-radius:inherit;
-    background:var(--lg-mirror); opacity:var(--rf-shine);
+    background:radial-gradient(180px circle at var(--spec-x,50%) var(--spec-y,0%),rgb(255 255 255 / .55),transparent 70%), var(--lg-mirror); opacity:calc(.55 * var(--rf-shine));
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor;
     mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
   }
 }
 :root[data-material] :is(.popover,.toast-card) { background-color: var(--lg-raised); }
-/* Honest FLIP: the panel is the glass now, so it refracts like the borrowed
-   skin did. Set directly (not via --lg-blur) to avoid changing the blur of
-   glass tiles nested inside the dialog. */
-:root[data-refraction][data-material] .rf-dialog-surface {
-  -webkit-backdrop-filter: var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);
-  backdrop-filter: var(--lg-diffusion) url(#rf-liquid-pane) brightness(1.08);
-}
 :root[data-material] .nav-pill { background-color: var(--bar-tint); border-radius:var(--hud-radius); }
 .nav-capsules .nav-pill {height:var(--capsule-size);min-height:var(--capsule-size);box-sizing:border-box;}
 .nav-capsules :is(.studio-trigger,.assistant-trigger) {width:var(--capsule-size);padding:0;aspect-ratio:1;}
 :root[data-material] [data-chrome-panel]:not([data-hud="left"]) { box-shadow: var(--hud-panel-shadow,var(--lg-shadow)); }
 :root[data-material] :is(.btn-primary,.profile-option[aria-pressed="true"]) { background: var(--lg-coat),var(--theme-accent-gradient); color: var(--on-accent); }
-:root[data-material="liquid"] :is(.btn-primary,.profile-option[aria-pressed="true"]) { color: white; background: var(--lg-coat),rgb(255 255 255 / .17); }
+:root[data-material="liquid"] .btn.btn-primary { color: white; background: var(--lg-coat),#CE422B; }
+:root[data-material="liquid"] .btn-primary[data-island-button] { --island-button-color:#CE422B; }
+:root[data-material="liquid"] .profile-option[aria-pressed="true"] { color:white; background:var(--lg-coat),rgb(255 255 255 / .17); }
 :root[data-material] :is(.field:focus-visible,textarea:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 :root[data-material] .glass-danger { background-color: var(--surface-glass-danger); }
 :root[data-material] input:where([type=search])::-webkit-search-cancel-button { display:none; }
@@ -78,13 +65,12 @@
   font: 700 .68rem/1.5 var(--font-sans); letter-spacing: .035em; text-transform: none;
 }
 :root :is(.eyebrow,.reason-meta small,.report-stamp > span) { text-transform: uppercase; }
-:root[data-material] :is(h1,h2,h3,h4,h5,h6,.headline,.profile-heading) { font-family: var(--font-sans); font-weight: 760; letter-spacing: -.02em; }
-/* Keep controls, instructions and numbers in Inter. Only display/section
-   headings inherit the Cyrillic display family, never a whole card or button. */
-:root[data-material] :is(h1,h2,.headline) { font-family:var(--font-unbounded),var(--font-sans); font-weight:700; overflow-wrap:anywhere; }
-:root[data-material] :is(h1,.rf-home-title) {font-weight:800;}
-:root[data-material] .home-journey h2 {font-weight:900;}
-:root[data-material] .profile-heading {font-family:var(--font-unbounded),var(--font-sans);}
+:root[data-material] :is(h1,h2,h3,h4,h5,h6,.headline,.profile-heading) { font-family: var(--font-sans); font-weight: 650; letter-spacing: -.03em; }
+/* Headings use the same clear sans as the rest of the interface. */
+:root[data-material] :is(h1,h2,.headline) { font-family:var(--font-sans); font-weight:650; letter-spacing:-.03em; overflow-wrap:anywhere; }
+:root[data-material] :is(h1,.rf-home-title) {font-weight:650;}
+:root[data-material] .home-journey h2 {font-weight:650;}
+:root[data-material] .profile-heading {font-family:var(--font-sans);}
 :root[data-material] :is(h1,h2,h3) :is(button,a.btn) {font-family:var(--font-sans);}
 
 .catalog-bar { display: grid; gap: 12px; align-items: end; padding: clamp(14px,2vw,21px); }
@@ -153,27 +139,24 @@
   -webkit-backdrop-filter:var(--lg-diffusion);backdrop-filter:var(--lg-diffusion); }
 /* Header popovers separate the page with the 12px backdrop blur alone:
    no light/dark matte, including during the return flight. */
-.header-backdrop::before, .assistant-scrim {--popup-time:420ms;--popup-ease:cubic-bezier(.22,1,.36,1);background-color:transparent;}
+.header-backdrop::before, .assistant-scrim {--popup-time:280ms;--popup-ease:var(--rf-spring);background-color:transparent;}
 :root[data-theme="light"] .modal-backdrop:not(.header-backdrop)::before {background-color:rgb(225 231 241 / .65);}
 .rf-dialog-surface::after {content:"";position:absolute;pointer-events:none;z-index:1;
   top:0;left:var(--rim-left,0px);right:var(--rim-right,0px);bottom:var(--rim-bottom,0px);
   border:1px solid var(--lg-edge);
   border-radius:var(--rim-radius,28px);box-shadow:var(--lg-bevel);}
-.rf-dialog-surface[data-ready]::after {transition-property:left,right,bottom,border-radius;transition-duration:380ms;transition-timing-function:var(--morph-ease);}
+.rf-dialog-surface[data-ready]::after {transition-property:left,right,bottom,border-radius;transition-duration:280ms;transition-timing-function:var(--morph-ease);}
 .rf-dialog-surface[data-shown]::after {left:0;right:0;bottom:0;border-radius:28px;}
-.rf-dialog-surface[data-ready]:not([data-open])::after {transition-duration:var(--land-time,340ms);}
-:root .rf-dialog-surface { --morph-ease:cubic-bezier(.32,.72,0,1); transform-origin:0 0; transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; will-change:transform,opacity,filter; }
+.rf-dialog-surface[data-ready]:not([data-open])::after {transition-duration:280ms;}
+:root .rf-dialog-surface { --morph-ease:var(--rf-spring); transform-origin:0 0; transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; will-change:transform,opacity; }
 :root .profile-panel { transform-origin:100% 0; }
-:root .rf-dialog-surface[data-ready] { transition: transform 380ms var(--morph-ease),clip-path 380ms var(--morph-ease),opacity 380ms var(--morph-ease); }
+:root .rf-dialog-surface[data-ready] { transition: transform 280ms var(--morph-ease),clip-path 280ms var(--morph-ease),opacity 180ms ease; }
 :root .rf-dialog-surface[data-shown] { transform:translate3d(0,0,0) scale(1); clip-path:inset(0px round 28px); opacity:1; }
-/* Honest 340ms FLIP close: the shell shrinks onto the untouched source
-   for the full cycle while the glass itself dissolves across 240-340ms,
-   landing exactly on the live button. Sourceless entries simply fade. */
-.rf-dialog-surface[data-flip-source] { --exit-opacity:100ms ease 240ms; }
+/* FLIP closes onto the live source; sourceless entries fade. */
+.rf-dialog-surface[data-flip-source] { --exit-opacity:100ms ease 180ms; }
 :root[data-material] .rf-dialog-surface[data-ready]:not([data-open]) {
   transform:var(--from-transform,none); clip-path:var(--from-clip,inset(0 round 28px)); opacity:0; pointer-events:none;
-  -webkit-backdrop-filter:blur(0px) saturate(100%); backdrop-filter:blur(0px) saturate(100%);
-  transition:transform var(--land-time,340ms) var(--morph-ease),clip-path var(--land-time,340ms) var(--morph-ease),opacity var(--exit-opacity,340ms ease),backdrop-filter var(--clear-time,108ms) ease-out;
+  transition:transform 280ms var(--morph-ease),clip-path 280ms var(--morph-ease),opacity var(--exit-opacity,180ms ease);
 }
 .rf-dialog-surface > * {opacity:0;transition:opacity 100ms ease;}
 .rf-dialog-surface[data-shown] > * {opacity:1;}
@@ -323,3 +306,6 @@ details[open]::details-content {block-size:auto;}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
   :root[data-material] .rf-dialog-surface {background:var(--surface-solid-fallback);}
 }
+/* A warmer Rust accent is reserved for primary actions and the labelled FPS delta. */
+:root[data-material="liquid"] .upgrade-row > div:first-child span { color:#f17965; font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+:root[data-material="liquid"] .upgrade-measure b { font-family:"JetBrains Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }

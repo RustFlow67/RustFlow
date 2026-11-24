@@ -12,7 +12,7 @@ import { ConfirmDialog } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { fpsToFrametime } from "@/lib/models/log";
 import { calcUserTweakDelta, type TweakRiskLevel } from "@/lib/models/tweak";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 
 /** Личный блок «Применено + мой замер FPS до/после» на странице твика. */
 export default function TweakPersonalBar({
@@ -24,7 +24,7 @@ export default function TweakPersonalBar({
   title: string;
   riskLevel: TweakRiskLevel;
 }) {
-  const { state, hydrated, storage } = useRustFlowStore();
+  const { state, hydrated, storage } = useShiftStore();
   const { toast } = useToast();
   const record = state?.tweaks[slug];
 

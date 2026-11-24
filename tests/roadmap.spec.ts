@@ -8,7 +8,6 @@ import { packEntries } from "@/lib/pack-entries";
 import { packHref, readTweakerPreferences, fitsVendor, fitsWindows, packEligible } from "@/lib/tweaker";
 import { registryBackup } from "@/lib/tweaks/registry-backup";
 import {
-  driverGroups,
   fileGroups,
   faqGroups,
   presetGroups,
@@ -48,7 +47,6 @@ test("curated CPU list, canonical old articles and 55+ reversible pack choices a
   expect(CPUS.map((c) => c.name).sort()).toEqual(models.sort());
   expect(getCpu("ryzen-5-7600x3d")?.name).toContain("7600X3D");
   const groups = {
-    "/drivers": driverGroups,
     "/tweaker?tab=windows": windowsGroups,
     "/presets": presetGroups,
     "/faq": faqGroups,
@@ -203,7 +201,7 @@ test("editable pack summary, nested login and the downloaded CFG, REG, BAT and r
   await click(
     page.getByRole("radiogroup", { name: "Графический профиль Rust" }).getByRole("radio", { name: /Качество/ }),
   );
-  const trigger = page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" });
+  const trigger = page.getByRole("button", { name: "Посмотреть сводку" });
   await click(trigger);
   const box = page.getByRole("dialog", { name: "ИИ-сводка вашего пакета" });
   const steps = async () =>
@@ -235,10 +233,10 @@ test("editable pack summary, nested login and the downloaded CFG, REG, BAT and r
   const download = page.waitForEvent("download");
   await click(dl);
   const file = await download;
-  expect(file.suggestedFilename()).toBe("RustFlow-Pack-quality.zip");
+  expect(file.suggestedFilename()).toBe("SHIFT-Pack-quality.zip");
   const z = unzipSync(await readFile((await file.path())!));
-  expect(strFromU8(z["RustFlow-Pack/client.cfg"]).replace(/\r\n/g, "\n").trim()).toBe(cfg?.trim());
-  const readme = strFromU8(z["RustFlow-Pack/README.txt"]);
+  expect(strFromU8(z["SHIFT-Pack/client.cfg"]).replace(/\r\n/g, "\n").trim()).toBe(cfg?.trim());
+  const readme = strFromU8(z["SHIFT-Pack/README.txt"]);
   expect(readme).toContain("Windows 10");
   expect([...readme.matchAll(/^• [^\n]*\(([a-z\d-]+)\)\r?$/gm)].map((m) => m[1]).sort()).toEqual(await steps());
   const names = Object.keys(z);
@@ -248,8 +246,8 @@ test("editable pack summary, nested login and the downloaded CFG, REG, BAT and r
     "Otkat/game-mode-dvr-restore-snapshot.bat",
     "Otkat/menu-delay-REVERT.bat",
   ])
-    expect(names).toContain("RustFlow-Pack/" + part);
-  expect(strFromU8(z["RustFlow-Pack/Otkat/menu-delay-REVERT.bat"])).toMatch(/MenuShowDelay/);
+    expect(names).toContain("SHIFT-Pack/" + part);
+  expect(strFromU8(z["SHIFT-Pack/Otkat/menu-delay-REVERT.bat"])).toMatch(/MenuShowDelay/);
   await expect(page.getByRole("status").filter({ hasText: "Загрузка началась успешно!" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
@@ -267,7 +265,7 @@ test("OS override with unknown Windows and a different GPU changes the sheet and
     QUICK_SAMPLE_BUILDS[0].input,
   );
   await page.goto("/tweaker?auto=live");
-  const trigger = page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" }),
+  const trigger = page.getByRole("button", { name: "Посмотреть сводку" }),
     box = page.getByRole("dialog", { name: "ИИ-сводка вашего пакета" });
   await click(trigger);
   await expect(box).toContainText("Версия Windows не указана");
@@ -293,11 +291,11 @@ test("OS override with unknown Windows and a different GPU changes the sheet and
   const started = page.waitForEvent("download");
   await click(dl);
   const z = unzipSync(await readFile((await (await started).path())!));
-  const text = strFromU8(z["RustFlow-Pack/README.txt"]);
+  const text = strFromU8(z["SHIFT-Pack/README.txt"]);
   expect(text).toContain("Видеокарта: AMD");
   expect(text).toContain("Windows 10");
   expect(text).not.toContain("Windows 11");
-  expect(strFromU8(z["RustFlow-Pack/client.cfg"]).replace(/\r\n/g, "\n").trim()).toBe(
+  expect(strFromU8(z["SHIFT-Pack/client.cfg"]).replace(/\r\n/g, "\n").trim()).toBe(
     (await box.locator("[data-pack-cfg]").textContent())!.trim(),
   );
 });

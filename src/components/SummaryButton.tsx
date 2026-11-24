@@ -18,10 +18,10 @@ export default function SummaryButton({
       className="btn summary-trigger"
       disabled={disabled}
       aria-haspopup="dialog"
-      aria-label="Посмотреть ИИ-сводку ✨"
+      aria-label="Посмотреть сводку"
       onClick={(e) => show?.(e.currentTarget)}
     >
-      Посмотреть ИИ-сводку <Sparkles aria-hidden="true" />
+      Посмотреть сводку <Sparkles aria-hidden="true" />
     </LiquidGlass>
   );
 }

@@ -3,14 +3,13 @@
 import LiquidGlass from "@/components/LiquidGlass";
 import { Activity, CheckCircle2, Cpu, FileJson } from "lucide-react";
 import Link from "next/link";
-import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import { Button } from "@/components/ui";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { plural } from "@/lib/tweaks/meta";
 
 /** Живая полоса статуса пользователя на главной (localStorage: сборка, твики, журнал, JSON). */
 export default function HomeUserStrip({ totalActionable }: { totalActionable: number }) {
-  const { state, hydrated } = useRustFlowStore();
+  const { state, hydrated } = useShiftStore();
 
   const activeBuild =
     hydrated && state
@@ -61,7 +60,7 @@ export default function HomeUserStrip({ totalActionable }: { totalActionable: nu
           <span className="block text-[12px] text-ink-3">Профиль в браузере</span>
           <strong className="block truncate text-[14px] font-bold text-ink">Экспорт / импорт</strong>
         </div>
-        <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
+        <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={(event) => window.dispatchEvent(new CustomEvent("shift:backup", { detail: event.currentTarget }))}>
           <FileJson className="text-accent-hi" aria-hidden="true" />
           JSON
         </Button>

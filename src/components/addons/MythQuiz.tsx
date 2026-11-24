@@ -64,8 +64,8 @@ export default function MythQuiz() {
 
   async function handleShare() {
     const url = new URL("/tools#quiz", window.location.origin).href;
-    const text = `«Миф или правда» в RustFlow: ${score}/${QUESTIONS.length} правильных ответов.`;
-    const result = await shareText({ title: "Миф или правда · RustFlow", text, url });
+    const text = `«Миф или правда» в SHIFT: ${score}/${QUESTIONS.length} правильных ответов.`;
+    const result = await shareText({ title: "Миф или правда · SHIFT", text, url });
     if (result === "done") toast({ title: "Результат готов к отправке" });
     if (result === "manual") setManual(`${text}\n${url}`);
   }

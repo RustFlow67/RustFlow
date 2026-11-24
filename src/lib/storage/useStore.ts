@@ -11,7 +11,7 @@ const getServerSnapshot = (): PersistedState | null => null;
  * Реактивная подписка на адаптер хранилища через useSyncExternalStore (React 19):
  * без каскадных перерисовок и с безопасным skeleton-состоянием при SSR.
  */
-export function useRustFlowStore(): {
+export function useShiftStore(): {
   state: PersistedState | null;
   hydrated: boolean;
   storage: typeof storage;

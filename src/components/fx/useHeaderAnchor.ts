@@ -76,7 +76,7 @@ export function useHeaderAnchor(
       sizes.observe(hud);
       for (const sibling of hud.querySelectorAll("[data-chrome-panel]")) sizes.observe(sibling);
     }
-    window.addEventListener("rustflow:dock-layout", align);
+    window.addEventListener("shift:dock-layout", align);
     window.addEventListener("resize", align);
     vp?.addEventListener("resize", align);
     let scrollFrame = 0;
@@ -84,7 +84,7 @@ export function useHeaderAnchor(
     vp?.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       sizes.disconnect();
-      window.removeEventListener("rustflow:dock-layout", align);
+      window.removeEventListener("shift:dock-layout", align);
       window.removeEventListener("resize", align);
       vp?.removeEventListener("resize", align);
       cancelAnimationFrame(scrollFrame);

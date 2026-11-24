@@ -12,7 +12,7 @@ import { useSyncExternalStore } from "react";
 export type MotionChoice = "auto" | "full" | "reduced";
 
 export const MOTION_KEY = "rustflow:motion";
-const MOTION_EVENT = "rustflow:motion-change";
+const MOTION_EVENT = "shift:motion-change";
 
 function readChoice(): MotionChoice {
   if (typeof window === "undefined") return "auto";

@@ -14,15 +14,12 @@ import OriginDisclosure from "@/components/fx/OriginDisclosure";
 import { Cpu, Monitor, ChevronDown } from "lucide-react";
 import SummaryButton from "./SummaryButton";
 import BuildResult from "./BuildResult";
-import Link from "@/components/RouteLink";
 import { useEffect, useMemo, useState } from "react";
-import Combobox from "@/components/Combobox";
+import HardwareDrawer from "@/components/HardwareDrawer";
 import LiquidSelect from "@/components/LiquidSelect";
-import { ProfileLock } from "@/components/auth/ProfileGate";
 import { MemoryControls, TimingControl, PersonalBuildSettings } from "@/components/BuildSetupControls";
-import { useAccount } from "@/components/auth/AccountProvider";
 import Segmented from "@/components/Segmented";
-import { Input, Skeleton } from "@/components/ui";
+import { Input } from "@/components/ui";
 import { publishDraft } from "@/lib/storage/calculator-draft";
 import { CPUS, getCpu, GPUS, getGpu, RAM_OPTIONS } from "@/lib/hardware";
 import { evaluateBuild10, type BuildInput } from "@/lib/models/build";
@@ -36,7 +33,7 @@ import {
   RESOLUTION_SIZES,
   type BuildResolutionId,
 } from "@/lib/models/build-resolution";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { profileCfg, textureMipForVram, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import DriveControls, { DriveDetails } from "./DriveControls";
 import { bestUpgrade } from "@/lib/models/build-upgrade";
@@ -49,6 +46,7 @@ import {
   WINDOWS,
 } from "@/lib/models/build-settings";
 import { PLAY_DEFAULTS, supportedLatency } from "@/lib/models/play-settings";
+import { recommendedProfile, useSetup } from "@/lib/shift-setup";
 
 const dimensionMin = (axis: "width" | "height") =>
   axis === "height" ? MIN_RESOLUTION_HEIGHT : MIN_RESOLUTION_DIMENSION;
@@ -60,44 +58,12 @@ type Props = {
   savedId?: string;
 };
 
-export default function BenchmarkTool({ accountBuild, ...props }: Props) {
-  const { session, problem } = useAccount();
-  if (accountBuild && !session && !problem)
-    return (
-      <>
-        <DockIntro href="/benchmark" />
-        <LiquidGlass as="section" id="build-config" className="glass p-4 sm:p-6" aria-busy="true">
-          <p role="status" className="mb-3 text-sm text-ink-2">
-            Загружаем сборку аккаунта…
-          </p>
-          <Skeleton className="h-44 w-full" />
-        </LiquidGlass>
-      </>
-    );
-  const user = session?.user;
-  if (accountBuild && !user)
-    return (
-      <>
-        <DockIntro href="/benchmark" />
-        <LiquidGlass as="section" id="build-config" className="glass liquid-glass-card p-4 sm:p-6">
-          <ProfileLock action="Открыть сохранённую сборку" />
-          <Link href="/benchmark" className="link mt-3 inline-block">
-            Перейти к свободному расчёту
-          </Link>
-        </LiquidGlass>
-      </>
-    );
-  return (
-    <BenchmarkForm
-      key={accountBuild ? user?.id : "personal"}
-      {...props}
-      presetInput={accountBuild ? (user?.build ?? props.presetInput) : props.presetInput}
-    />
-  );
+export default function BenchmarkTool(props: Props) {
+  return <BenchmarkForm {...props} />;
 }
 
 function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
-  const { state, hydrated, storage } = useRustFlowStore();
+  const { state, hydrated, storage } = useShiftStore();
   const [detected, setDetected] = useState<{ cpu: string; gpu: string; ramGb: number; ramMhz?: number; os?: string }>();
   useEffect(() => {
     if (!IS_DESKTOP_APP) return;
@@ -109,7 +75,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
     return () => { active = false; };
   }, []);
 
-  const cloudFallback = useAccount().session?.user?.build;
+  const setup = useSetup();
   const { detectedInput } = useSystemPlan();
   const initialSeed = useMemo<{ input: BuildInput; id?: string }>(() => {
     if (presetInput) return { input: presetInput };
@@ -118,7 +84,6 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
       state?.builds.find((b) => b.id === state.activeBuildId) ??
       state?.builds[0];
     if (active) return { input: active.input, id: active.id };
-    if (cloudFallback) return { input: cloudFallback };
     if (detectedInput) return { input: detectedInput };
     return {
       input: {
@@ -132,7 +97,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
         resolution: "1080p",
       },
     };
-  }, [state, presetInput, savedId, cloudFallback, detectedInput]);
+  }, [state, presetInput, savedId, detectedInput]);
 
   const [draft, setDraft] = useState<{ input: BuildInput; id?: string } | null>(null);
   const current = draft ?? initialSeed;
@@ -141,12 +106,11 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
   const input = saved?.input ?? current.input;
   const activeInput =
     state?.builds.find((b) => b.id === state.activeBuildId)?.input ??
-    state?.builds[0]?.input ??
-    cloudFallback;
+    state?.builds[0]?.input;
   const editingId = current.id;
   const { name, cpuId, gpuId, ramGb, resolution } = input;
 
-  const mode = input.graphicsProfile ?? initialMode ?? "competitive";
+  const mode = input.graphicsProfile ?? initialMode ?? recommendedProfile(setup?.goal);
   useEffect(
     () => (hydrated ? publishDraft({ input, mode, id: editingId }) : undefined),
     [hydrated, input, mode, editingId],
@@ -226,7 +190,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
             </p>
           </header>
           <div className="build-fields">
-            <Combobox
+            <HardwareDrawer
               label="Процессор (CPU)"
               placeholder={
                 getCpu(cpuId)?.name
@@ -238,7 +202,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
               onChange={setCpuId}
               icon={<Cpu size={17} aria-hidden="true" />}
             />
-            <Combobox
+            <HardwareDrawer
               label="Видеокарта (GPU)"
               placeholder="Выберите видеокарту"
               items={GPUS}
@@ -372,7 +336,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
         onExited={insight.finish}
         source={insight.source}
         returnFocus={insight.opener}
-        title="ИИ-сводка вашей сборки"
+        title="Сводка вашей сборки"
         maxWidth="max-w-2xl"
       >
         {evaluation && (
@@ -405,7 +369,7 @@ function BenchmarkForm({ presetInput, initialMode, savedId }: Props) {
             <AdaptiveActions action={{kind:"cfg",cfg}}>
             <a
               className="btn btn-primary mt-3"
-              download="rustflow-graphics-fragment.cfg"
+              download="shift-graphics-fragment.cfg"
               href={`data:text/plain;charset=utf-8,${encodeURIComponent(cfg + "\n")}`}
             >
               Скачать фрагмент настроек

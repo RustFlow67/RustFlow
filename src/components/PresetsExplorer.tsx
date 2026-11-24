@@ -50,7 +50,7 @@ import { formatBuildResolution, type BuildResolution } from "@/lib/models/build-
 import { presetCalculatorHref, projectPreset, type PresetView } from "@/lib/models/preset-projection";
 import { getGraphicsProfile, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import { tweakerHref } from "@/lib/tweaker";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { plural } from "@/lib/tweaks/meta";
 
 type ResFilter = "all" | PresetResolution | "1440x1080" | "custom";
@@ -94,7 +94,7 @@ const byPrice = (a: HardwarePreset, b: HardwarePreset) =>
 
 // Web: download the displayed cfg without clipboard permission or a Blob URL.
 function CfgDownload({preset}:{preset:PresetView}) {
-  return <AdaptiveActions action={{kind:"cfg",cfg:preset.cfgText}}><a className="btn btn-sm btn-primary" title="Перед заменой сохраните исходный client.cfg. Скопируйте только выбранные строки при закрытой игре." download="rustflow-graphics-fragment.cfg" href={`data:text/plain;charset=utf-8,${encodeURIComponent(preset.cfgText + "\n")}`}>
+  return <AdaptiveActions action={{kind:"cfg",cfg:preset.cfgText}}><a className="btn btn-sm btn-primary" title="Перед заменой сохраните исходный client.cfg. Скопируйте только выбранные строки при закрытой игре." download="shift-graphics-fragment.cfg" href={`data:text/plain;charset=utf-8,${encodeURIComponent(preset.cfgText + "\n")}`}>
     <Download aria-hidden="true"/> Скачать фрагмент настроек</a></AdaptiveActions>;
 }
 
@@ -262,7 +262,7 @@ export default function PresetsExplorer({
   initial?:string; presets: HardwarePreset[];
   tweakTitles: Record<string, string>;
 }) {
-  const { state, hydrated } = useRustFlowStore();
+  const { state, hydrated } = useShiftStore();
   const cardBudget = useCardBudget(presets.length, hydrated);
   const { toast } = useToast();
 
@@ -310,7 +310,7 @@ export default function PresetsExplorer({
     if(tap)record(p.slug);
   },[initial,presets,showDetail,record]);
   useEffect(()=>{const open=(e:Event)=>{const {slug,from}=(e as CustomEvent).detail??{};const p=presets.find(p=>p.slug===slug);if(p){setRes(p.resolution);showDetail(p.id,from instanceof HTMLElement?from:null);record(p.slug);}};
-    window.addEventListener("rustflow:matched-preset",open);return ()=>window.removeEventListener("rustflow:matched-preset",open);},[presets,showDetail,record]);
+    window.addEventListener("shift:matched-preset",open);return ()=>window.removeEventListener("shift:matched-preset",open);},[presets,showDetail,record]);
   const detailPreset = views.find((p) => p.id === detail.value);
 
   const myBuild =
@@ -370,10 +370,13 @@ export default function PresetsExplorer({
 
   const handleModeChange = useCallback((id: string, mode: GraphicsProfileId) => {
     setCardModes((previous) => ({ ...previous, [id]: mode }));
+    window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: `Графика: ${getGraphicsProfile(mode)?.short ?? mode}` } }));
   }, []);
   const handleDetails = useCallback((id: string, from: HTMLElement) => {
     showDetail(id, from);
-    record(presets.find((p) => p.id === id)?.slug ?? "");
+    const preset = presets.find((p) => p.id === id);
+    if (preset) window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: `Пресет: ${preset.title}` } }));
+    record(preset?.slug ?? "");
   }, [showDetail, record, presets]);
 
   function resetFilters() {
@@ -460,7 +463,7 @@ export default function PresetsExplorer({
             <Button variant="secondary" size="sm" onClick={e => openComparison(e.currentTarget)} aria-haspopup="dialog"><GitCompareArrows aria-hidden="true" /> Сравнение · {compareIds.length}</Button>
           </div>
         </div>
-        <GraphicsPicker value={globalMode} onChange={(value) => { setGlobalMode(value); setCardModes({}); }} label="Графика всех пресетов" />
+        <GraphicsPicker value={globalMode} onChange={(value) => { setGlobalMode(value); setCardModes({}); window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: `Графика: ${getGraphicsProfile(value)?.short ?? value}` } })); }} label="Графика всех пресетов" />
         <p className="text-xs leading-relaxed text-ink-3">
           Начните с 1080p и «Комбат» или выберите своё разрешение. 1% low показывает скорость в самых медленных кадрах: сравнивайте его, если в бою заметны рывки. Все показатели — расчёт, а не замер.
         </p>
@@ -484,7 +487,7 @@ export default function PresetsExplorer({
           }
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="preset-editorial-grid">
           {filtered.map((p, index) => {
             if (index >= cardBudget && p.id !== initial) return <LiquidGlass as="article" key={p.id} id={`preset-${p.slug}`} aria-busy="true" className="glass preset-card preset-preview p-4 sm:p-6">
               <h2 className="text-xl font-bold">{p.title}</h2><p className="mt-3 text-sm text-ink-2">{p.cpu} · {p.gpu}</p>

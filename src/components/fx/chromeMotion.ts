@@ -15,7 +15,7 @@ const micro: Record<string, Keyframe[]> = {
   "knob-c": [{ translate: "0 0" }, { translate: "2px 0" }, { translate: "0 0" }],
   shield: [{ scale: "1" }, { scale: "1.12" }, { scale: "1" }],
 };
-export const pulsePanels = () => window.dispatchEvent(new Event("rustflow:chrome-pulse"));
+export const pulsePanels = () => window.dispatchEvent(new Event("shift:chrome-pulse"));
 export function useChromeMotion() {
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -94,15 +94,15 @@ export function useChromeMotion() {
     };
     window.addEventListener("scroll", scroll, { passive: true });
     window.addEventListener("wheel", wheel, { passive: true });
-    window.addEventListener("rustflow:chrome-pulse", pulse);
-    window.addEventListener("rustflow:modal-open", clear);
+    window.addEventListener("shift:chrome-pulse", pulse);
+    window.addEventListener("shift:modal-open", clear);
     return () => {
       clear();
       cancelAnimationFrame(scrollFrame);
       window.removeEventListener("scroll", scroll);
       window.removeEventListener("wheel", wheel);
-      window.removeEventListener("rustflow:chrome-pulse", pulse);
-      window.removeEventListener("rustflow:modal-open", clear);
+      window.removeEventListener("shift:chrome-pulse", pulse);
+      window.removeEventListener("shift:modal-open", clear);
       delete root.dataset.scrolled;
       delete root.dataset.scrollDown;
       delete root.dataset.scrollUp;

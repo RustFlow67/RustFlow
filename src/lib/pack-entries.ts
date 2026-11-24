@@ -8,7 +8,7 @@ import { TWEAK_RISK_META } from "./models/tweak";
 import { PHASES, RESTART_LABEL } from "./tweaks/meta";
 import { fitsVendor, fitsWindows, packEligible, type TweakerVendor } from "./tweaker";
 
-const ROOT = "RustFlow-Pack";
+const ROOT = "SHIFT-Pack";
 
 export function packEntries({
   slugs,
@@ -17,6 +17,7 @@ export function packEntries({
   ram,
   vram,
   tuning,
+  includeCfg = true,
 }: {
   slugs: readonly string[];
   mode: GraphicsProfileId;
@@ -24,6 +25,7 @@ export function packEntries({
   ram: number;
   vram?: number;
   tuning?: ConfigTuning;
+  includeCfg?: boolean;
 }) {
   const chosen = TWEAKS.filter(
     (t) =>
@@ -46,14 +48,14 @@ export function packEntries({
   text(
     "README.txt",
     [
-      "RustFlow — выбранные настройки Rust",
+      "SHIFT — выбранные настройки Rust",
       `Профиль: ${profile.title}. Видеокарта: ${gpu.toUpperCase()}. ОЗУ: ${ram} ГБ. Выбрано шагов: ${chosen.length}.`,
       ...(tuning?.windowsVersion ? [`ОС: Windows ${tuning.windowsVersion}.`] : []),
-      `Буфер GC: ${gcBudget(ram, tuning).mb} МБ.`,
-      ...(gpu === "amd" && supportedLatency(tuning?.latencyMode, gpu) === "on"
+      ...(includeCfg ? [`Буфер GC: ${gcBudget(ram, tuning).mb} МБ.`] : ["Графический client.cfg не выбран и в архив не входит."]),
+      ...(includeCfg && gpu === "amd" && supportedLatency(tuning?.latencyMode, gpu) === "on"
         ? ["Radeon Anti-Lag включите вручную в AMD Software для профиля Rust. Конфиг не меняет драйвер."]
         : []),
-      ...(isMonitorHz(tuning?.monitorHz)
+      ...(includeCfg && isMonitorHz(tuning?.monitorHz)
         ? [`Лимит FPS: ${tuning.monitorHz}, по выбранной частоте монитора.`]
         : []),
       ...(connection
@@ -67,34 +69,38 @@ export function packEntries({
           ]
         : []),
       "2. Прочитайте инструкции и открытые файлы перед применением. Выполняйте только подходящие пункты, по одному.",
-      "3. Перед правкой графики закройте Rust. Сохраните копию cfg\\client.cfg рядом с оригиналом как client.cfg.rustflow-backup.",
-      "   Перенесите команды из client.cfg этого архива в оригинал, заменяя только одноимённые строки.",
-      "   Разрешение и текстуры выставьте в меню игры; остальные настройки своего файла сохраните.",
+      ...(includeCfg ? [
+        "3. Перед правкой графики закройте Rust. Сохраните копию cfg\\client.cfg рядом с оригиналом как client.cfg.rustflow-backup.",
+        "   Перенесите команды из client.cfg этого архива в оригинал, заменяя только одноимённые строки.",
+        "   Проверьте текстуры и прочие параметры в меню игры и F1: доступность команд зависит от версии Rust. Сохраните остальные настройки своего файла.",
+      ] : []),
       "4. Проверьте FPS и 1% low в одной сцене. Откат к каждому шагу — в папке Otkat, системное восстановление — rstrui.",
       "",
-      "Штатные настройки Windows, драйвера и игры; без вмешательства в память Rust. RustFlow не связан с Facepunch Studios.",
+      "Штатные настройки Windows, драйвера и игры; без вмешательства в память Rust. SHIFT не связан с Facepunch Studios.",
       "",
       ...chosen.map((t) => `• ${t.title} (${t.slug})`),
       "",
     ].join("\n"),
   );
-  entries.push({
-    name: `${ROOT}/client.cfg`,
-    data: encoder.encode(
-      profileCfg(mode, ram, "", vram === undefined ? undefined : textureMipForVram(vram), tuning, gpu).replace(
-        /\n/g,
-        "\r\n",
-      ) + "\r\n",
-    ),
-  });
-  entries.push({
-    name: `${ROOT}/Otkat/rustflow-restore-client-cfg.bat`,
-    data: encodeFile({ name: "rustflow-restore-client-cfg.bat", kind: "bat", content: cfgRestore() }),
-  });
-  text(
-    "Otkat/client-cfg.txt",
-    "При закрытом Rust восстановите свой cfg\\client.cfg из сохранённой копии. Если копия называется client.cfg.rustflow-backup, это можно сделать файлом rustflow-restore-client-cfg.bat. Скрипт не загружает файлы из интернета.",
-  );
+  if (includeCfg) {
+    entries.push({
+      name: `${ROOT}/client.cfg`,
+      data: encoder.encode(
+        profileCfg(mode, ram, "", vram === undefined ? undefined : textureMipForVram(vram), tuning, gpu).replace(
+          /\n/g,
+          "\r\n",
+        ) + "\r\n",
+      ),
+    });
+    entries.push({
+      name: `${ROOT}/Otkat/shift-restore-client-cfg.bat`,
+      data: encodeFile({ name: "shift-restore-client-cfg.bat", kind: "bat", content: cfgRestore() }),
+    });
+    text(
+      "Otkat/client-cfg.txt",
+      "При закрытом Rust восстановите свой cfg\\client.cfg из сохранённой копии. Если копия называется client.cfg.rustflow-backup, это можно сделать файлом shift-restore-client-cfg.bat. Скрипт не загружает файлы из интернета.",
+    );
+  }
 
   let n = 0;
   for (const phase of PHASES) {

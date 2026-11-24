@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { unzipSync, strFromU8 } from "fflate";
 import { evaluateBuild10, isValidBuildInput, QUICK_SAMPLE_BUILDS } from "@/lib/models/build";
-import { profileCfg } from "@/lib/graphics-profiles";
+import { profileCfg, textureMipForVram } from "@/lib/graphics-profiles";
 import { PLAY_DEFAULTS, readPlaySettings, type PlaySettings } from "@/lib/models/play-settings";
 import { localPack } from "@/lib/local-pack";
 import { personalPlanHref, packHref } from "@/lib/tweaker";
@@ -36,10 +36,10 @@ test("personal URL, server pack URL and browser ZIP preserve the same settings",
   }
   for (const gpu of ["nvidia", "amd"] as const) {
     const archive = unzipSync(localPack({ slugs: [], mode: "balanced", gpu, ram: 32, vram: 8, tuning })!);
-    const cfg = strFromU8(archive["RustFlow-Pack/client.cfg"]).replaceAll("\r\n", "\n").trim();
-    expect(cfg).toBe(profileCfg("balanced", 32, "", 1, tuning, gpu));
+    const cfg = strFromU8(archive["SHIFT-Pack/client.cfg"]).replaceAll("\r\n", "\n").trim();
+    expect(cfg).toBe(profileCfg("balanced", 32, "", textureMipForVram(8), tuning, gpu));
     expect(cfg).toContain(`graphics.reflexmode "${gpu === "nvidia" ? 2 : 0}"`);
     expect(cfg.match(/^gc\.buffer /gm)).toHaveLength(1);
-    if (gpu === "amd") expect(strFromU8(archive["RustFlow-Pack/README.txt"])).toContain("Anti-Lag включите вручную");
+    if (gpu === "amd") expect(strFromU8(archive["SHIFT-Pack/README.txt"])).toContain("Anti-Lag включите вручную");
   }
 });

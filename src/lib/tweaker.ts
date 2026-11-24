@@ -88,16 +88,18 @@ export interface TweakerPreferences {
   mode: GraphicsProfileId;
   gpu: TweakerVendor | null;
   slugs: string[] | null;
+  includeCfg: boolean;
 }
 
 export function readTweakerPreferences(input: unknown): TweakerPreferences | null {
   if (!input || typeof input !== "object") return null;
-  const { mode, preset, gpu, slugs } = input as Partial<TweakerPreferences> & { preset?: unknown };
+  const { mode, preset, gpu, slugs, includeCfg } = input as Partial<TweakerPreferences> & { preset?: unknown };
   const profile = getGraphicsProfile(mode ?? preset);
   if (!profile) return null;
   return {
     mode: profile.id,
     gpu: isTweakerVendor(gpu) ? gpu : null,
+    includeCfg: includeCfg === true,
     slugs: Array.isArray(slugs)
       ? Array.from(
           new Set(

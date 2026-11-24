@@ -1,5 +1,6 @@
 "use client";
 import { useFeedbackTimer } from "./fx/useFeedbackTimer";
+import { useDownload } from "./fx/useDownload";
 
 import { Check, Download, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -23,6 +24,7 @@ export default function DownloadButton({
 }) {
   const { toast } = useToast();
   const feedbackLater=useFeedbackTimer();
+  const downloadFile=useDownload();
   const [done, setDone] = useState(false);
   const Icon = variant === "revert" ? RotateCcw : Download;
   const classes = [
@@ -42,7 +44,19 @@ export default function DownloadButton({
       className={classes}
       aria-label={iconOnly ? label : undefined}
       title={iconOnly ? label : undefined}
-      onClick={() => {
+      onClick={async (event) => {
+        const match = /^\/api\/download\/([a-z0-9-]+)(?:\?v=(snapshot|restore-snapshot|revert))?$/.exec(href);
+        if (match) {
+          event.preventDefault();
+          const [{ getTweak, encodeFile }, { registryBackup }] = await Promise.all([import("@/lib/tweaks"), import("@/lib/tweaks/registry-backup")]);
+          const tweak = getTweak(match[1]);
+          const snapshot = tweak && (match[2] === "snapshot" || match[2] === "restore-snapshot") ? registryBackup(tweak) : null;
+          const file = match[2] === "revert" ? tweak?.revert : match[2] === "snapshot" ? snapshot?.save : match[2] === "restore-snapshot" ? snapshot?.restore : tweak?.file;
+          if (!file || !downloadFile(new Blob([new Uint8Array(encodeFile(file))], { type: "text/plain;charset=utf-8" }), file.name)) {
+            toast({ title: "Не удалось скачать файл", tone: "error" });
+            return;
+          }
+        }
         setDone(true);
         feedbackLater(() => setDone(false), 2000);
         toast({

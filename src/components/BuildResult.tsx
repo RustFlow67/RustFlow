@@ -7,8 +7,7 @@ import { avgFps, frameMs } from "@/lib/models/fps-calibration";
 import type { UpgradeReport } from "@/lib/models/build-upgrade";
 import { PLAY_OPTIONS, PLAY_DEFAULTS } from "@/lib/models/play-settings";
 import LiquidGlass from "@/components/LiquidGlass";
-import { AnimatedNumber } from "./fx/AnimatedNumber";
-import BuildRadar from "./addons/BuildRadar";
+import { CountUp } from "./fx/CountUp";
 import UpgradeVerdict from "./UpgradeVerdict";
 import Segmented from "./Segmented";
 
@@ -40,22 +39,23 @@ export default function BuildResult({
   return (
     <div className="result-sections">
       <div className="balance-overview">
-        <BuildRadar builds={[{ id: "benchmark", input, evaluation: r }]} compact />
+        <div className="balance-model" aria-label={`Модель баланса: ${BOTTLENECK_LABEL[r.bottleneck]}`}><div className="balance-model-orbit"><span>СИСТЕМА</span><strong>{BOTTLENECK_LABEL[r.bottleneck]}</strong><small>ВЕРОЯТНОЕ ОГРАНИЧЕНИЕ</small></div></div>
         <div className="balance-score">
           <small>Общая оценка</small>
           <p>
             <strong>
-              <AnimatedNumber value={r.score10} digits={1} />
+              <CountUp value={r.score10} digits={1} />
             </strong>{" "}
             / 10
           </p>
           <b>{r.verdictLabel}</b>
+          <p className="balance-bottleneck"><small>Вероятное узкое место</small><strong>{BOTTLENECK_LABEL[r.bottleneck]}</strong><span>Расчётная оценка, не измерение в игре.</span></p>
           <dl aria-label="Баллы по узлам">
             {(Object.keys(scoreLabels) as Array<keyof typeof scoreLabels>).map((key) => (
               <div key={key}>
                 <dt>{scoreLabels[key]}</dt>
                 <dd>
-                  <AnimatedNumber value={r.breakdown.find((b) => b.key === key)!.score} digits={1} />
+                  <CountUp value={r.breakdown.find((b) => b.key === key)!.score} digits={1} />
                 </dd>
               </div>
             ))}
@@ -90,10 +90,10 @@ export default function BuildResult({
                   <small>{online}</small>
                 </th>
                 <td>
-                  <AnimatedNumber value={Math.round(avgFps(fps))} />
+                  <CountUp value={Math.round(avgFps(fps))} />
                 </td>
                 <td>
-                  <AnimatedNumber value={fps.low1} />
+                  <CountUp value={fps.low1} />
                 </td>
               </tr>
             ))}

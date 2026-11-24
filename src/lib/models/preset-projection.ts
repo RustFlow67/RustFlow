@@ -1,5 +1,5 @@
 import { presetBuildInput } from "@/lib/addons/build-tools";
-import { getGraphicsProfile, graphicsCommands, profileCfg, type GraphicsProfileId } from "@/lib/graphics-profiles";
+import { getGraphicsProfile, graphicsCommands, profileCfg, textureMipForVram, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import { evaluateBuild10 } from "./build";
 import { type BuildResolution, formatBuildResolution, getResolutionSize } from "./build-resolution";
 import { frameMs } from "./fps-calibration";
@@ -45,7 +45,7 @@ export function projectPreset(preset: HardwarePreset, mode: GraphicsProfileId | 
       ? after.notes[0] ?? preset.bottleneckNote : preset.bottleneckNote,
     fpsModded: [modded.min, modded.max], low1Modded: modded.low1, frametimeModdedMs: frameMs(modded),
     fpsOfficial: [official.min, official.max], low1Official: official.low1, frametimeOfficialMs: frameMs(official),
-    cfgText: profile ? profileCfg(profile.id, preset.ramGb) : preset.cfgText,
+    cfgText: profile ? profileCfg(profile.id, preset.ramGb, "", textureMipForVram(preset.vramGb)) : preset.cfgText,
     settings: profile && commands ? {
       ...preset.settings, graphicsQuality: profile.short, drawDistance: profile.draw,
       shaderLevel: profile.shader, waterQuality: profile.water, shadowQuality: profile.shadows,

@@ -1,4 +1,5 @@
 "use client";
+import { recommendedProfile, useSetup } from "@/lib/shift-setup";
 import LiquidGlass from "@/components/LiquidGlass";
 import AdaptiveActions from "./AdaptiveActions";
 import type { TweakPlan } from "@/services/systemBridge";
@@ -33,8 +34,6 @@ import Segmented from "@/components/Segmented";
 import GraphicsPicker from "@/components/GraphicsPicker";
 import { FavoriteButton, useFavorites } from "@/components/addons/Favorites";
 import Link from "@/components/RouteLink";
-import { accountHeaders, useAccount } from "@/components/auth/AccountProvider";
-import ProfileGate, { openPlayerProfile, ProfileLock } from "@/components/auth/ProfileGate";
 import LiquidSelect from "@/components/LiquidSelect";
 import { Button, Switch } from "@/components/ui";
 import { usePopupState } from "@/components/fx/usePopupMotion";
@@ -60,9 +59,8 @@ import {
   isWindows,
   type ConfigTuning,
 } from "@/lib/models/build-settings";
-import { localAccount } from "@/lib/auth/local";
 import { getGpu } from "@/lib/hardware";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { gcBudget } from "@/lib/models/play-settings";
 import type { TweakLite } from "@/lib/tweaks/types";
 
@@ -87,8 +85,7 @@ type TweakerProps = {
 };
 
 export default function Tweaker(props: TweakerProps) {
-  const { session } = useAccount();
-  const locked = Boolean(props.personal && !session?.user);
+  const locked = false;
   const system = useSystemPlan();
   const seed = props.auto && props.auto !== "live" ? props.auto : null;
   const picked = useMemo(
@@ -101,8 +98,8 @@ export default function Tweaker(props: TweakerProps) {
       reset((v) => v + 1);
       document.getElementById("tweaker-profiles")?.scrollIntoView({ block: "center" });
     };
-    window.addEventListener("rustflow:reapply-plan", apply);
-    return () => window.removeEventListener("rustflow:reapply-plan", apply);
+    window.addEventListener("shift:reapply-plan", apply);
+    return () => window.removeEventListener("shift:reapply-plan", apply);
   }, []);
   const applied = props.auto ? picked : null;
   const personal = applied
@@ -124,7 +121,7 @@ export default function Tweaker(props: TweakerProps) {
       preview={!!seed}
       notice={
         locked ? (
-          <ProfileLock action="Подобрать конфиг под этот ПК" />
+          "Сначала настройте сборку."
         ) : props.auto && !picked ? (
           "Сначала настройте сборку. Пока показан общий каталог."
         ) : null
@@ -149,12 +146,11 @@ function TweakerForm({
   const systemSlugs = plan?.slugs;
   const download = useDownload();
   const { toast } = useToast();
-  const { session } = useAccount();
-  const user = session?.user;
+  const setup = useSetup();
   const { tweak: favorites } = useFavorites();
-  const { state, storage, hydrated } = useRustFlowStore();
+  const { state, storage, hydrated } = useShiftStore();
   const saved = state?.builds.find((b) => b.id === state.activeBuildId) ?? state?.builds[0];
-  const hardware = plan?.input ?? (personal ? undefined : (saved?.input ?? user?.build ?? undefined));
+  const hardware = plan?.input ?? (personal ? undefined : (saved?.input ?? undefined));
   const ram = personal?.ram ?? (isPackRam(hardware?.ramGb) ? hardware.ramGb : 16);
   const [osOverride, setOs] = useState<"auto" | "10" | "11">("auto");
   const { hostWindows } = useSystemPlan();
@@ -175,8 +171,9 @@ function TweakerForm({
     savedPrefs?.mode ??
     hardware?.graphicsProfile ??
     saved?.recommendedPreset ??
-    "balanced";
+    recommendedProfile(setup?.goal);
   const selection = (personal ? local?.slugs : savedPrefs?.slugs) ?? null;
+  const includeCfg = (personal ? local?.includeCfg : savedPrefs?.includeCfg) ?? false;
   function update(patch: Partial<TweakerPreferences>) {
     // In live/preview mode the rig remains authoritative until THIS field is
     // explicitly overridden. Editing one checkbox must not pin the old GPU.
@@ -184,7 +181,7 @@ function TweakerForm({
       setLocal((prev) => ({ ...{ gpu: null, slugs: null }, ...prev, ...patch }));
       return;
     }
-    const next = { gpu: vendor, mode, slugs: selection, ...patch };
+    const next = { gpu: vendor, mode, slugs: selection, includeCfg, ...patch };
     if (!hydrated || initialMode || initialGpu) setLocal(next);
     storage.updateTweaker(next);
   }
@@ -211,8 +208,9 @@ function TweakerForm({
     })
     .map((t) => t.slug);
   const chosen =
-    selection === null ? recommended : eligible.filter((t) => selection.includes(t.slug)).map((t) => t.slug);
+    selection === null ? [] : eligible.filter((t) => selection.includes(t.slug)).map((t) => t.slug);
   const chosenSet = new Set(chosen);
+  useEffect(() => { window.dispatchEvent(new CustomEvent("shift:scene-tweaks", { detail: { selected: chosen.length } })); }, [chosen.length]);
   const category = TWEAK_GROUPS.find((g) => g.id === group.value);
   const baseVendor = hardware ? getGpu(hardware.gpuId)?.vendor : initialGpu;
   const vram =
@@ -220,7 +218,7 @@ function TweakerForm({
   const mip = vram === undefined ? undefined : textureMipForVram(vram);
   const cfg = profileCfg(mode, ram, "", mip, tuning, gpu);
 
-  const action: TweakPlan = { kind: "pack", cfg, slugs: chosen, mode, gpu, ram, vram, tuning };
+  const action: TweakPlan = { kind: "pack", cfg: includeCfg ? cfg : "", includeCfg, slugs: chosen, mode, gpu, ram, vram, tuning };
 
   const [query, setQuery] = useState(""),
     [sort, setSort] = useState<TweakSort>("effective");
@@ -269,22 +267,15 @@ function TweakerForm({
     "Приоритет — по пользе для FPS, плавности или отклика. Эффект зависит от ПК; сравните два прогона. Фильтры не меняют состав ZIP.";
 
   function toggle(slug: string) {
-    update({ slugs: chosenSet.has(slug) ? chosen.filter((s) => s !== slug) : [...chosen, slug] });
+    const current = selection ?? [];
+    const next = chosenSet.has(slug) ? current.filter((s) => s !== slug) : [...current, slug];
+    update({ slugs: next });
+    window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: `Выбрано твиков: ${next.length}` } }));
   }
 
   function selectVendor(next: TweakerVendor) {
     if (next === gpu) return;
-    const driver = next === "amd" ? "amd-adrenalin" : next === "nvidia" ? "nvidia-panel" : null;
-    const hadDriver = selection?.some((slug) => slug === "amd-adrenalin" || slug === "nvidia-panel");
-    update({
-      gpu: next,
-      slugs: selection
-        ? [
-            ...selection.filter((slug) => slug !== "amd-adrenalin" && slug !== "nvidia-panel"),
-            ...(hadDriver && driver ? [driver] : []),
-          ]
-        : null,
-    });
+    update({ gpu: next });
   }
 
   async function copyCfg(from: HTMLElement) {
@@ -300,50 +291,22 @@ function TweakerForm({
     }
   }
 
-  async function downloadPack(opener: HTMLElement) {
-    if (!user || packing) return;
+  async function downloadPack() {
+    if (packing) return;
     setPacking(true);
+    window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: "Собираем ZIP…" } }));
     try {
-      let blob: Blob;
-      if (user.kind === "local") {
-        const { localPack } = await import("@/lib/local-pack");
-        if (localAccount()?.id !== user.id) {
-          openPlayerProfile(opener);
-          return;
-        }
-        const zip = localPack({ slugs: chosen, mode, gpu, ram, vram, tuning });
-        if (!zip) throw new Error("Проверьте выбранные твики.");
-        blob = new Blob([new Uint8Array(zip)], { type: "application/zip" });
-      } else {
-        const endpoint = new URL(packHref(chosen, mode, gpu, ram, vram, tuning), location.href);
-        if (endpoint.origin !== location.origin) throw new Error("Для скачивания нужен API на том же домене.");
-        const response = await fetch(endpoint, {
-          headers: accountHeaders(),
-          credentials: "same-origin",
-          cache: "no-store",
-          redirect: "error",
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (response.status === 401) {
-          openPlayerProfile(opener);
-          return;
-        }
-        if (!response.ok || response.headers.get("content-type") !== "application/zip")
-          throw new Error("Сервер не подготовил ZIP. Попробуйте ещё раз.");
-        blob = await response.blob();
-      }
-      const name = `RustFlow-Pack-${mode}.zip`;
-      if (download(blob, name))
-        toast({ title: "Загрузка началась успешно!", description: name, tone: "success" });
+      const { localPack } = await import("@/lib/local-pack");
+      const zip = localPack({ slugs: chosen, mode, gpu, ram, vram, tuning, includeCfg });
+      if (!zip) throw new Error("Проверьте выбранные твики.");
+      const name = `SHIFT-Pack-${mode}.zip`;
+      if (!download(new Blob([new Uint8Array(zip)], { type: "application/zip" }), name)) throw new Error("Не удалось начать загрузку.");
+      window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: "Загрузка ZIP началась" } }));
+      toast({ title: "Загрузка началась", description: name, tone: "success" });
     } catch (error) {
-      toast({
-        title: "Не удалось скачать ZIP",
-        description: error instanceof Error ? error.message : undefined,
-        tone: "error",
-      });
-    } finally {
-      setPacking(false);
-    }
+      window.dispatchEvent(new CustomEvent("shift:status", { detail: { text: "Ошибка сборки ZIP" } }));
+      toast({ title: "Не удалось скачать ZIP", description: error instanceof Error ? error.message : undefined, tone: "error" });
+    } finally { setPacking(false); }
   }
 
   const discoveryItem = (t: TweakerEntry) => (
@@ -383,7 +346,7 @@ function TweakerForm({
         onExited={insight.finish}
         source={insight.source}
         returnFocus={insight.opener}
-        title="ИИ-сводка вашего пакета"
+        title="Сводка вашего пакета"
         maxWidth="max-w-2xl"
       >
         <PackageInsight
@@ -394,21 +357,17 @@ function TweakerForm({
           vram={vram}
           tuning={tuning}
           rig={hardware}
-          cfg={cfg}
+          cfg={includeCfg ? cfg : ""}
         >
           <AdaptiveActions action={action}>
             <Button
               variant="primary"
               className="summary-download"
               loading={packing}
-              aria-haspopup={!user ? "dialog" : undefined}
-              onClick={(e) => (user ? void downloadPack(e.currentTarget) : openPlayerProfile(e.currentTarget))}
+              onClick={() => void downloadPack()}
             >
               <Download aria-hidden="true" /> Скачать готовый ZIP с откатом
             </Button>
-            {!user && (
-              <p className="mt-2 text-sm text-ink-3">Скачивание доступно после входа. Выбор шагов сохранится.</p>
-            )}
           </AdaptiveActions>
         </PackageInsight>
       </Modal>
@@ -433,6 +392,7 @@ function TweakerForm({
             label="Графический профиль Rust"
             presentation="cards"
           />
+          <div className="cfg-selection"><div><strong>Добавить графический client.cfg</strong><p>Отдельный выбор: профиль и gc.buffer попадут в пакет и нативный план только при включении. Остальные настройки и бинды сохраняются при безопасном слиянии.</p></div><Switch checked={includeCfg} onChange={(value) => update({ includeCfg: value })} label="Добавить графический client.cfg в пакет" /></div>
           <div className="tweaker-toolbar mt-4" aria-label="Параметры пакета">
             <Segmented
               ariaLabel="Показать твики"
@@ -473,17 +433,15 @@ function TweakerForm({
               />
             </div>
             <AdaptiveActions action={action}>
-              <ProfileGate action="Скачать ZIP с твиками и откатом" className="btn-primary">
                 <Button
                   variant="primary"
                   size="sm"
                   className="liquid-glass-btn"
                   loading={packing}
-                  onClick={(event) => void downloadPack(event.currentTarget)}
+                  onClick={() => void downloadPack()}
                 >
                   <Download aria-hidden="true" /> Скачать ZIP с твиками и откатом
                 </Button>
-              </ProfileGate>
               <button type="button" className="btn btn-sm" onClick={(event) => void copyCfg(event.currentTarget)}>
                 <Copy aria-hidden="true" /> Скопировать client.cfg
               </button>
@@ -521,7 +479,7 @@ function TweakerForm({
             </p>
           )}
           <p className="mt-3 text-xs leading-relaxed text-ink-3">
-            Рекомендуемые — обратимые настройки и проверки для вашего ПК. В файл настроек игры входит запас памяти между очистками:{" "}
+            Рекомендуемые — предложения для выбора, а не автоматически включённые шаги. Если добавить графический конфиг, в него войдёт запас памяти между очистками:{" "}
             <code>gc.buffer {gcBudget(ram, tuning).mb}</code>
             {personal
               ? " из выбранной конфигурации"
@@ -533,6 +491,19 @@ function TweakerForm({
             </Link>
           </p>
         </LiquidGlass>
+
+        <section className="manual-tweaks" aria-labelledby="manual-tweaks-title">
+          <div className="manual-tweaks-heading"><div><span className="tech-label">01 // ВАШ ВЫБОР</span><h2 id="manual-tweaks-title">Выберите <em>твики</em><span>.</span></h2><p>Включите только нужные шаги. Изменения не выполняются при выборе: архив содержит инструкции, а нативное применение требует отдельного подтверждения.</p></div>
+            <div className="manual-tweaks-actions"><button type="button" className="btn btn-sm" onClick={() => update({ slugs: recommended })}>Выбрать рекомендуемые</button><button type="button" className="btn btn-sm" onClick={() => update({ slugs: [] })}>Снять выбор</button></div>
+          </div>
+          <p className="manual-tweaks-note" aria-live="polite">Выбрано {chosen.length} из {eligible.length}. {includeCfg ? "Графический client.cfg включён отдельно." : "Графический client.cfg не включён."} Шаги для другой ОС или GPU, мифы и небезопасные советы в пакет не добавляются. gc.buffer — часть опционального конфига, не отдельный твик. {selection && selection.length > chosen.length ? `Ранее выбранных несовместимых шагов: ${selection.length - chosen.length}. Они сохранены, но не войдут в пакет при текущих параметрах.` : ""}</p>
+          <div className="manual-tweaks-grid">{eligible.map(t => <article className="manual-tweak" key={t.slug} data-manual-tweak={t.slug}>
+            <div className="manual-tweak-top"><span className="tech-label">{TWEAK_GROUPS.find(g => g.id === t.group)?.title} / {t.fileKind.toUpperCase()}</span><Switch checked={chosenSet.has(t.slug)} onChange={() => toggle(t.slug)} label={`Включить в пакет: ${t.title}`} /></div>
+            <h3>{t.title}</h3><p>{t.tagline}</p><small>{TWEAK_RISK_META[t.riskLevel].label} · {RESTART_LABEL[t.restart]}{recommended.includes(t.slug) ? " · Рекомендуется" : ""}</small>
+            <button type="button" className="manual-tweak-detail" onClick={event => openGroup(t.group, event.currentTarget, t.slug)} aria-haspopup="dialog">Описание и откат ↗</button>
+          </article>)}</div>
+          {!eligible.length && <p>Нет подходящих шагов. Проверьте выбранные GPU и версию Windows.</p>}
+        </section>
 
         <CatalogBar
           label="Твикер"

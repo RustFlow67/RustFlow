@@ -11,6 +11,7 @@ export type TweakPlan =
   | {
       kind: "pack";
       cfg: string;
+      includeCfg?: boolean;
       slugs: readonly string[];
       mode: GraphicsProfileId;
       gpu: TweakerVendor;
@@ -203,7 +204,9 @@ async function runNativePack(
 ): Promise<SystemResult<BatchExecutionReport>> {
   if (
     !window.confirm(
-      "Применить выбранные настройки в игру и Windows? Перед изменением будет создан снимок client.cfg и веток реестра в %AppData%/RustFlow/backups.",
+      plan.cfg.trim()
+        ? "Применить выбранный client.cfg и системные шаги? Перед изменениями будут созданы резервные копии. Проверьте выбор и инструкции."
+        : "Применить только выбранные системные шаги? Client.cfg не будет изменён. Перед изменениями будут созданы резервные копии. Проверьте выбор и инструкции.",
     )
   ) {
     return { status: "cancelled" };

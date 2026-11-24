@@ -20,8 +20,8 @@ export function RouteScroll({ children }: { children: ReactNode }) {
   const cancelExit = useRef<(() => void) | null>(null);
   useLayoutEffect(() => {
     const abort = () => { revision.current++; cancelExit.current?.(); cancelExit.current = null; };
-    window.addEventListener("popstate", abort); window.addEventListener("rustflow:modal-open", abort);
-    return () => { abort(); window.removeEventListener("popstate", abort); window.removeEventListener("rustflow:modal-open", abort); };
+    window.addEventListener("popstate", abort); window.addEventListener("shift:modal-open", abort);
+    return () => { abort(); window.removeEventListener("popstate", abort); window.removeEventListener("shift:modal-open", abort); };
   }, []);
   const destination = intent ?? pathname;
   const pulsed = useRef<string | null>(null), last = useRef(destination);

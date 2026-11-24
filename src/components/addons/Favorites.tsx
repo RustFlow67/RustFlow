@@ -2,7 +2,7 @@
 
 import { useId } from "react";
 import { Star } from "lucide-react";
-import { readFavorites } from "@/lib/auth/favorites";
+import { readFavorites } from "@/lib/favorites";
 import { useAddonValue } from "@/lib/addons/progress";
 import { storage } from "@/lib/storage/adapter";
 

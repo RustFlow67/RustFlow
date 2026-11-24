@@ -2,7 +2,7 @@ import { optics as materialOptics } from "./material-optics";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { QUICK_SAMPLE_BUILDS, evaluateBuild10, isValidBuildInput } from "@/lib/models/build";
 import { DRIVES, changeDrive, driveEstimate } from "@/lib/models/drive";
-import { profileBuild } from "@/lib/auth/profile-build";
+import { profileBuild } from "@/lib/profile-build";
 
 const activate = (el: Locator) => test.info().project.use.hasTouch ? el.tap() : el.click();
 const sample = QUICK_SAMPLE_BUILDS[0].input;

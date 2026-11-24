@@ -2,6 +2,7 @@
 
 import { AnimatedNumber } from "@/components/fx/AnimatedNumber";
 import { Radar } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { presetBuildInput } from "@/lib/addons/build-tools";
 import { evaluateBuild10, type BreakdownKey, type BuildEvaluation, type BuildInput, type UserBuild } from "@/lib/models/build";
 import { formatBuildResolution, getResolutionSize } from "@/lib/models/build-resolution";
@@ -46,6 +47,7 @@ const polygon = (scale: (axis: BreakdownKey) => number) => AXES.map(({ key }, i)
 }).join(" ");
 
 export default function BuildRadar({ builds, compact = false }: { builds: readonly RadarBuild[]; compact?: boolean }) {
+  const reduced = useReducedMotion();
   const series = builds.slice(0, compact ? 1 : 4).flatMap(({ id, input, label, evaluation: calculated }) => {
     const evaluation = calculated ?? evaluateBuild10(input);
     return evaluation ? [{ id, title: label ?? input.name, input, evaluation }] : [];
@@ -67,8 +69,8 @@ export default function BuildRadar({ builds, compact = false }: { builds: readon
             <text className={styles.chartText} x={at.x} y={at.y + 4} textAnchor="middle">{compact ? short ?? label : label}</text>
           </g>;
         })}
-        {series.map((item, i) => <polygon data-build-series="" key={item.id} className={`${styles.plot} ${PALETTES[i]}`}
-          points={polygon((axis) => value(i, axis) / 10)} />)}
+        {series.map((item, i) => <motion.polygon data-build-series="" key={item.id} className={`${styles.plot} ${PALETTES[i]}`}
+          initial={false} animate={{ points: polygon((axis) => value(i, axis) / 10) }} transition={{ duration: reduced ? 0 : .65, ease: [0.22, 1, 0.36, 1] }} />)}
         {!compact && [2, 4, 6, 8, 10].map((score) => <text key={score} className={styles.chartTick} x={center.x + 5} y={center.y - radius * score / 10 + 3}>{score}</text>)}
         {compact && <>
           <text className={`${styles.chartTick} ${styles.radarGuide}`} x={center.x} y="266" textAnchor="middle">Точки: подсказки</text>

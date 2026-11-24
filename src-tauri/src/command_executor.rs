@@ -173,11 +173,15 @@ pub fn parse_cfg_entries(raw: &str) -> Result<Vec<CfgKeyValue>, String> {
 /// cannot modify FOV, binds, audio, HUD, network, GC or FPS limits.
 pub fn is_graphics_cfg_key(key: &str) -> bool {
     matches!(key.to_ascii_lowercase().as_str(),
-        "graphics.drawdistance" | "graphics.shaderlod" | "graphics.shadowquality" | "graphics.shadowmode" |
+        "graphics.quality" | "graphics.lodbias" | "graphics.drawdistance" | "graphics.shaderlod" | "graphics.shadowquality" | "graphics.shadowmode" |
         "graphics.shadowcascades" | "graphics.shadowdistance" | "graphics.shadowlights" | "graphics.grassshadows" |
         "graphics.contactshadows" | "graphics.af" | "graphics.parallax" | "graphics.branding" |
         "graphics.reflexmode" | "graphics.vsync" | "graphics.renderscale" | "water.quality" | "water.reflections" |
-        "grass.quality" | "grass.displace" | "tree.quality" | "tree.meshes" | "terrain.quality" |
+        "grass.quality" | "grass.displacement" | "graphics.texturequality" | "graphicssettings.globaltexturemipmaplimit" |
+        "graphics.dlss" | "graphics.dlaa" | "graphics.reflexlatencymarker" | "graphicssettings.pixellightcount" |
+        "graphicssettings.particleraycastbudget" | "graphicssettings.softparticles" | "graphics.volumetric_clouds" |
+        "ui.showinventoryplayer" | "ui.inventoryplayerquality" | "graphicssettings.billboardsfacecameraposition" |
+        "graphicssettings.anisotropicfiltering" | "tree.quality" | "tree.meshes" | "terrain.quality" |
         "mesh.quality" | "decor.quality" | "particle.quality" | "effects.maxgibs" | "effects.ao" |
         "effects.bloom" | "effects.motionblur" | "effects.antialiasing")
 }
@@ -351,11 +355,10 @@ impl TweakCommand for ClientCfgCommand {
             String::new()
         };
 
-        // Keep a readily accessible first backup beside the config as well as
-        // the per-operation snapshot managed above. Never overwrite an old .bak.
-        if target_path.is_file() {
+        // Refresh the adjacent backup before each write; the transaction snapshot is retained separately.
+        if self.target == CfgTarget::Client && target_path.is_file() {
             let bak = target_path.with_file_name("client.cfg.bak");
-            if !bak.exists() { fs::copy(&target_path, &bak).map_err(|e| format!("Не удалось создать client.cfg.bak: {e}"))?; }
+            write_atomic_bytes(&bak, existing.as_bytes())?;
         }
         let (merged, changed_count) = merge_cfg_content(&existing, &self.entries);
         write_atomic_bytes(&target_path, merged.as_bytes())?;

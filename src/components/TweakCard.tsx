@@ -1,4 +1,5 @@
 "use client";
+import DownloadButton from "@/components/DownloadButton";
 
 import LiquidGlass from "@/components/LiquidGlass";
 import { usePopupTrigger } from "./fx/usePopupMotion";
@@ -118,7 +119,7 @@ const TweakCard = memo(function TweakCard({
   return (
     <>
       <LiquidGlass as="article"
-        className={`glass glass-hover group flex h-full flex-col p-5 ${
+        className={`glass glass-hover tweak-card group flex h-full flex-col p-5 ${
           isHarmful ? "glass-danger" : ""
         }`}
         data-open={stepsOpen ? "" : undefined}
@@ -258,23 +259,7 @@ const TweakCard = memo(function TweakCard({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <a
-              href={`/api/download/${tweak.slug}`}
-              download
-              aria-label={
-                isHarmful
-                  ? `Скачать файл восстановления ${tweak.fileName}`
-                  : `Скачать файл ${tweak.fileName}`
-              }
-              title={
-                isHarmful
-                  ? `Скачать инструкцию/скрипт восстановления (${tweak.fileName})`
-                  : `Скачать ${tweak.fileName}`
-              }
-              className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-ink hover:bg-white/20"
-            >
-              <Download className="h-4 w-4" aria-hidden="true" />
-            </a>
+            <DownloadButton href={`/api/download/${tweak.slug}`} label={isHarmful ? `Скачать файл восстановления ${tweak.fileName}` : `Скачать файл ${tweak.fileName}`} iconOnly size="sm" />
             <Link
               href={`/tweaks/${tweak.slug}`}
               aria-label={`Открыть инструкцию и код: ${tweak.title}`}

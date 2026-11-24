@@ -12,7 +12,7 @@ import { Badge, Button } from "@/components/ui";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { storage, type ImportPreview } from "@/lib/storage/adapter";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 
 export type BackupTab = "export" | "import";
 
@@ -24,7 +24,7 @@ function useDownloadBackup() {
     const json = JSON.stringify(bundle, null, 2);
     const blob = new Blob([json], { type: "application/json;charset=utf-8" });
     const date = new Date().toISOString().slice(0, 10);
-    if (!download(blob,`rustflow-profile-${date}.json`)) return;
+    if (!download(blob,`shift-backup-${date}.json`)) return;
     toast({
       title: "JSON-профиль скачан",
       description: `Сборок: ${bundle.builds.length}, твиков: ${bundle.appliedTweaks.length}.`,
@@ -51,7 +51,7 @@ export default function DataBackupModal({
   onTabChange: (tab: BackupTab) => void;
 }) {
   const confirm = usePopupTrigger();
-  const { state } = useRustFlowStore();
+  const { state } = useShiftStore();
   const { toast } = useToast();
   const handleDownloadJson = useDownloadBackup();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,7 +135,7 @@ export default function DataBackupModal({
         open={open}
         onClose={onClose}
         title="Резервная копия профиля (JSON)"
-        description="Копия сохранённых сборок, журнала замеров и настроек браузера. Она не меняет сборку в аккаунте и не включает данные входа."
+        description="Локальная копия сохранённых сборок, журнала замеров и настроек этого устройства."
         maxWidth="max-w-xl"
       >
         <Segmented
@@ -224,7 +224,7 @@ export default function DataBackupModal({
                 id="rf-import-json"
                 className="field font-sans !text-[12.5px]"
                 rows={5}
-                placeholder='{"app": "RustFlow", "schemaVersion": 1, ...}'
+                placeholder='{"app": "SHIFT", "schemaVersion": 1, ...}'
                 value={rawInput}
                 aria-invalid={importError ? "true" : undefined}
                 onChange={(e) => parseCandidate(e.target.value)}

@@ -2,19 +2,22 @@
 
 import { Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { isTauri } from "@tauri-apps/api/core";
 import LiquidGlass from "@/components/LiquidGlass";
 import { IS_DESKTOP_APP } from "@/lib/config";
 import { initSystemBridge } from "@/services/systemBridge";
 
+const subscribeNoop = () => () => {};
 export default function DesktopTitlebar() {
+  const tauri = useSyncExternalStore(subscribeNoop, () => isTauri(), () => false);
   useEffect(() => {
     if (IS_DESKTOP_APP) {
       initSystemBridge();
     }
   }, []);
 
-  if (!IS_DESKTOP_APP) return null;
+  if (!IS_DESKTOP_APP || !tauri) return null;
   const run = (action: "minimize" | "toggleMaximize" | "close") => {
     void getCurrentWindow()[action]().catch(() => {});
   };

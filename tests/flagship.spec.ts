@@ -6,7 +6,7 @@ import { HARDWARE_PRESETS } from "@/lib/models/preset";
 import { presetBuildInput } from "@/lib/addons/build-tools";
 import { isValidBuildInput, QUICK_SAMPLE_BUILDS, type BuildInput } from "@/lib/models/build";
 import { readSavedBuild } from "@/lib/models/saved-build";
-import { profileBuild } from "@/lib/auth/profile-build";
+import { profileBuild } from "@/lib/profile-build";
 import { TWEAKS_LITE } from "@/lib/tweaks";
 import { systemPlan, systemPlanHref, readPlanSeed } from "@/lib/catalog/system-plan";
 import { packEntries } from "@/lib/pack-entries";
@@ -263,7 +263,7 @@ test("calculator, actual preset, live two-tab recommendations and downloaded ZIP
   test.setTimeout(90000);
   await page.goto("/benchmark");
   const here = page.getByRole("dialog", { name: insight, exact: true }),
-    trigger = page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" }),
+    trigger = page.getByRole("button", { name: "Посмотреть сводку" }),
     footer = page.getByRole("region", { name: summary, exact: true });
   await expect(page.locator("#build-recommendations,.system-plan")).toHaveCount(0);
   await pick(page, "Версия Windows", "Windows 11");
@@ -341,12 +341,12 @@ test("calculator, actual preset, live two-tab recommendations and downloaded ZIP
   const dl = page.waitForEvent("download");
   await click(zip);
   const archive = unzipSync(await readFile((await (await dl).path())!));
-  const readme = strFromU8(archive["RustFlow-Pack/README.txt"]);
+  const readme = strFromU8(archive["SHIFT-Pack/README.txt"]);
   expect(readme).toContain("Windows 11");
   for (const s of after.slugs) expect(readme).toContain(`(${s})`);
   expect(readme).not.toMatch(/windows-10-graphics|amd-adrenalin|pagefile-auto/);
   expect(Object.keys(archive).some((n) => n.includes("/Otkat/"))).toBe(true);
-  const cfg = strFromU8(archive["RustFlow-Pack/client.cfg"]);
+  const cfg = strFromU8(archive["SHIFT-Pack/client.cfg"]);
   expect(cfg.match(/^gc\.buffer\s/gm)).toHaveLength(1);
   expect(cfg).toContain('gc.buffer "4096"');
 });
@@ -362,7 +362,7 @@ test("unmodified preview prepares its own package without replacing the saved ri
       );
   }, mine);
   await page.goto(`/benchmark?preset=${preset.slug}&mode=quality`);
-  await click(page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" }));
+  await click(page.getByRole("button", { name: "Посмотреть сводку" }));
   const box = page.getByRole("dialog", { name: insight, exact: true });
   await expect(box.getByRole("link", { name: apply })).toHaveAttribute("href", /auto=preview/);
   await click(box.getByRole("link", { name: apply }));

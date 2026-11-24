@@ -8,40 +8,36 @@ import { PageHeader } from "./PageHeader";
 // Same banner on first paint and on an optimistic Dock transition. Large route
 // tools own their interactive action; the pending banner cannot open a stale rig.
 const intros = {
-  "/knowledge": { eyebrow: "Полезные знания", title: "Команды и механики Rust", text: "Справочные карточки: проверяйте команды и актуальность механик на своей версии игры." },
   "/guide": {
     eyebrow: "С чего начать",
     title: "Пять шагов к настройке Rust",
     text: "Пройдите путь от резервной копии до контрольного замера. Отмечайте только то, что уже сделали на своём ПК.",
   },
   "/benchmark": {
-    eyebrow: "Сборка",
-    title: "Укажите ваш ПК — получите точный прогноз FPS и готовый конфиг",
+    eyebrow: "01 // HARDWARE LAB",
+    title: "Сборка.",
     text: "Начните с модели процессора и видеокарты. Прогноз — расчёт для выбранного ПК, не замер в игре. Конфиг — текстовый файл настроек Rust.",
   },
   "/presets": {
-    eyebrow: "Пресеты",
-    title: "43 сборки для Rust",
+    eyebrow: "02 // CONFIG LAB",
+    title: "Пресеты.",
     text: IS_DESKTOP_APP ? "Пресет — готовый набор настроек игры. Выберите похожий ПК и откройте «Детали», чтобы проверить команды перед применением." : "Пресет — готовый набор настроек игры. Выберите похожий ПК и откройте «Детали», чтобы посмотреть или скачать файл client.cfg.",
   },
   "/tweaker": {
-    eyebrow: "Твикер",
-    title: "Настройте Rust под себя",
+    eyebrow: "03 // SYSTEM CONTROL",
+    title: "Твикер.",
     text: IS_DESKTOP_APP ? "Выберите графику и обратимые шаги. Перед применением проверьте список и команды своего конфига." : "Выберите графику и понятные вам изменения. Твикер соберёт ZIP с настройками и инструкцией, как вернуть всё назад. На ПК ничего не запускается автоматически.",
   },
-  "/drivers": {eyebrow:"Драйверы",title:"Драйвер для вашего железа",text:"Драйвер помогает Windows работать с вашим устройством. Выберите устройство, затем свою модель — появится инструкция и ссылки производителя."},
   "/windows": {eyebrow:"Windows",title:"Настройте Windows для игры",text:"Сначала запишите, как игра работает сейчас. Затем измените один параметр и повторите тот же маршрут: так проще отличить пользу от случайности."},
   "/faq": {
-    eyebrow: "Мифы и EAC",
-    title: "Что не стоит применять",
+    eyebrow: "06 // SAFETY & FAQ",
+    title: "FAQ.",
     text: "EAC — античит Rust. Прежде чем пробовать чужой «ускоритель», проверьте, не вмешивается ли он в игру и есть ли штатная альтернатива.",
   },
 } as const;
 export type DockPath = "/" | keyof typeof intros;
 const actions = {
-  "/knowledge": ["#knowledge", "К карточкам"],
   "/guide": ["#roadmap", "К моей дорожной карте"],
-  "/drivers": ["#driver-selector","Выбрать устройство"],
   "/windows": ["#measure","К протоколу замера"],
   "/presets": ["#preset-library", "Выбрать пресет"],
   "/tweaker": ["#pack-settings", "Настроить пакет"],
@@ -75,8 +71,11 @@ export function DockIntro({
       </section>
     );
   const button = "btn btn-primary mt-4";
+  const intro = intros[href];
+  const editorialTitle = href === "/benchmark" || href === "/presets" || href === "/tweaker"
+    ? <em>{intro.title}</em> : intro.title;
   return (
-    <PageHeader {...intros[href]}>
+    <PageHeader {...intro} title={editorialTitle}>
       {children ??
         (href === "/benchmark" ? (
           <div className="mt-4"><SummaryButton disabled /></div>

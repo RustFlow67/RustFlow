@@ -203,7 +203,7 @@ test("dock navigation commits the requested page and keeps browser history", asy
   expect(paint.optics).toEqual(["pageArrival", materialOptics(28, "pane"), "hidden", "isolate"]);
   expect(paint.roots).toEqual([]); expect(paint.reserved).toBe(paint.natural); expect(paint.scroll).toBe(1100);
   await firstCommit.dispose();
-  await expect(page.getByRole("heading", { level: 1, name: "43 сборки для Rust" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Пресеты." })).toBeVisible();
   await expect(page).toHaveURL(/\/presets$/);
   await activate(page.getByRole("button", { name:"Меню RustFlow" }));
   await activate(page.locator("#rustflow-menu").getByRole("link", { name: /С чего начать/ }));
@@ -340,7 +340,7 @@ test("motion is local, interruptible, and keeps the modal's scroll area usable",
   // Two navigation intents in one task: only the last destination may push.
   await dock.evaluate(el => { el.querySelector<HTMLElement>('a[href="/tweaker"]')!.click(); el.querySelector<HTMLElement>('a[href="/drivers"]')!.click(); });
   await expect(page).toHaveURL(/\/drivers$/);
-  await expect(main.getByRole("heading", { level: 1 })).toHaveText("Драйвер для вашего железа");
+  await expect(main.getByRole("heading", { level: 1 })).toHaveText("Драйверы.");
   await expect(page.locator('[data-velocity]')).toHaveCount(0);
   const profile = page.getByRole("button", { name: "Профиль", exact: true });
   await activate(profile);

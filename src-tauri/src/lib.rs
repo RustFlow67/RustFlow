@@ -17,7 +17,46 @@ use command_executor::{
 use hardware_info::WindowsHardwareInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use sysinfo::System;
 use steam_locator::RustInstallPaths;
+
+/// Shared sampler: CPU load needs two readings separated in time.
+struct TelemetrySampler {
+    system: System,
+    previous: Option<Instant>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TelemetrySample {
+    cpu_load: Option<f32>,
+    #[serde(rename = "cpuMHz")]
+    cpu_m_hz: Option<u64>,
+    #[serde(rename = "ramUsedGB")]
+    ram_used_g_b: Option<f64>,
+    #[serde(rename = "ramTotalGB")]
+    ram_total_g_b: Option<f64>,
+}
+
+#[tauri::command]
+fn read_telemetry(state: tauri::State<'_, Mutex<TelemetrySampler>>) -> Result<TelemetrySample, String> {
+    let mut sampler = state.lock().map_err(|_| "Датчик системы недоступен".to_string())?;
+    let now = Instant::now();
+    let valid_cpu = sampler.previous.map(|t| now.duration_since(t) >= Duration::from_millis(200)).unwrap_or(false);
+    sampler.system.refresh_cpu_all();
+    sampler.system.refresh_memory();
+    sampler.previous = Some(now);
+    let system = &sampler.system;
+    let total = system.total_memory();
+    Ok(TelemetrySample {
+        cpu_load: if valid_cpu && !system.cpus().is_empty() { Some(system.global_cpu_usage()) } else { None },
+        cpu_m_hz: system.cpus().first().map(|cpu| cpu.frequency()).filter(|value| *value > 0),
+        ram_used_g_b: if total > 0 { Some(system.used_memory() as f64 / 1_073_741_824.0) } else { None },
+        ram_total_g_b: if total > 0 { Some(total as f64 / 1_073_741_824.0) } else { None },
+    })
+}
 
 /// Сведения о созданном снимке конфигурации.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +170,7 @@ fn find_driver_installers(family: Option<String>) -> Result<Vec<DetectedInstalle
     command_executor::find_downloaded_installers(family.as_deref())
 }
 
-/// Файл внутри экспортируемого пакета `RustFlow-Pack`.
+/// Файл внутри экспортируемого пакета `SHIFT-Pack`.
 #[derive(Deserialize)]
 struct PackFile {
     name: String,
@@ -161,7 +200,7 @@ fn validate_pack(files: &[PackFile]) -> Result<(), String> {
         let parts: Vec<_> = file.name.split('/').collect();
         if parts.len() < 2
             || parts.len() > 4
-            || parts[0] != "RustFlow-Pack"
+            || parts[0] != "SHIFT-Pack"
             || file.name.len() > 200
         {
             return Err("Недопустимый путь внутри пакета.".into());
@@ -199,7 +238,7 @@ fn validate_pack(files: &[PackFile]) -> Result<(), String> {
     Ok(())
 }
 
-/// Сохраняет пакет `RustFlow-Pack` (включая `README.txt` и `Otkat/`) на рабочий стол без автозапуска.
+/// Сохраняет пакет `SHIFT-Pack` (включая `README.txt` и `Otkat/`) на рабочий стол без автозапуска.
 #[tauri::command]
 fn save_tweak_pack(app: tauri::AppHandle, files: Vec<PackFile>) -> Result<SavedPack, String> {
     validate_pack(&files)?;
@@ -215,7 +254,7 @@ fn save_tweak_pack(app: tauri::AppHandle, files: Vec<PackFile>) -> Result<SavedP
 
         let display_desktop = app.path().desktop_dir().map_err(|e| e.to_string())?;
         let desktop = std::fs::canonicalize(&display_desktop).map_err(|e| e.to_string())?;
-        let root = desktop.join("RustFlow_Tweaks");
+        let root = desktop.join("SHIFT_Tweaks");
         std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
         let root = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
         if root.parent() != Some(desktop.as_path()) {
@@ -248,9 +287,9 @@ fn save_tweak_pack(app: tauri::AppHandle, files: Vec<PackFile>) -> Result<SavedP
         }
 
         let readme = display_desktop
-            .join("RustFlow_Tweaks")
+            .join("SHIFT_Tweaks")
             .join(directory_name)
-            .join("RustFlow-Pack")
+            .join("SHIFT-Pack")
             .join("README.txt");
         let opened = readme.is_file()
             && std::process::Command::new("explorer.exe")
@@ -266,8 +305,10 @@ fn save_tweak_pack(app: tauri::AppHandle, files: Vec<PackFile>) -> Result<SavedP
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(Mutex::new(TelemetrySampler { system: System::new(), previous: None }))
         .invoke_handler(tauri::generate_handler![
             read_windows_info,
+            read_telemetry,
             find_rust_directory,
             locate_steam_rust,
             backup_client_cfg,
@@ -300,25 +341,25 @@ mod pack_tests {
     #[test]
     fn accepts_pack_and_rejects_unsafe_paths() {
         assert!(validate_pack(&[
-            file("RustFlow-Pack/README.txt"),
-            file("RustFlow-Pack/Otkat/test.bat"),
+            file("SHIFT-Pack/README.txt"),
+            file("SHIFT-Pack/Otkat/test.bat"),
         ])
         .is_ok());
 
         for path in [
             "../evil.bat",
-            "RustFlow-Pack/../evil.reg",
-            "RustFlow-Pack/C:/evil.bat",
-            "RustFlow-Pack/evil.exe",
-            "RustFlow-Pack/NUL.txt",
-            "RustFlow-Pack/a\\evil.reg",
+            "SHIFT-Pack/../evil.reg",
+            "SHIFT-Pack/C:/evil.bat",
+            "SHIFT-Pack/evil.exe",
+            "SHIFT-Pack/NUL.txt",
+            "SHIFT-Pack/a\\evil.reg",
         ] {
             assert!(validate_pack(&[file(path)]).is_err(), "{path}");
         }
 
         assert!(validate_pack(&[
-            file("RustFlow-Pack/a.txt"),
-            file("RustFlow-Pack/A.TXT"),
+            file("SHIFT-Pack/a.txt"),
+            file("SHIFT-Pack/A.TXT"),
         ])
         .is_err());
     }

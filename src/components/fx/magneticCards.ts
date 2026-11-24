@@ -119,19 +119,19 @@ export function magneticCards() {
   document.addEventListener("pointerout", leave);
   window.addEventListener("scroll", scrolled, { passive: true, capture: true });
   window.addEventListener("blur", stop);
-  window.addEventListener("rustflow:motion-change", stop);
+  window.addEventListener("shift:motion-change", stop);
   fine.addEventListener("change", stop);
   document.addEventListener("keydown", stop);
-  window.addEventListener("rustflow:modal-open", stop);
+  window.addEventListener("shift:modal-open", stop);
   return () => {
     stop();
     document.removeEventListener("pointermove", move);
     document.removeEventListener("pointerout", leave);
     window.removeEventListener("scroll", scrolled, true);
     window.removeEventListener("blur", stop);
-    window.removeEventListener("rustflow:motion-change", stop);
+    window.removeEventListener("shift:motion-change", stop);
     fine.removeEventListener("change", stop);
     document.removeEventListener("keydown", stop);
-    window.removeEventListener("rustflow:modal-open", stop);
+    window.removeEventListener("shift:modal-open", stop);
   };
 }

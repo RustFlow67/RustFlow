@@ -11,6 +11,8 @@ for (const name of ['src', 'public', 'next.config.ts', 'tsconfig.json', 'postcss
 }
 symlinkSync(path.join(root, 'node_modules'), path.join(stage, 'node_modules'), 'junction');
 for (const route of ['api', 'admin']) rmSync(path.join(stage, 'src/app', route), { recursive: true, force: true });
+// Desktop-only UI sources live outside the public web routes.
+cpSync(path.join(root, 'desktop-src'), path.join(stage, 'src/app'), { recursive: true, force: true });
 // Convert request-time query parsing to client-side parsing. Keep the original
 // render bodies so deep links behave the same without a Next server.
 for (const name of ['benchmark', 'presets', 'tweaker']) {

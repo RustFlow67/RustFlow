@@ -3,8 +3,8 @@
 import { enterDepth } from "./pageDepth";
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
-import { captureSource, setSourcePose, sourceBox, type PopupSource } from "./popupGeometry";
-import { pulseFlight, quietMotion } from "./velocity";
+import { captureSource, setSourcePose, type PopupSource } from "./popupGeometry";
+import { quietMotion } from "./velocity";
 
 export type PopupOrigin = { source: RefObject<PopupSource>; returnFocus: RefObject<HTMLElement | null> };
 
@@ -78,15 +78,6 @@ export function usePopupMotion<T extends HTMLElement>(
       panel.dataset.ready = "";
     }
     panel.toggleAttribute("data-shown", !closing);
-    // Bidirectional shell/content flight: the same blur + vector stretch on
-    // open and on close, sharp at rest. The shell carries its contents.
-    const box = sourceBox(origin, closing);
-    const slot = panel.parentElement?.getBoundingClientRect();
-    const dx = box && slot ? slot.left + slot.width / 2 - (box.left + box.width / 2) : 0;
-    const dy = box && slot ? slot.top + slot.height / 2 - (box.top + box.height / 2) : 0;
-    const flightTime = closing ? 340 : 380;
-    const shells = origin ? [panel] : [];
-    const stopFlight = shells.length ? pulseFlight(shells, dx, dy, flightTime) : undefined;
     if (!closing) {
       const release = enterDepth(panel);
       // A HUD source stays visible in its pinned bar while siblings recede;
@@ -100,7 +91,6 @@ export function usePopupMotion<T extends HTMLElement>(
       }
       src?.setAttribute("data-flip-anchor", "");
       return () => {
-        stopFlight?.();
         release();
         src?.removeAttribute("data-flip-anchor");
         if (hud && !hud.querySelector("[data-flip-anchor]")) {
@@ -109,8 +99,7 @@ export function usePopupMotion<T extends HTMLElement>(
         }
       };
     }
-    // Exactly at 340ms the window unmounts and the untouched source plays
-    // its landing bounce. No post-close ghost, no extra timers.
+    // Unmount after the current transition; a reopened sheet cancels this exit.
     let cancelled = false;
     const done = () => {
       if (cancelled) return;
@@ -124,20 +113,17 @@ export function usePopupMotion<T extends HTMLElement>(
       captured.current = null;
       finish.current();
     };
-    // Unified close cycle: every window is gone exactly 340ms after the
-    // dismiss click. Transitions ending on time resolve through allSettled
-    // on the same tick; the deadline only guards a stalled timeline.
+    // The deadline guards stalled transitions; reduced motion completes immediately.
     const deadline = window.setTimeout(done, 340);
     const transitions = [...panel.getAnimations()]
       .filter(
         (a) =>
           "transitionProperty" in a &&
-          ["transform", "clip-path", "opacity", "width", "height", "border-top-left-radius"].includes(String(a.transitionProperty)),
+          ["transform", "opacity"].includes(String(a.transitionProperty)),
       );
     void Promise.allSettled(transitions.map((a) => a.finished)).then(done);
     return () => {
       cancelled = true;
-      stopFlight?.();
       clearTimeout(deadline);
     };
   }, [isOpen, closing, source, anchor]);

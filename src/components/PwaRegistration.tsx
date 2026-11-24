@@ -9,7 +9,7 @@ export default function PwaRegistration() {
 
     const register = () => {
       // Browsers or privacy settings may disable service workers. The site stays usable.
-      void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+      void navigator.serviceWorker.register("/shift-sw.js", { scope: "/" }).catch(() => {});
     };
     if (document.readyState === "complete") register();
     else window.addEventListener("load", register, { once: true });
