@@ -15,9 +15,12 @@ public final class ConfigEditorSelfTest {
             if (!Files.readString(cfg).equals(output) || !Files.readString(backup).equals(input)) throw new AssertionError("Config or backup mismatch");
             try { ConfigEditor.apply(cfg, Map.of("graphics.drawdistance", "800")); throw new AssertionError("Existing backup should block the operation"); }
             catch (java.nio.file.FileAlreadyExistsException expected) { /* no overwrite */ }
-            if (!Files.readString(cfg).equals(output)) throw new AssertionError("Rejected operation changed config");
+            if (!Files.readString(cfg).equals(output) || !Files.readString(backup).equals(input)) throw new AssertionError("Rejected operation changed config or backup");
             ConfigEditor.restore(cfg);
             if (!Files.readString(cfg).equals(input) || !Files.readString(backup).equals(input)) throw new AssertionError("Restore failed");
+            try { ConfigEditor.apply(cfg, Map.of("graphics.drawdistance", "800")); throw new AssertionError("Restored backup must still block edits"); }
+            catch (java.nio.file.FileAlreadyExistsException expected) { /* restoration retains the backup */ }
+            if (!Files.readString(cfg).equals(input) || !Files.readString(backup).equals(input)) throw new AssertionError("Retry changed restored files");
         } finally { Files.deleteIfExists(cfg); Files.deleteIfExists(backup); Files.deleteIfExists(dir); }
         System.out.println("ConfigEditorSelfTest passed");
     }

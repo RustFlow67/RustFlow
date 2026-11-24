@@ -1,6 +1,7 @@
 package app.rustflow;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
@@ -8,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -72,12 +74,15 @@ public final class ConfigEditor {
         String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
         if (text.indexOf('\0') >= 0) throw new IOException("Недопустимый формат файла.");
         Path backup = file.resolveSibling("client.cfg.bak");
-        if (Files.isSymbolicLink(backup)) throw new IOException("client.cfg.bak является ссылкой.");
-        Path backupTmp = Files.createTempFile(file.getParent(), ".shift-backup-", ".tmp");
-        try {
-            Files.write(backupTmp, bytes);
-            Files.move(backupTmp, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally { Files.deleteIfExists(backupTmp); }
+        // CREATE_NEW atomically refuses an existing file, directory, or symlink.
+        // Never remove an existing backup, even if opening it fails.
+        OutputStream backupStream = Files.newOutputStream(backup, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        try (backupStream) {
+            backupStream.write(bytes);
+        } catch (IOException ex) {
+            try { Files.deleteIfExists(backup); } catch (IOException cleanup) { ex.addSuppressed(cleanup); }
+            throw ex;
+        }
         Path tmp = Files.createTempFile(file.getParent(), ".rustflow-", ".tmp");
         try {
             Files.writeString(tmp, merge(text, settings), StandardCharsets.UTF_8);

@@ -69,7 +69,8 @@ export default function HomeExperience() {
     function move(e:TouchEvent){if(!touch||!e.touches.length)return;const area=e.target instanceof Element?e.target.closest<HTMLElement>('.home-slide-scroll'):null;const y=e.touches[0].clientY,delta=touch.lastY-y;touch.lastY=y;if(area && area.scrollHeight>area.clientHeight+2){const before=area.scrollTop;area.scrollTop+=delta;if(Math.abs(area.scrollTop-before)>0)touch.scrolled=true;}}
     function end(e:TouchEvent){if(!touch||!e.changedTouches.length)return;const dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;if(!touch.scrolled&&Math.abs(dy)>60&&Math.abs(dy)>Math.abs(dx))go(slide+(dy<0?1:-1));touch=null;}
     window.addEventListener('wheel',wheel,{passive:false});window.addEventListener('keydown',keys);window.addEventListener('touchstart',start,{passive:true});window.addEventListener('touchmove',move,{passive:true});window.addEventListener('touchend',end,{passive:true});
-    return()=>{window.removeEventListener('wheel',wheel);window.removeEventListener('keydown',keys);window.removeEventListener('touchstart',start);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);};
+    document.documentElement.dataset.homeGesturesReady='true';
+    return()=>{delete document.documentElement.dataset.homeGesturesReady;window.removeEventListener('wheel',wheel);window.removeEventListener('keydown',keys);window.removeEventListener('touchstart',start);window.removeEventListener('touchmove',move);window.removeEventListener('touchend',end);};
   },[slide,go]);
   return <div className="home-deck" data-slide={slide}>
     <section id="scene-1" className="home-slide home-hero" aria-label={en?'About Us':'О нас'} hidden={slide!==0}>

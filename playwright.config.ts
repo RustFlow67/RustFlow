@@ -7,7 +7,12 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests",
-  ...(IS_DESKTOP_APP ? { testMatch: "**/native-mode.spec.ts" } : { testIgnore: "**/native-mode.spec.ts" }),
+  // Historical specs target retired routes and the old onboarding. Keep them available
+  // via playwright.legacy.config.ts, but run current showcase and shared-logic coverage by default.
+  testMatch: IS_DESKTOP_APP ? ["**/native-mode.spec.ts"] : [
+    "**/showcase.spec.ts", "**/cfg-merge.spec.ts", "**/graphics-profiles.spec.ts",
+    "**/play-settings.spec.ts", "**/native-hardware.spec.ts", "**/hardware-2026.spec.ts",
+  ],
   workers: 1,
   timeout: 60_000,
   use: {

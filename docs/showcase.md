@@ -13,3 +13,11 @@ from `desktop-src/` and exports it into `out/`; Windows packaging and its behavi
 still require Windows verification. The staged development tree is refreshed when
 `node scripts/desktop-dev.mjs`/the Tauri development command starts and should be restarted
 after source changes.
+
+## Tests
+
+`npx playwright test` runs the current showcase and shared configuration/hardware
+regressions in desktop and touch projects. The historical E2E specifications for
+removed routes and the old onboarding are retained for reference only; they are
+not compatible with this site. `npm run test:legacy` runs those historical tests
+with a separate configuration and is not expected to pass against the showcase.

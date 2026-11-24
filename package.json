@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
     "test:ui": "playwright test tests/showcase.spec.ts",
-    "test:legacy": "playwright test",
+    "test:legacy": "playwright test --config playwright.legacy.config.ts",
     "tauri": "tauri",
     "build:desktop": "node scripts/build-desktop.mjs"
   },

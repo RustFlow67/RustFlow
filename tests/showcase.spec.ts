@@ -20,6 +20,7 @@ test('first visit has three sculptures and consent; subsequent reload skips setu
 
 test('four translated scenes, menu navigation, FAQ and removed routes',async({page,request})=>{
   test.setTimeout(120000);await page.addInitScript(()=>localStorage.setItem('shift_web_device_onboarded','true')); await page.goto('/');
+  await expect(page.getByRole('heading',{name:'SHIFT.'})).toBeVisible({timeout:30000});
   const nav=page.getByRole('navigation',{name:'Разделы'});const items=nav.getByRole('link');await expect(items).toHaveCount(4);
   await expect(items.nth(0)).toContainText('О нас');await expect(items.nth(1)).toContainText('О нашем проекте');await expect(items.nth(2)).toContainText('О приложении');await expect(items.nth(3)).toContainText('FAQ и мифы');
   await items.nth(1).click(); await expect(page.locator('.home-deck')).toHaveAttribute('data-slide','1'); await expect(page.getByText(/Пиковый FPS в пустом поле/)).toBeVisible();
@@ -41,6 +42,9 @@ test('keyboard and wheel navigate; reduced motion retains immediate setup state'
 test('wheel and touch gestures change scenes without document scrolling', async ({page},info)=>{
   test.setTimeout(90000); await page.addInitScript(()=>localStorage.setItem('shift_web_device_onboarded','true')); await page.goto('/');
   const deck=page.locator('.home-deck'); await expect(deck).toHaveAttribute('data-slide','0');
+  await expect(page.locator('html')).toHaveAttribute('data-home-gestures-ready','true');
+  await expect(page.getByRole('heading',{name:'SHIFT.'})).toBeVisible({timeout:30000});
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   if(info.project.name==='touch') {
     await page.evaluate(()=>{
       const target=document.querySelector('.home-hero')!;
@@ -56,6 +60,7 @@ test('wheel and touch gestures change scenes without document scrolling', async 
 test('scene content and FAQ span the available width and menu labels do not wrap', async ({page},info) => {
   await page.addInitScript(() => localStorage.setItem('shift_web_device_onboarded','true'));
   await page.goto('/');
+  await expect(page.getByRole('heading',{name:'SHIFT.'})).toBeVisible({timeout:30000});
   const nav=page.getByRole('navigation',{name:'Разделы'});
   await expect(nav.getByRole('link')).toHaveCount(4);
   for (const language of ['RU', 'EN']) {
@@ -82,4 +87,33 @@ test('scene content and FAQ span the available width and menu labels do not wrap
       }
     }
   }
+});
+
+test('showcase works when storage is blocked and preserves the consent requirement', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.addInitScript(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } }); });
+  await page.goto('/');
+  const dialog=page.getByRole('dialog');
+  await expect(dialog).toBeVisible({timeout:30000});
+  await dialog.getByRole('button',{name:'Продолжить'}).click();
+  await dialog.getByRole('button',{name:'Продолжить'}).click();
+  const enter=dialog.getByRole('button',{name:'Войти в SHIFT'});
+  await expect(enter).toBeDisabled();
+  await dialog.getByRole('checkbox').check();
+  await enter.click();
+  await expect(dialog).toHaveCount(0);
+  const nav=page.getByRole('navigation',{name:'Разделы'});
+  await expect(nav.getByRole('link')).toHaveCount(4);
+  await nav.getByRole('link').nth(3).click();
+  await expect(page.getByRole('button',{name:/За любые оптимизаторы/})).toBeVisible();
+});
+
+test('removed pages return 404 and menu links navigate back to the chosen scene', async ({page}) => {
+  await page.addInitScript(()=>localStorage.setItem('shift_web_device_onboarded','true'));
+  const response=await page.goto('/tweaker');
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole('heading',{name:'Страница не найдена.'})).toBeVisible();
+  await page.getByRole('navigation',{name:'Разделы'}).getByRole('link').nth(2).click();
+  await expect(page.locator('.home-deck')).toHaveAttribute('data-slide','2');
+  await expect(page.getByText(/Отдельное десктопное направление/)).toBeVisible();
 });
