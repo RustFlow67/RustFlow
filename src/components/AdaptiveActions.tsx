@@ -36,7 +36,7 @@ function outcomeMessage(value: unknown, fallback: string): string {
 
 /** В веб-версии рендерит исходный контент, в десктопе — нативные кнопки. */
 export default function AdaptiveActions({ action, children }: { action: Action; children: ReactNode }) {
-  return IS_DESKTOP_APP ? <NativeActions action={action} /> : children;
+  return IS_DESKTOP_APP ? <><NativeActions action={action} />{action.kind === "pack" && children}</> : children;
 }
 
 function NativeActions({ action }: { action: Action }) {
@@ -99,14 +99,14 @@ function NativeActions({ action }: { action: Action }) {
           setMessage(
             result.message ||
               (action.kind === "pack" && tauri && mode === "primary"
-                ? "Не удалось сохранить пакет или открыть Проводник. Проверьте папку RustFlow_Tweaks на Рабочем столе."
+                ? "Не удалось сохранить пакет или открыть Проводник. Проверьте папку SHIFT_Tweaks на Рабочем столе."
                 : "Системный модуль вернул ошибку. Проверьте состояние ПК перед повтором."),
           );
           break;
         default:
           setMessage(
             action.kind === "pack" && tauri && mode === "primary"
-              ? "Не удалось сохранить пакет или открыть Проводник. Проверьте папку RustFlow_Tweaks на Рабочем столе."
+              ? "Не удалось сохранить пакет или открыть Проводник. Проверьте папку SHIFT_Tweaks на Рабочем столе."
               : "Системный модуль не подтвердил выполнение. Проверьте состояние ПК перед повтором.",
           );
       }

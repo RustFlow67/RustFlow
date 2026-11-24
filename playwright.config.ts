@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 
-import { IS_DESKTOP_APP } from "./src/lib/config";
+const IS_DESKTOP_APP = process.env.NEXT_PUBLIC_IS_DESKTOP_APP === "true";
 
 const port = IS_DESKTOP_APP ? 3001 : 3000;
 const baseURL = `http://127.0.0.1:${port}`;

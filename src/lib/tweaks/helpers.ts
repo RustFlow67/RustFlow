@@ -136,7 +136,8 @@ const PS_APPLY = String.raw`function Main {
     $backup = $cfg + '.rustflow-backup'
     if (-not (Test-Path -LiteralPath $backup)) { Copy-Item -LiteralPath $cfg -Destination $backup }
     $bak = $cfg + '.bak'
-    if (-not (Test-Path -LiteralPath $bak)) { Copy-Item -LiteralPath $cfg -Destination $bak }
+    if ((Test-Path -LiteralPath $bak) -and (Get-Item -LiteralPath $bak -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Backup path is a link; nothing changed.' }
+    Copy-Item -LiteralPath $cfg -Destination $bak -Force -ErrorAction Stop
     $bytes = [System.IO.File]::ReadAllBytes($cfg)
     $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
     $offset = if ($hasBom) { 3 } else { 0 }

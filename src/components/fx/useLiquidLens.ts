@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import { pulseVelocity, quietMotion } from "./velocity";
+import { quietMotion } from "./velocity";
 
 const ITEM = "[data-liquid-item]";
 const stops = [1.38, 1.18, 1.06, 1];
@@ -53,7 +53,6 @@ export function useLiquidLens<
     let frame = 0,
       measured = false,
       visible = !lazy;
-    let stopBlur: (() => void) | undefined;
     function rect(node: HTMLElement): Box {
       let x = node.offsetLeft,
         y = node.offsetTop;
@@ -139,21 +138,7 @@ export function useLiquidLens<
           items[i].style.setProperty("--mag", scale.toFixed(4));
           items[i].style.setProperty("--lift", `${((-10 * (scale - 1)) / 0.38).toFixed(2)}px`);
         });
-        if (goal && changed && glass.hasAttribute("data-positioned") && animate) {
-          // Brief optical response to the actual movement of the CSS lens.
-          const axis = side ? "f" : "e";
-          const here = () => new DOMMatrixReadOnly(getComputedStyle(glass).transform)[axis];
-          let previous = here(),
-            time = performance.now();
-          stopBlur = pulseVelocity(glass, side ? "motion-blur-y" : "motion-blur-x", () => {
-            const next = here(),
-              now = performance.now();
-            const speed = (next - previous) / Math.max(1, now - time);
-            previous = next;
-            time = now;
-            return speed;
-          });
-        }
+
       }
       if (!goal || !goal[2] || !goal[3]) {
         delete glass.dataset.positioned;
@@ -254,7 +239,7 @@ export function useLiquidLens<
       revealSelected();
       measure();
     }
-    if (dock) window.addEventListener("rustflow:dock-layout", layout);
+    if (dock) window.addEventListener("shift:dock-layout", layout);
     sync.current = () => {
       revealSelected();
       aim();
@@ -312,12 +297,11 @@ export function useLiquidLens<
     rail.addEventListener("focusout", blur);
     document.addEventListener("visibilitychange", visibility);
     return () => {
-      if (dock) window.removeEventListener("rustflow:dock-layout", layout);
+      if (dock) window.removeEventListener("shift:dock-layout", layout);
       sync.current = null;
       cancelAnimationFrame(frame);
       cancelAnimationFrame(scrollFrame);
       cancelAnimationFrame(pointerFrame);
-      stopBlur?.();
       ro.disconnect();
       changes.disconnect();
       io?.disconnect();

@@ -81,7 +81,7 @@ export default function PackageInsight({
       {!rig && (
         <p>Полная сборка не задана. Ниже — расчёт по параметрам пакета, а не обнаруженное в браузере железо.</p>
       )}
-      <section>
+      {cfg ? <section>
         <h3>Что изменит client.cfg</h3>
         <p>
           <strong>{profile.title}.</strong> {profile.hint} Для {ram} ГБ ОЗУ и выбранной фоновой нагрузки в файл
@@ -93,7 +93,7 @@ export default function PackageInsight({
             {cfg}
           </LiquidGlass>
         </details>
-      </section>
+      </section> : <p>Графический client.cfg не выбран и не будет включён или применён.</p>}
       <section>
         <h3>Выбранные шаги: {entries.length}</h3>
         {entries.length ? (
@@ -111,7 +111,7 @@ export default function PackageInsight({
             ))}
           </ol>
         ) : (
-          <p>Системные шаги не выбраны. В ZIP останутся профиль игры, инструкция и возврат client.cfg.</p>
+          <p>Системные шаги не выбраны.</p>
         )}
       </section>
       <section>

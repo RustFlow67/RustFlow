@@ -250,7 +250,7 @@ export default function FpsLab() {
   function exportSnapshot() {
     const s = fpsEngine.getStats();
     const payload = {
-      app: "RustFlow FPS Lab",
+      app: "SHIFT FPS Lab",
       exportedAt: new Date().toISOString(),
       path: typeof window !== "undefined" ? window.location.pathname : "/",
       theme: getResolvedTheme(),

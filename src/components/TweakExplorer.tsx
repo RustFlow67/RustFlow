@@ -5,7 +5,6 @@ import { usePopupTrigger } from "./fx/usePopupMotion";
 
 import { FileJson, RotateCcw, Search, SearchX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import LiquidSelect from "@/components/LiquidSelect";
 import { useLiquidLens } from "./fx/useLiquidLens";
 import Segmented from "@/components/Segmented";
@@ -22,7 +21,7 @@ import {
   type TweakGroupId,
   type TweakRiskLevel,
 } from "@/lib/models/tweak";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { plural } from "@/lib/tweaks/meta";
 import type { TweakLite } from "@/lib/tweaks/types";
 
@@ -62,7 +61,7 @@ const SORT_OPTIONS = [
 ] as const;
 
 export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
-  const { state, hydrated, storage } = useRustFlowStore();
+  const { state, hydrated, storage } = useShiftStore();
   const { toast } = useToast();
 
   const [query, setQuery] = useState("");
@@ -280,7 +279,7 @@ export default function TweakExplorer({ tweaks }: { tweaks: TweakLite[] }) {
               Сбросить фильтры
             </Button>
           )}
-          <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
+          <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={(event) => window.dispatchEvent(new CustomEvent("shift:backup", { detail: event.currentTarget }))}>
             <FileJson className="text-accent-hi" aria-hidden="true" />
             JSON
           </Button>

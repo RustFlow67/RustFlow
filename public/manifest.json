@@ -1,23 +1,36 @@
 {
   "id": "/",
-  "name": "RustFlow: сборка, твики и настройка Rust",
-  "short_name": "RustFlow",
-  "description": "Оценка ПК под Rust, 43 пресета, база знаний и конфиги с откатом.",
+  "name": "SHIFT — Rust performance",
+  "short_name": "SHIFT",
+  "description": "Independent project for thoughtful Rust performance.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#090605",
-  "theme_color": "#090605",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "lang": "ru",
-  "categories": ["utilities", "games"],
-  "icons": [
-    { "src": "/icons/rustflow-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/rustflow-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  "categories": [
+    "utilities",
+    "games"
   ],
-  "shortcuts": [
-    { "name": "Сборка", "url": "/benchmark", "description": "Оценка FPS и симулятор сценариев" },
-    { "name": "Твикер", "url": "/tweaker", "description": "client.cfg и настройки с откатом" },
-    { "name": "Пресеты", "url": "/presets", "description": "Сравнение сборок и режимов графики" }
+  "icons": [
+    {
+      "src": "/icons/shift-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/shift-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
   ]
 }

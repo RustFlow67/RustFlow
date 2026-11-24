@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 import path from "node:path";
-import { WINDOWS_TAB_HREF } from "./src/lib/tweaker-routes";
+import { randomBytes } from "node:crypto";
 
 // npm scripts use the webpack next/font loader so even air-gapped builds
 // can resolve the requested Google family from the checked-in OFL subsets.
@@ -25,6 +25,11 @@ function apiBase(raw: string | undefined) {
 }
 const publicApiBase = apiBase(process.env.VITE_API_BASE_URL);
 const previewId = process.env.E2B_SANDBOX_ID;
+// Legacy service workers cached dev chunks at stable paths, so an old layout
+// could be mixed with fresh server output. Give each dev compilation namespace
+// fresh URLs even before the legacy worker has had a chance to retire itself.
+// The content hash also changes on HMR recompilation within the same session.
+const devChunkTag = randomBytes(6).toString("hex");
 
 export default function createNextConfig(phase: string): NextConfig {
   // Десктопный режим включается флагом NEXT_PUBLIC_IS_DESKTOP_APP=true (или TAURI_ENV=true).
@@ -38,6 +43,20 @@ export default function createNextConfig(phase: string): NextConfig {
   return {
     ...(staticExport ? { output: "export", trailingSlash: true } : {}),
     ...(isDesktopApp ? { images: { unoptimized: true } } : {}),
+    webpack(config, { dev, isServer }) {
+      if (dev && !isServer && config.output) {
+        for (const key of ["filename", "chunkFilename"] as const) {
+          const value = config.output[key];
+          if (typeof value === "string" && value.endsWith(".js")) {
+            // Lazy route chunks can be requested before their content hash exists
+            // in webpack's dev runtime. A session tag avoids stale workers while
+            // leaving those on-demand filenames resolvable on the first visit.
+            config.output[key] = value.slice(0, -3) + `.shift-${devChunkTag}${key === "filename" ? ".[contenthash]" : ""}.js`;
+          }
+        }
+      }
+      return config;
+    },
     compress: true,
     poweredByHeader: false,
     // Permit loopback and this sandbox's preview to hydrate and connect to HMR.
@@ -50,38 +69,9 @@ export default function createNextConfig(phase: string): NextConfig {
     ...(staticExport
       ? {}
       : {
-          // The ZIP endpoint reads the allowlisted project files at runtime, not the whole checkout.
-          outputFileTracingIncludes: {
-            "/api/source": [
-              "./src/**/*.{ts,tsx,js,mjs,cjs,css,json,svg,md}",
-              "./public/**/*",
-              "./README.md",
-              "./package.json",
-              "./package-lock.json",
-              "./docs/{production-audit,addons,deployment,measurement-method}.md",
-              "./tsconfig.json",
-              "./next.config.ts",
-              "./postcss.config.mjs",
-              "./eslint.config.mjs",
-              "./drizzle.config.ts",
-              "./.env.example",
-              "./.dockerignore",
-              "./Dockerfile",
-              "./docker-compose.yml",
-            ],
-          },
-          async redirects() {
-            return [
-              { source: "/windows", destination: WINDOWS_TAB_HREF, permanent: true },
-              { source: "/setup", destination: "/tweaker", permanent: true },
-              { source: "/tweaks", destination: "/tweaker", permanent: true },
-              { source: "/tweaks/:slug", destination: "/tweaker?tweak=:slug", permanent: true },
-            ];
-          },
           async rewrites() {
             const prefix = publicApiBase.endsWith("/api") ? publicApiBase : `${publicApiBase}/api`;
             return [
-              { source: "/api/auth/build", destination: "/api/auth/active-build" },
               { source: "/manifest.webmanifest", destination: "/manifest.json" },
               ...(prefix.startsWith("/") && prefix !== "/api" ? [{ source: `${prefix}/:path*`, destination: "/api/:path*" }] : []),
             ];

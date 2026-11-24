@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
-import { openPlayerProfile } from "@/components/auth/ProfileGate";
 import LiquidSelect from "@/components/LiquidSelect";
 import Segmented from "@/components/Segmented";
 import { Badge, Button, EmptyState, Input, Skeleton } from "@/components/ui";
@@ -31,7 +30,7 @@ import {
   type BenchmarkLog,
   type ServerKind,
 } from "@/lib/models/log";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 
 type VerdictFilter = "all" | "positive" | "neutral" | "negative";
 
@@ -78,7 +77,7 @@ export default function JournalManager({
 }: {
   tweakOptions: { slug: string; title: string }[];
 }) {
-  const { state, hydrated, storage } = useRustFlowStore();
+  const { state, hydrated, storage } = useShiftStore();
   const { toast } = useToast();
 
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>("all");
@@ -285,9 +284,9 @@ export default function JournalManager({
               <Plus aria-hidden="true" />
               Добавить замер до/после
             </Button>
-            <Button variant="secondary" aria-haspopup="dialog" onClick={(event) => openPlayerProfile(event.currentTarget)}>
+            <Button variant="secondary" aria-haspopup="dialog" onClick={(event) => window.dispatchEvent(new CustomEvent("shift:backup", { detail: event.currentTarget }))}>
               <FileJson className="text-accent-hi" aria-hidden="true" />
-              JSON в профиле игрока
+              Экспорт / импорт JSON
             </Button>
           </div>
           <div className="flex flex-wrap items-center gap-2">

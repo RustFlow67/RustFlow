@@ -1,4 +1,4 @@
-import { graphicsCommands, profileCfg, type GraphicsProfileId } from "@/lib/graphics-profiles";
+import { graphicsCommands, profileCfg, textureMipForVram, type GraphicsProfileId } from "@/lib/graphics-profiles";
 import { getCpu, getGpu } from "@/lib/hardware";
 import { evaluateBuild10 } from "./build";
 import { type UserOwnedRecord } from "./common";
@@ -121,7 +121,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-rtx-5060",
     gpu: "GeForce RTX 5060 8 ГБ",
     vramGb: 8,
-    ram: "32 ГБ (2×16 ГБ) DDR4-3600 CL18",
+    ram: "32 ГБ (2×16 ГБ) DDR4-3600",
     ramGb: 32,
     ramMhz: 3600,
     ramCl: 18,
@@ -179,7 +179,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-gtx-1660-super",
     gpu: "GeForce GTX 1660 Super 6 ГБ",
     vramGb: 6,
-    ram: "16 ГБ (2×8 ГБ) DDR4-3200 CL16",
+    ram: "16 ГБ (2×8 ГБ) DDR4-3200",
     ramGb: 16,
     ramMhz: 3200,
     ramCl: 16,
@@ -237,7 +237,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-rtx-3060",
     gpu: "GeForce RTX 3060 12 ГБ",
     vramGb: 12,
-    ram: "16 ГБ (2×8 ГБ) DDR4-3200 CL16",
+    ram: "16 ГБ (2×8 ГБ) DDR4-3200",
     ramGb: 16,
     ramMhz: 3200,
     ramCl: 16,
@@ -295,7 +295,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-rtx-4060-ti",
     gpu: "GeForce RTX 4060 Ti 8 ГБ",
     vramGb: 8,
-    ram: "32 ГБ (2×16 ГБ) DDR4-3600 CL16",
+    ram: "32 ГБ (2×16 ГБ) DDR4-3600",
     ramGb: 32,
     ramMhz: 3600,
     ramCl: 16,
@@ -353,7 +353,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "radeon-rx-7800-xt",
     gpu: "Radeon RX 7800 XT 16 ГБ",
     vramGb: 16,
-    ram: "32 ГБ (2×16 ГБ) DDR5-6000 CL30",
+    ram: "32 ГБ (2×16 ГБ) DDR5-6000",
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 30,
@@ -411,7 +411,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-rtx-4070-super",
     gpu: "GeForce RTX 4070 Super 12 ГБ",
     vramGb: 12,
-    ram: "32 ГБ (2×16 ГБ) DDR5-6000 CL30",
+    ram: "32 ГБ (2×16 ГБ) DDR5-6000",
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 30,
@@ -469,7 +469,7 @@ const REFERENCE_PRESETS: PresetRecord[] = [
     gpuId: "geforce-rtx-5080",
     gpu: "GeForce RTX 5080 16 ГБ",
     vramGb: 16,
-    ram: "32 ГБ (2×16 ГБ) DDR5-6000 CL28",
+    ram: "32 ГБ (2×16 ГБ) DDR5-6000",
     ramGb: 32,
     ramMhz: 6000,
     ramCl: 28,
@@ -571,7 +571,7 @@ function makeCatalogPreset(tier: PresetTier, spec: PresetEstimate, index: number
     gpuId,
     gpu: `${gpuName} ${vram}`,
     vramGb: gpu.vram,
-    ram: `${ramGb} ГБ (${modules}×${stickGb} ГБ) ${ddr}-${ramMhz} CL${ramCl}`,
+    ram: `${ramGb} ГБ (${modules}×${stickGb} ГБ) ${ddr} · ${ramMhz} MT/s`,
     ramGb,
     ramMhz,
     ramCl,
@@ -615,7 +615,7 @@ export const HARDWARE_PRESETS: HardwarePreset[] = catalog.map((p) => {
   // config from the shared profile, including the reference presets.
   const mode: GraphicsProfileId = p.settings.shaderLevel >= 600 ? "realistic" : p.settings.shaderLevel >= 350 ? "quality" : p.settings.shaderLevel >= 225 ? "balanced" : "competitive";
   const c = graphicsCommands(mode, p.ramGb);
-  return { ...p, cfgText: profileCfg(mode, p.ramGb), settings: { ...p.settings, graphicsQuality: mode === "competitive" ? "Комбат" : mode === "balanced" ? "Баланс" : mode === "quality" ? "Качество" : "Реалистичность",
+  return { ...p, cfgText: profileCfg(mode, p.ramGb, "", textureMipForVram(p.vramGb)), settings: { ...p.settings, graphicsQuality: mode === "competitive" ? "Комбат" : mode === "balanced" ? "Баланс" : mode === "quality" ? "Качество" : "Реалистичность",
     drawDistance: c["graphics.drawdistance"], shaderLevel: c["graphics.shaderlod"], waterQuality: c["water.quality"],
     shadowQuality: c["graphics.shadowquality"], shadowCascades: String(c["graphics.shadowcascades"]),
     treeQuality: c["tree.quality"], maxGibs: c["effects.maxgibs"], gcBuffer: c["gc.buffer"] },

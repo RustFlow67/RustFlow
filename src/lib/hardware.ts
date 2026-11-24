@@ -65,6 +65,9 @@ const gpus = (group: string, vendor: Gpu["vendor"], rows: [string, number, numbe
 // the player owns a different processor. Only the curated list is selectable.
 const CPU_INDEX: Cpu[] = [
   ...cpus("AMD Ryzen", [
+    ["Ryzen 9 9950X3D2", 101], ["Ryzen 7 9850X3D", 103], ["Ryzen 9 9900X3D", 97],
+    ["Ryzen 7 7700X3D", 91], ["Ryzen 5 7500X3D", 88], ["Ryzen 9 7900X3D", 92],
+    ["Ryzen 5 9600", 78], ["Ryzen 9 7900", 78], ["Ryzen 7 5700", 58], ["Ryzen 5 3600X", 46],
     ["Ryzen 7 9800X3D", 100],
     ["Ryzen 9 9950X3D", 100],
     ["Ryzen 7 7800X3D", 95],
@@ -105,6 +108,12 @@ const CPU_INDEX: Cpu[] = [
     ["FX-8350", 14],
   ]),
   ...cpus("Intel Core", [
+    ["Core Ultra 7 270K Plus", 89], ["Core Ultra 5 250K Plus", 83],
+    ["Core Ultra 7 265KF", 84], ["Core Ultra 7 265", 81], ["Core Ultra 5 245KF", 80],
+    ["Core Ultra 5 235", 76], ["Core Ultra 5 225F", 73], ["Core Ultra 5 225", 73],
+    ["Core i9-14900KF", 92], ["Core i9-14900F", 87], ["Core i7-14700F", 84],
+    ["Core i5-14500", 70], ["Core i5-14400", 69], ["Core i3-14100F", 62],
+    ["Core i9-13900KF", 90], ["Core i7-12700KF", 75], ["Core i5-12600KF", 70],
     ["Core i9-14900KS", 93],
     ["Core i9-14900K", 92],
     ["Core i9-13900K", 90],
@@ -170,7 +179,7 @@ export const BUILD_CPU_TIERS:Record<string,Record<string,number>> = {
   AM5:{"ryzen-5-7500f":1,"ryzen-5-7600":1,"ryzen-5-7600x":1,"ryzen-7-7700":2,"ryzen-7-7800x3d":2,"ryzen-7-9800x3d":3},
   LGA1700:{"core-i5-12400f":1,"core-i5-13400f":1,"core-i5-13600kf":2,"core-i5-14600kf":2,"core-i7-14700kf":3},
 };
-export const CPUS = Object.entries(BUILD_CPU_TIERS).flatMap(([group,ids])=>CPU_INDEX.filter(c=>Object.hasOwn(ids,c.id)).map(c=>({...c,group})));
+export const CPUS = CPU_INDEX;
 export const GPUS: Gpu[] = [
   ...gpus("NVIDIA GeForce", "nvidia", [
     ["GeForce RTX 5090", 160, 32],
@@ -178,6 +187,7 @@ export const GPUS: Gpu[] = [
     ["GeForce RTX 5070 Ti", 104, 16],
     ["GeForce RTX 5070", 86, 12],
     ["GeForce RTX 5060 Ti", 66, 16],
+    ["GeForce RTX 5060 Ti 8GB", 66, 8],
     ["GeForce RTX 5060", 58, 8],
     ["GeForce RTX 5050", 50, 8],
     ["GeForce RTX 4090", 132, 24],
@@ -198,6 +208,7 @@ export const GPUS: Gpu[] = [
     ["GeForce RTX 3070", 59, 8],
     ["GeForce RTX 3060 Ti", 52, 8],
     ["GeForce RTX 3060", 40, 12],
+    ["GeForce RTX 3060 8GB", 36, 8],
     ["GeForce RTX 3050", 28, 8],
     ["GeForce RTX 2080 Ti", 58, 11],
     ["GeForce RTX 2080 Super", 50, 8],
@@ -229,7 +240,9 @@ export const GPUS: Gpu[] = [
   ...gpus("AMD Radeon", "amd", [
     ["Radeon RX 9070 XT", 102, 16],
     ["Radeon RX 9070", 90, 16],
+    ["Radeon RX 9070 GRE", 78, 12],
     ["Radeon RX 9060 XT", 67, 16],
+    ["Radeon RX 9060 XT 8GB", 67, 8],
     ["Radeon RX 7900 XTX", 108, 24],
     ["Radeon RX 7900 XT", 94, 20],
     ["Radeon RX 7900 GRE", 83, 16],
@@ -262,6 +275,7 @@ export const GPUS: Gpu[] = [
     ["Arc B570", 44, 10],
     ["Arc A770", 42, 16],
     ["Arc A750", 38, 8],
+    ["Arc A580", 32, 8],
     ["Arc A380", 14, 6],
   ]),
   ...gpus("Ноутбуки", "nvidia", [

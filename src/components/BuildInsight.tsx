@@ -45,7 +45,7 @@ export default function BuildInsight({
         : "Параметры → Система → Дисплей → Настройки графики";
   return (
     <div className="build-insight">
-      <p className="rubric">Расчёт RustFlow · не замер на ПК</p>
+      <p className="rubric">Расчёт SHIFT · не замер на ПК</p>
       <p className="insight-rig">
         {r.cpuName} · {r.gpuName} · {input.ramGb} ГБ · {driveEstimate(input).label} ·{" "}
         {[planWindows(os), resolution].filter(Boolean).join(" · ")}

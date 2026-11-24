@@ -5,7 +5,7 @@ import { MATERIALS } from "@/lib/materials";
 import { DOCK_KEY } from "@/lib/dock-position";
 
 const press = (c: Locator) => (test.info().project.use.hasTouch ? c.tap() : c.click());
-const insightName = "Посмотреть ИИ-сводку ✨";
+const insightName = "Посмотреть сводку";
 
 for (const position of ["left", "bottom"] as const)
   test(`54px HUD, focus and hit-testing in every finish: ${position}`, async ({ page }) => {

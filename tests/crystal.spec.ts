@@ -200,7 +200,7 @@ test("both report controls share the same material and source motion", async ({
       return [s.color, s.boxShadow, s.borderColor, s.background, s.backdropFilter, s.padding, s.borderRadius];
     });
   };
-  const summary = page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" });
+  const summary = page.getByRole("button", { name: "Посмотреть сводку" });
   const buildSkin = await skin(summary);
   await checkFlight(page, summary);
   await page.goto("/tweaker");

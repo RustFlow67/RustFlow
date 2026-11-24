@@ -191,7 +191,7 @@ test("ZIP and copy show success only after the action, with one RAM-aware config
   await expect(toast).toBeVisible();
   await expect.poll(async () => { const r = (await toast.boundingBox())!; return Math.abs(r.x + r.width - page.viewportSize()!.width); }).toBeLessThan(23);
   const entries = unzipSync(await readFile((await file.path())!));
-  const cfg = strFromU8(entries["RustFlow-Pack/client.cfg"]);
+  const cfg = strFromU8(entries["SHIFT-Pack/client.cfg"]);
   expect(cfg.match(/^gc\.buffer\s/gm)).toHaveLength(1);
   expect(Object.keys(entries).some((n) => /gc-buffer\.bat/.test(n))).toBe(false);
   expect(Object.keys(entries).some((n) => n.includes("Otkat"))).toBe(true);

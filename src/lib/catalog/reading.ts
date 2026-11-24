@@ -39,7 +39,7 @@ const sections: Record<string, ReadingHome> = {
   "kb-windows": "/windows",
   "kb-rust": "/presets",
   "kb-binds": "/presets",
-  "kb-drivers": "/drivers",
+  "kb-drivers": "/faq",
   trouble: "/presets",
 };
 const labels: Record<ReadingHome, string> = {
@@ -47,7 +47,6 @@ const labels: Record<ReadingHome, string> = {
   "/faq": "Безопасность ОС",
   "/windows": "Windows",
   "/presets": "Практика Rust",
-  "/drivers": "Драйверы",
 };
 function distribute(home: ReadingHome): ReadingGroup[] {
   return GUIDE.flatMap((g) => {
@@ -81,8 +80,7 @@ function distribute(home: ReadingHome): ReadingGroup[] {
       : [];
   });
 }
-export const driverGroups = distribute("/drivers"),
-  presetGroups = distribute("/presets"),
+export const presetGroups = distribute("/presets"),
   fileGroups = distribute("/tweaker");
 export const windowsGroups: ReadingGroup[] = [
   {
@@ -125,7 +123,6 @@ export const windowsGroups: ReadingGroup[] = [
 const safetyGroups = distribute("/faq");
 export const guideGroups = [
   ...windowsGroups,
-  ...driverGroups,
   ...presetGroups,
   ...fileGroups,
   ...safetyGroups,

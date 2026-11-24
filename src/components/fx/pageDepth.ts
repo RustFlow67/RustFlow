@@ -10,9 +10,9 @@ export function enterDepth(panel: HTMLElement) {
     // Release the scroll impulse before the HUD recedes; a pinned source
     // bar holds the pose captured at press time instead.
     document.documentElement.removeAttribute("data-scroll-down"); document.documentElement.removeAttribute("data-scroll-up");
-    background = Array.from(document.querySelectorAll<HTMLElement>("[data-hud], .rf-main, .rf-footer-wrap, .skip-link")).filter(el => !el.inert);
+    background = Array.from(document.querySelectorAll<HTMLElement>("[data-hud], .shift-header, .shift-dock, .rf-main, .rf-footer-wrap, .skip-link")).filter(el => !el.inert);
     for (const el of background) el.inert = true;
-    window.dispatchEvent(new Event("rustflow:modal-open"));
+    window.dispatchEvent(new Event("shift:modal-open"));
   }
   owners.add(panel);
   // A nested login/confirmation must own Tab, the accessibility tree and

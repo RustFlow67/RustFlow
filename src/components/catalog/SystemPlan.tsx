@@ -6,8 +6,7 @@ import { rememberPreset } from "../fx/presetHandoff";
 import FrameTime from "../FrameTime";
 import { ScanLine } from "lucide-react";
 import Link from "../RouteLink";
-import { useAccount } from "../auth/AccountProvider";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { useCalculatorDraft } from "@/lib/storage/calculator-draft";
 import { isValidBuildInput } from "@/lib/models/build";
 import { formatBuildResolution } from "@/lib/models/build-resolution";
@@ -27,13 +26,11 @@ const Context = createContext<{
   detectedInput?: BuildInput;
 } | null>(null);
 export function SystemPlanProvider({ index, children }: { index: PlanIndex; children: ReactNode }) {
-  const { state } = useRustFlowStore(),
-    { session } = useAccount(),
+  const { state } = useShiftStore(),
     draft = useCalculatorDraft();
   const saved =
     state?.builds.find((b) => b.id === state.activeBuildId)?.input ??
-    state?.builds[0]?.input ??
-    session?.user?.build;
+    state?.builds[0]?.input;
   const [detectedInput, setDetectedInput] = useState<BuildInput>();
   const input = draft && isValidBuildInput(draft.input) ? draft.input : saved ?? detectedInput;
   const mode =
@@ -77,7 +74,7 @@ export const useSystemPlan = () => useContext(Context)!;
 // Dock routes own one contextual placement each. Reference pages outside the
 // Dock retain the shared plan; the calculator must never append a second card.
 export function SitePlan() {
-  return ["/", "/benchmark", "/presets", "/tweaker", "/guide", "/faq", "/drivers"].includes(
+  return ["/", "/benchmark", "/presets", "/tweaker", "/guide", "/faq"].includes(
     usePathname(),
   ) ? null : (
     <PlanCard />
@@ -96,7 +93,7 @@ export function MatchedPresetLink({ plan, primary = false }: { plan: MatchedPlan
         if (path === "/presets") {
           e.preventDefault();
           window.dispatchEvent(
-            new CustomEvent("rustflow:matched-preset", {
+            new CustomEvent("shift:matched-preset", {
               detail: { slug: plan.best.slug, from: link.current },
             }),
           );
@@ -118,7 +115,7 @@ export function PlanActions({ plan, href }: { plan: MatchedPlan; href: string })
         onNavigate={(e) => {
           if (path === "/tweaker" && location.pathname + location.search === href) {
             e.preventDefault();
-            window.dispatchEvent(new Event("rustflow:reapply-plan"));
+            window.dispatchEvent(new Event("shift:reapply-plan"));
           }
         }}
       >
@@ -171,7 +168,7 @@ export function PlanCard({ home = false, preview }: { home?: boolean; preview?: 
   const active = useSystemPlan(),
     plan = preview ?? active.plan,
     href = preview ? systemPlanHref(preview.input, preview.mode, false) : active.href;
-  const title = home ? "Автоподбор по конфигурации" : "ИИ-сводка RustFlow для вашей сборки";
+  const title = home ? "Автоподбор по конфигурации" : "Сводка SHIFT для вашей сборки";
   return (
     <LiquidGlass as="section" className={`glass system-plan${home ? " plan-with-trace" : ""}`} aria-label={title}>
       <div className="plan-copy">
@@ -198,7 +195,7 @@ export function PlanCard({ home = false, preview }: { home?: boolean; preview?: 
         ) : (
           <>
             <p>
-              Укажите комплектующие и версию Windows — RustFlow подберёт ближайший пресет и обратимые шаги для
+              Укажите комплектующие и версию Windows — SHIFT подберёт ближайший пресет и обратимые шаги для
               вашего ПК.
             </p>
             <div className="plan-actions">

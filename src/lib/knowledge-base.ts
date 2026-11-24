@@ -22,10 +22,10 @@ export interface KnowledgeEntry {
   note?: string;
 }
 
-export type ReadingHome = "/drivers" | "/windows" | "/presets" | "/faq" | "/tweaker";
+export type ReadingHome = "/windows" | "/presets" | "/faq" | "/tweaker";
 export function readingHome(entry: KnowledgeEntry): ReadingHome {
   if (["searchapp", "system-restore"].includes(entry.id)) return "/faq";
-  if (entry.category === "drivers" || ["amd-shadows", "amd-crosshair"].includes(entry.id)) return "/drivers";
+  if (entry.category === "drivers" || ["amd-shadows", "amd-crosshair"].includes(entry.id)) return "/faq";
   if (entry.category === "windows" || entry.id === "kernel-power") return "/windows";
   return "/presets";
 }

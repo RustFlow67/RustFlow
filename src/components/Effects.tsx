@@ -1,12 +1,12 @@
 "use client";
 
-import { magneticCards } from "./fx/magneticCards";
+import { specularEdges } from "./fx/specularEdges";
 import { useEffect } from "react";
 import { applyMotionChoice, MOTION_KEY } from "@/lib/motion";
 
 /** Pause CSS decoration in background tabs; the wallpaper owns its own clock. */
 export default function Effects() {
-  useEffect(magneticCards, []);
+  useEffect(specularEdges, []);
   useEffect(() => {
     const root = document.documentElement;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -15,6 +15,7 @@ export default function Effects() {
       try { choice = localStorage.getItem(MOTION_KEY) ?? choice; } catch { /* private browsing */ }
       applyMotionChoice(choice === "full" || choice === "reduced" ? choice : "auto", { persist: false });
     }
+    motion();
     const visibility = () => root.toggleAttribute("data-rfx-paused", document.hidden);
     visibility();
     document.addEventListener("visibilitychange", visibility);

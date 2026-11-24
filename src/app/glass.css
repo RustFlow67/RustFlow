@@ -1,81 +1,42 @@
-/* Material recipes. The original Rust finish is the fallback. Every finish
-   recolours the actual wallpaper, glass, type, controls and chrome, not the DOM. */
-:root {
-  --theme-accent: #ff903e; --theme-tip: #ffd2a2; --theme-glow: rgba(255,130,50,.45);
-  --theme-ink: var(--theme-tip); --on-accent: #151114;
-  --theme-accent-gradient: linear-gradient(104deg,color-mix(in srgb,var(--theme-accent) 78%,#412b35),var(--theme-accent) 52%,var(--theme-tip));
-  --theme-pill-bg: linear-gradient(140deg,color-mix(in srgb,var(--theme-accent) 17%,transparent),var(--veil));
-  --theme-pill-border: color-mix(in srgb,var(--theme-ink) 34%,transparent);
-  --static-rim: inset 0 1px 1.5px rgb(255 255 255 / calc(.35 * var(--rf-shine)));
-  --tube-fill: linear-gradient(180deg,rgb(255 255 255 / .65),rgb(255 255 255 / .08) 35%,transparent 54%,rgb(0 0 0 / .10)),var(--theme-accent-gradient);
+/* SHIFT dark glass: one neutral material, no displacement filters. */
+:root[data-material] {
+  --theme-accent:#f5f5f7; --theme-tip:#f5f5f7; --theme-ink:#f5f5f7; --theme-glow:transparent;
+  --on-accent:#050505; --theme-accent-gradient:linear-gradient(#f5f5f7,#e5e5e7);
+  --theme-pill-bg:rgba(255,255,255,.05); --theme-pill-border:rgba(255,255,255,.09);
+  --static-rim:inset 0 1px 0 rgba(255,255,255,.1); --glass-optics:var(--static-rim);
+  --glass-body:rgba(12,12,14,.88); --glass-title:var(--glass-body); --glass-tint:transparent;
+  --glass-text-1:#f5f5f7; --glass-text-2:#c0c0c5; --glass-text-3:#aaa; --glass-text-4:#929298;
+  --tube-fill:#f5f5f7; --edge-flash:rgba(255,255,255,.1);
 }
-:root[data-material="pearl"] { --theme-accent: #728eb6; --theme-tip: #acd6f5; --theme-ink: #405778; --theme-glow: rgba(255,255,255,.9);
-  --theme-accent-gradient: linear-gradient(105deg,#d49c62,#d9c4ac 29%,#a5cbe8 66%,#719bc2); --on-accent: #162539; }
-:root[data-material="ruby"]     { --theme-accent: #ff3054; --theme-tip: #ffa2ae; --theme-glow: rgba(255,35,70,.5); --ore: #300d19; --coal: #10060c; }
-:root[data-material="emerald"]  { --theme-accent: #35da79; --theme-tip: #a2f8bf; --theme-glow: rgba(35,220,115,.45); --ore: #1a3021; --coal: #070e0a; }
-:root[data-material="ice"]      { --theme-accent: #48c4ff; --theme-tip: #b6ebff; --theme-glow: rgba(60,195,255,.45); --ore: #173b4d; --coal: #07141d; }
-:root[data-material="amethyst"] { --theme-accent: #b266ff; --theme-tip: #dfbaff; --theme-glow: rgba(175,75,255,.48); --ore: #312040; --coal: #100b1b; }
-:root[data-material="obsidian"] { --theme-accent: #b7c3d5; --theme-tip: #eaf1fa; --theme-glow: rgba(200,210,225,.35); --ore: #232830; --coal: #07080a; }
-:root[data-material="gold"]     { --theme-accent: #ffc328; --theme-tip: #ffe79c; --theme-glow: rgba(255,195,35,.48); --ore: #403014; --coal: #130f06; }
-:root, :root[data-theme] { --accent: var(--theme-accent); --accent-hi: var(--theme-ink); --glass-optics: var(--static-rim); }
-:root[data-material]:where(:not([data-material="pearl"],[data-material="amber"])) {
-  --metal: var(--theme-accent); --bg: var(--coal);
-  --accent-deep: color-mix(in srgb,var(--metal) 66%,var(--ore)); --color-focus: var(--accent-hi);
-  --ink: color-mix(in srgb,white 95%,var(--metal)); --ink-2: color-mix(in srgb,#e1e2e4 84%,var(--metal));
-  --ink-3: color-mix(in srgb,#b6b8bc 85%,var(--metal)); --ink-4: #a8a8aa;
-  --ok: var(--accent-hi); --warn: #e2cb92; --honey: var(--accent-hi); --clay: var(--ink-2);
-  --glass-body: linear-gradient(143deg,rgb(255 255 255 / .105),color-mix(in srgb,var(--ore) 15%,transparent) 55%,color-mix(in srgb,var(--metal) 12%,transparent));
-  --glass-title: var(--glass-body); --glass-tint: color-mix(in srgb,var(--ore) 13%,transparent);
-  --surface-glass: color-mix(in srgb,var(--ore) 60%,transparent); --bar-tint: color-mix(in srgb,var(--coal) 54%,transparent);
-  --surface-popover: color-mix(in srgb,var(--ore) 92%,transparent); --surface-well: rgb(0 0 0 / .18);
-  --surface-glass-accent: color-mix(in srgb,var(--metal) 18%,transparent); --surface-solid-fallback: var(--ore);
-
-  --edge-flash: color-mix(in srgb,var(--accent-hi) calc(85% * var(--rf-shine)),transparent);
-  --glass-text-1: white; --glass-text-2: var(--ink-2); --glass-text-3: var(--accent-hi); --glass-text-4: var(--metal);
-  --glass-text-glow: color-mix(in srgb,var(--metal) 28%,transparent); --chip-accent-fg: var(--accent-hi); --scroll-thumb: var(--accent-deep);
-}
-
 :root[data-material] :is(.icon-tile,.check[aria-checked="true"],.switch[aria-checked="true"]) {
-  color: var(--on-accent); background: var(--lg-coat),var(--theme-accent-gradient); border:1px solid var(--lg-edge); box-shadow:var(--lg-bevel);
+  color:var(--on-accent); background:var(--theme-accent-gradient); border:1px solid var(--lg-edge); box-shadow:var(--static-rim);
 }
-:root[data-theme="light"] input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #eef1f5 inset !important; -webkit-text-fill-color: #121316 !important; caret-color: #121316; }
 
-/* Only document scrolling drives the lift. Keep it on the rails, separate
-   from the navigation pulse (individual scale) and the Dock lens. */
-:root { --hud-scroll-tween: 360ms cubic-bezier(.22,1,.36,1); }
-:root:is([data-motion="reduced"],[data-engine-motion="instant"],[data-lite]) { --hud-scroll-zoom: 1; }
+/* Compositor-only HUD motion. Spring timing approximates k=380, c=30, m=.8;
+   CSS transitions retarget from their current pose on rapid interaction. */
+:root { --hud-scroll-tween: 280ms cubic-bezier(.2,.8,.2,1); --rf-spring: cubic-bezier(.2,.8,.2,1); }
+@supports (transition-timing-function: linear(0, 1)) {
+  :root { --rf-spring: linear(0, .13 10%, .38 20%, .60 30%, .77 40%, .88 50%, .95 60%, .98 70%, 1 85%, 1 100%); }
+}
 :root[data-scroll-down]:not([data-motion="reduced"],[data-engine-motion="instant"],[data-lite])
-  body:not([data-popup-depth]) :is([data-hud="top"],[data-hud="bottom"],.chrome-veil) {
-  --hud-scale: var(--hud-scroll-zoom);
-  --hud-top-y: -4px;
-  --hud-bottom-y: 3px;
-  --hud-panel-shadow: var(--lg-bevel), 0 12px 36px var(--theme-glow);
-  --hud-band-blur: 16px;
+  body:not([data-popup-depth]) :is([data-hud="top"],[data-hud="bottom"]) {
+  --hud-top-y: -4px; --hud-bottom-y: 3px;
 }
-[data-hud], [data-chrome-panel] {
-  transition: transform var(--hud-pose-tween,var(--hud-scroll-tween)), opacity 380ms var(--apple-ease),
-    box-shadow var(--hud-scroll-tween), backdrop-filter 360ms var(--apple-ease);
-}
-[data-hud="top"] { transform: translate3d(0,var(--hud-top-y,0px),0) scale(var(--hud-scale,1)); }
-[data-hud="bottom"] { transform: translate3d(0,var(--hud-bottom-y,0px),0) scale(var(--hud-scale,1)); }
-/* Transparent, feathered strips behind the controls. No tint, hard edge,
-   full-screen filter, or hit target between the header capsules. */
-.chrome-veil {
-  position: fixed; inset-inline: 0; z-index: 55; pointer-events: none;
-  -webkit-mask-image: var(--hud-mask); mask-image: var(--hud-mask);
-  -webkit-backdrop-filter: blur(var(--hud-band-blur,8px)); backdrop-filter: blur(var(--hud-band-blur,8px));
-  transition: -webkit-backdrop-filter var(--hud-scroll-tween), backdrop-filter var(--hud-scroll-tween), opacity var(--hud-scroll-tween);
-}
-.chrome-veil-top { top: 0; height: calc(var(--header-size) + 12px); --hud-mask: linear-gradient(to bottom, black, rgb(0 0 0 / .8) 40%, transparent); }
-.chrome-veil-bottom { bottom: 0; height: calc(var(--dock-top) + 12px); --hud-mask: linear-gradient(to top, black, rgb(0 0 0 / .8) 40%, transparent); }
-:root[data-dock="left"] .chrome-veil-bottom, :root[data-lite] .chrome-veil { display: none; }
-/* A single owner set keeps the HUD inert during nested sheets. The strips
-   fade without moving a blurred rectangle across the page. */
-body[data-popup-depth] [data-chrome-panel] { pointer-events: none; }
-body[data-popup-depth] .chrome-veil { opacity: 0; }
-body[data-popup-depth] [data-hud] { --hud-pose-tween: 380ms var(--apple-ease); opacity: 0; pointer-events: none; }
-body[data-popup-depth] [data-hud="top"] { transform: translate3d(0,min(-120%,calc(-100% - var(--chrome-top))),0) scale(.95); }
-body[data-popup-depth] [data-hud="bottom"] { transform: translate3d(0,max(140%,calc(100% + var(--dock-bottom))),0) scale(.95); }
+[data-hud], [data-chrome-panel] { transition: transform 280ms var(--rf-spring), opacity 220ms ease; }
+[data-hud="top"] { transform: translate3d(0,var(--hud-top-y,0px),0); }
+[data-hud="bottom"] { transform: translate3d(0,var(--hud-bottom-y,0px),0); }
+.chrome-veil { position:fixed; inset-inline:0; z-index:55; pointer-events:none;
+  -webkit-mask-image:var(--hud-mask); mask-image:var(--hud-mask);
+  background:linear-gradient(to bottom, color-mix(in srgb,var(--bg) 72%,transparent),transparent);
+  transition:opacity 220ms ease; }
+.chrome-veil-top { top:0; height:calc(var(--header-size) + 12px); --hud-mask:linear-gradient(to bottom,black,transparent); }
+.chrome-veil-bottom { bottom:0; height:calc(var(--dock-top) + 12px); --hud-mask:linear-gradient(to top,black,transparent); transform:rotate(180deg); }
+:root[data-dock="left"] .chrome-veil-bottom, :root[data-lite] .chrome-veil { display:none; }
+body[data-popup-depth] [data-chrome-panel] { pointer-events:none; }
+body[data-popup-depth] .chrome-veil { opacity:0; }
+body[data-popup-depth] [data-hud] { opacity:0; pointer-events:none; }
+body[data-popup-depth] [data-hud="top"] { transform:translate3d(0,min(-120%,calc(-100% - var(--chrome-top))),0); }
+body[data-popup-depth] [data-hud="bottom"] { transform:translate3d(0,max(140%,calc(100% + var(--dock-bottom))),0); }
 /* A HUD source stays visible in its pinned bar: the bar holds its press
    pose above the dialog while sibling panels recede. Markers only — the
    source button itself is never hidden or restyled. */
@@ -84,15 +45,15 @@ body[data-popup-depth] [data-source-pinned] [data-chrome-panel]:not([data-flip-a
 /* A moving lens with a fixed bevel, not a specular streak. */
 .liquid-lens { position: absolute; top: 0; left: 0; right: auto; z-index: 0; overflow: hidden; isolation: isolate;
   pointer-events: none; border-radius: 9999px; backface-visibility: hidden; transform-origin: 0 0; transition: opacity 120ms ease; opacity: 0;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
   border: 1px solid var(--theme-pill-border);
   background: var(--theme-pill-bg);
   box-shadow: var(--static-rim),inset 0 -2px 3px color-mix(in srgb,var(--theme-accent) 22%,transparent),0 5px 12px -7px var(--glass-shadow); }
 .liquid-lens[data-positioned] {
-  opacity: 1; transition: transform .48s cubic-bezier(.22,1,.36,1), width .48s cubic-bezier(.22,1,.36,1), height .48s cubic-bezier(.22,1,.36,1), opacity 120ms ease;
+  opacity: 1; transition: transform 280ms var(--rf-spring), width 280ms var(--rf-spring), height 280ms var(--rf-spring), opacity 120ms ease;
 }
 :root:is([data-lite],[data-motion="reduced"],[data-engine-motion="instant"],[data-rfx-paused]) .liquid-lens {transition:none;}
-.dock-lens { will-change: transform, opacity, filter; border-radius: 999px; background-color: color-mix(in srgb,var(--accent) 14%,transparent); }
+.dock-lens { will-change: transform, opacity; border-radius: 999px; background-color: color-mix(in srgb,var(--accent) 14%,transparent); }
 .liquid-options,.brand-list,.material-grid,.liquid-filter-list { position: relative; isolation: isolate; }
 :is(.liquid-options,.liquid-select-panel,.liquid-filter-list) [data-liquid-item] { position: relative; z-index: 1; }
 :is(.liquid-options,.liquid-select-panel) .option:is([data-active],[aria-selected],:hover) { background: transparent; box-shadow: none; }
@@ -150,3 +111,25 @@ body[data-popup-depth] [data-source-pinned] [data-chrome-panel]:not([data-flip-a
 :root:is([data-motion="reduced"],[data-lite]) :is(.nav-capsules,.tabbar-bottom) { scale: 1; transition: none; }
 :root[data-lite] :is(.glass,.btn,.well,.segmented,.tile,.modal-panel,.popover) { backdrop-filter: none; -webkit-backdrop-filter: none; }
 :root[data-lite] .modal-backdrop::before { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* The status island keeps a fixed hit box while its small skin expands. */
+.dynamic-island { position:absolute; left:50%; transform:translateX(-50%); width:clamp(104px,28vw,250px); height:var(--capsule-size); display:grid; place-items:center; border:0; background:none; color:var(--ink); pointer-events:auto; }
+.dynamic-island-skin { position:absolute; inset-block:0; left:50%; width:48px; translate:-50% 0; border:1px solid var(--lg-edge); border-radius:999px; background:var(--lg-coat),var(--bar-tint); box-shadow:var(--static-rim); transition:width 280ms var(--rf-spring); }
+.dynamic-island[data-expanded] .dynamic-island-skin { width:100%; }
+.dynamic-island-icon { position:absolute; z-index:1; transition:opacity 120ms ease,transform 280ms var(--rf-spring); }
+.dynamic-island[data-expanded] .dynamic-island-icon { opacity:0; transform:scale(.8); }
+.dynamic-island-text { position:relative; z-index:1; max-width:calc(100% - 24px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.72rem; font-weight:600; opacity:0; transform:translateY(4px); transition:opacity 150ms ease,transform 280ms var(--rf-spring); }
+.dynamic-island[data-expanded] .dynamic-island-text { opacity:1; transform:translateY(0); }
+.profile-tools { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.profile-tools .profile-tool { min-height:40px; padding:0 12px; font-size:.8rem; }
+.profile-tool svg { width:17px; height:17px; }
+@media(max-width:540px) {
+  .nav-capsules .nav-brand-name,.nav-capsules .brand-chevron,.profile-trigger .truncate { display:none; }
+  .nav-capsules .nav-brand { padding:0 6px; }
+  .nav-capsules .profile-trigger { padding:0 10px; }
+  .dynamic-island { width:min(52vw,220px); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .dynamic-island :is(.dynamic-island-skin,.dynamic-island-icon,.dynamic-island-text) { transition:none; }
+}
+:root:is([data-motion="reduced"],[data-engine-motion="instant"],[data-lite]) .dynamic-island :is(.dynamic-island-skin,.dynamic-island-icon,.dynamic-island-text) { transition:none; }

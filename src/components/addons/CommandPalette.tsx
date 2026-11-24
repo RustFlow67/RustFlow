@@ -17,7 +17,7 @@ export interface CommandEntry {
   keywords?: string;
 }
 
-const OPEN_EVENT = "rustflow:open-palette";
+const OPEN_EVENT = "shift:open-palette";
 const ICONS = { Страница: Layers3, Твик: SlidersHorizontal, Пресет: Cpu, Инструмент: Command };
 const normalize = (value: string) => value.toLocaleLowerCase("ru").replaceAll("ё", "е").replace(/[-_/]+/g, " ");
 
@@ -94,7 +94,7 @@ export default function CommandPalette({ entries }: { entries: readonly CommandE
   return <Modal {...origin} open={open} title="Палитра команд" onClose={() => setOpen(false)} maxWidth="max-w-2xl">
     <div className={`${styles.surface} ${styles.palette}`}>
       <label className={styles.label}>
-        <span className={styles.actions}><Search size={15} aria-hidden="true" />Поиск по RustFlow</span>
+        <span className={styles.actions}><Search size={15} aria-hidden="true" />Поиск по SHIFT</span>
         <input ref={input} className={styles.input} value={query} maxLength={100} role="combobox" aria-expanded="true"
           aria-controls={listId} aria-autocomplete="list" aria-activedescendant={activeId}
           type="text" autoComplete="off" placeholder="Например: 7800X3D, замеры, миф…"

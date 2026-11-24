@@ -2,6 +2,10 @@ import { expect, test, type Locator } from "@playwright/test";
 import { QUICK_SAMPLE_BUILDS } from "@/lib/models/build";
 import type { SystemBridge, TweakPlan } from "@/lib/systemBridge";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('shift:setup:v1', JSON.stringify({ version: 1, language: 'ru', goal: 'smooth', accepted: true })));
+});
+
 const press = (el: Locator) => (test.info().project.use.hasTouch ? el.tap() : el.click());
 const apply = "Применить в систему",
   undo = "Откатить изменения";
@@ -66,11 +70,13 @@ test("the narrow host contract receives the actual preview/selection only on exp
     window.rustflowSystem = host;
   });
   await page.goto("/tweaker?mode=quality&gpu=amd");
+  await press(page.getByRole("switch", { name: "Добавить графический client.cfg в пакет" }));
+  await press(page.getByRole("button", { name: "Выбрать рекомендуемые" }));
   const os = page.getByRole("combobox", { name: "Windows для пакета" });
   await press(os);
   await expect(page.getByRole("option", { name: "Авто: Windows 10" })).toBeVisible();
   await press(page.getByRole("option", { name: "Windows 11" }));
-  await press(page.getByRole("button", { name: "Посмотреть ИИ-сводку ✨" }));
+  await press(page.getByRole("button", { name: "Посмотреть сводку" }));
   const dialog = page.getByRole("dialog");
   const cfg = await dialog.locator("[data-pack-cfg]").textContent();
   const slugs = await dialog
@@ -92,7 +98,7 @@ test("the narrow host contract receives the actual preview/selection only on exp
   await expect(dialog.getByRole("status")).toContainText("Не удалось получить подтверждение");
   await page.goto("/drivers");
   await press(page.locator("#radeon"));
-  await press(dialog.getByRole("button", { name: "RX 500 · Polaris", exact: true }));
+  await press(dialog.getByRole("button", { name: /RX 500 · Polaris/ }));
   await press(dialog.getByRole("button", { name: "Radeon RX 580", exact: true }));
   await press(dialog.getByRole("button", { name: "Открыть официальный подбор драйвера ↗" }));
   await expect(dialog.locator(".driver-downloads [role=status]")).toContainText("Открыта официальная страница");
@@ -110,6 +116,7 @@ test("cfg previews and preset cards use the same desktop action, not a browser d
   await press(dialog.getByRole("button", { name: apply }));
   await expect(dialog.getByRole("status")).toContainText("не подключён");
   await page.goto("/presets");
+  await expect(page.locator(".dock-lens[data-positioned]")).toBeVisible();
   const card = page.locator(".preset-card").first();
   await expect(card.getByRole("button", { name: apply })).toBeVisible();
   await press(card.getByRole("button", { name: "Детали" }));
@@ -134,10 +141,47 @@ test("Tauri exports a package of instructions and rollback files without running
   });
   await page.goto("/tweaker?mode=quality&gpu=amd");
   const actions = page.locator("#pack-settings .native-actions");
+  await press(page.getByRole("switch", { name: "Добавить графический client.cfg в пакет" }));
   await press(actions.getByRole("button", { name: "Подготовить и открыть пакет твиков" }));
   await expect(actions.getByRole("status")).toContainText("Твики не запускались");
   await expect(actions.getByRole("button", { name: "Откатить изменения" })).toHaveCount(0);
   const names = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pack-files") || "[]") as string[]);
-  expect(names).toContain("RustFlow-Pack/README.txt");
-  expect(names.some(name => name.startsWith("RustFlow-Pack/Otkat/"))).toBe(true);
+  expect(names).toContain("SHIFT-Pack/README.txt");
+  expect(names.some(name => name.startsWith("SHIFT-Pack/Otkat/"))).toBe(true);
+});
+
+
+test("native confirmation sends exactly the selected steps and optional config", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('shift:setup:v1', JSON.stringify({ version: 1, language: 'ru', goal: 'smooth', accepted: true }));
+    const win = window as unknown as { isTauri: boolean; __TAURI_INTERNALS__: { invoke: (cmd: string, args?: unknown) => Promise<unknown> } };
+    win.isTauri = true;
+    window.confirm = () => sessionStorage.getItem('allow') === 'yes';
+    win.__TAURI_INTERNALS__ = { invoke: async (cmd, args) => {
+      if (cmd === 'execute_tweak_plan') { sessionStorage.setItem('executed-plan', JSON.stringify(args)); return { message: 'ok' }; }
+      throw new Error('unavailable');
+    } };
+  });
+  await page.goto('/tweaker');
+  const first = page.locator('[data-manual-tweak]').first();
+  const slug = await first.getAttribute('data-manual-tweak');
+  await press(first.getByRole('switch'));
+  const run = page.locator('#pack-settings .native-actions').getByRole('button', { name: 'Применить в систему (с бэкапом)' });
+  await press(run);
+  await expect(page.locator('#pack-settings .native-actions [role=status]')).toContainText('отменена');
+  expect(await page.evaluate(() => sessionStorage.getItem('executed-plan'))).toBeNull();
+  await page.evaluate(() => sessionStorage.setItem('allow', 'yes'));
+  await press(run);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('executed-plan'))).not.toBeNull();
+  let result = await page.evaluate(() => JSON.parse(sessionStorage.getItem('executed-plan')!));
+  expect(result.plan).toMatchObject({ slugs: [slug], cfg: '' });
+  const cfgSwitch = page.getByRole('switch', { name: 'Добавить графический client.cfg в пакет' });
+  await press(cfgSwitch);
+  await expect(cfgSwitch).toHaveAttribute('aria-checked', 'true');
+  await page.evaluate(() => sessionStorage.removeItem('executed-plan'));
+  await press(run);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('executed-plan'))).not.toBeNull();
+  result = await page.evaluate(() => JSON.parse(sessionStorage.getItem('executed-plan')!));
+  expect(result.plan.slugs).toEqual([slug]);
+  expect(result.plan.cfg.length).toBeGreaterThan(0);
 });

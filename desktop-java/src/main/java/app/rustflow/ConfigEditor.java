@@ -19,20 +19,20 @@ import java.util.regex.Pattern;
 /** Graphics-only edits: never accept commands from the UI as executable code. */
 public final class ConfigEditor {
     private ConfigEditor() { }
-    private static final Set<String> ALLOWED = Set.of("graphics.drawdistance", "graphics.shaderlod", "graphics.shadowdistance", "graphics.shadowmode", "graphics.shadowlights", "graphics.af", "graphics.parallax", "graphics.renderscale", "graphics.branding", "water.quality", "water.reflections", "grass.quality", "grass.displace", "particle.quality", "effects.maxgibs", "decor.quality", "tree.quality", "tree.meshes", "terrain.quality", "mesh.quality");
+    private static final Set<String> ALLOWED = Set.of("graphics.quality", "graphics.lodbias", "graphics.drawdistance", "graphics.shaderlod", "graphics.shadowdistance", "graphics.shadowmode", "graphics.shadowlights", "graphics.af", "graphics.parallax", "graphics.renderscale", "graphics.branding", "water.quality", "water.reflections", "grass.quality", "grass.displacement", "particle.quality", "effects.maxgibs", "decor.quality", "tree.quality", "tree.meshes", "terrain.quality", "mesh.quality");
     private static final Pattern LINE = Pattern.compile("^(\\uFEFF?[ \\t]*)([a-zA-Z0-9_.]+)([ \\t]+)(\"[^\"\\r\\n]*\"|[^\\s\\r\\n]+)(.*)$");
 
     public static Map<String, String> preset(String id) {
         boolean potato = "potato".equals(id), combat = "competitive".equals(id), balance = "balanced".equals(id);
         if (!potato && !combat && !balance && !"quality".equals(id)) throw new IllegalArgumentException("Unknown profile");
-        String[] keys = {"graphics.drawdistance", "graphics.shaderlod", "graphics.shadowdistance", "graphics.shadowmode", "graphics.shadowlights", "water.quality", "water.reflections", "grass.quality", "grass.displace", "particle.quality", "effects.maxgibs", "decor.quality", "tree.quality", "tree.meshes", "terrain.quality", "mesh.quality", "graphics.af", "graphics.parallax", "graphics.branding"};
-        String[] values = potato ? new String[]{"800","100","50","1","0","0","0","0","False","0","0","0","50","25","0","50","1","0","False"}
-            : combat ? new String[]{"1200","200","50","1","0","0","0","0","False","0","0","0","100","50","25","100","1","0","False"}
+        String[] keys = {"graphics.drawdistance", "graphics.shaderlod", "graphics.shadowdistance", "graphics.shadowmode", "graphics.shadowlights", "water.quality", "water.reflections", "grass.quality", "grass.displacement", "particle.quality", "effects.maxgibs", "decor.quality", "tree.quality", "tree.meshes", "terrain.quality", "mesh.quality", "graphics.af", "graphics.parallax", "graphics.branding"};
+        String[] values = potato ? new String[]{"1200","100","50","1","1","0","0","0","False","25","0","25","100","25","25","50","8","0","False"}
+            : combat ? new String[]{"1500","200","50","1","1","0","0","0","True","25","0","25","100","25","25","50","8","0","False"}
             : balance ? new String[]{"1600","300","100","2","1","1","0","40","True","25","500","25","150","75","50","150","4","0","False"}
             : new String[]{"2200","400","300","2","2","2","1","75","True","75","1500","75","200","100","75","200","8","1","False"};
         Map<String, String> result = new LinkedHashMap<>();
         for (int i = 0; i < keys.length; i++) result.put(keys[i], values[i]);
-        if (potato) result.put("graphics.renderscale", "0.85");
+        result.put("graphics.renderscale", "1");
         return result;
     }
 
@@ -72,8 +72,12 @@ public final class ConfigEditor {
         String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
         if (text.indexOf('\0') >= 0) throw new IOException("Недопустимый формат файла.");
         Path backup = file.resolveSibling("client.cfg.bak");
-        // No overwrite: require the user to archive an earlier backup first.
-        Files.copy(file, backup);
+        if (Files.isSymbolicLink(backup)) throw new IOException("client.cfg.bak является ссылкой.");
+        Path backupTmp = Files.createTempFile(file.getParent(), ".shift-backup-", ".tmp");
+        try {
+            Files.write(backupTmp, bytes);
+            Files.move(backupTmp, backup, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } finally { Files.deleteIfExists(backupTmp); }
         Path tmp = Files.createTempFile(file.getParent(), ".rustflow-", ".tmp");
         try {
             Files.writeString(tmp, merge(text, settings), StandardCharsets.UTF_8);

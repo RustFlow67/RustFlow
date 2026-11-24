@@ -6,11 +6,11 @@ export type DockGlyph = "home" | "book" | "gauge" | "gear" | "sliders" | "shield
 export default function DockIcon({ glyph }: { glyph: DockGlyph }) {
   const attrs = { "data-dock-glyph": glyph, "aria-hidden": true } as const;
   if (glyph === "windows") return <svg {...attrs} viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" /></svg>;
-  if (glyph === "chip") return <Cpu {...attrs} data-part="chip" />;
-  if (glyph === "window") return <PanelsTopLeft {...attrs} data-part="window" />;
-  if (glyph === "gear") return <Settings {...attrs} />;
-  if (glyph === "shield") return <ShieldAlert {...attrs} />;
-  return <svg {...attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  if (glyph === "chip") return <Cpu strokeWidth={1.5} {...attrs} data-part="chip" />;
+  if (glyph === "window") return <PanelsTopLeft strokeWidth={1.5} {...attrs} data-part="window" />;
+  if (glyph === "gear") return <Settings strokeWidth={1.5} {...attrs} />;
+  if (glyph === "shield") return <ShieldAlert strokeWidth={1.5} {...attrs} />;
+  return <svg {...attrs} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     {glyph === "home" ? <>
       <path data-part="roof" d="m2.5 10.5 8.2-7.1a2 2 0 0 1 2.6 0l8.2 7.1" />
       <path d="M4.5 10v9.5a1.5 1.5 0 0 0 1.5 1.5h4v-7h4v7h4a1.5 1.5 0 0 0 1.5-1.5V10" />

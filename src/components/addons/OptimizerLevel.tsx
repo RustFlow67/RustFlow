@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Award, Check, LockKeyhole } from "lucide-react";
 import Link from "@/components/RouteLink";
 import { isValidBuildInput } from "@/lib/models/build";
-import { useRustFlowStore } from "@/lib/storage/useStore";
+import { useShiftStore } from "@/lib/storage/useStore";
 import { ACHIEVEMENTS, grantAchievements, progressXp, useProgress, XP_PER_LEVEL, type AchievementId } from "@/lib/addons/progress";
 import { Meter } from "../ui";
 import Panel from "./Panel";
@@ -12,7 +12,7 @@ import styles from "./addons.module.css";
 
 /** Derive one-time rewards from the real adapter, not samples or clicks. */
 export function ProgressObserver({ eligibleSlugs }: { eligibleSlugs: readonly string[] }) {
-  const { state } = useRustFlowStore();
+  const { state } = useShiftStore();
   useEffect(() => {
     if (!state) return;
     const ids: AchievementId[] = [];

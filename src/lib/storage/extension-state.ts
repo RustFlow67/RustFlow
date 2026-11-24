@@ -11,7 +11,7 @@ export interface ExtensionState {
 }
 
 const EMPTY: Values = Object.freeze({});
-const keyFor = (ownerId: string) => `rustflow:addons:v1:${JSON.stringify(ownerId)}`;
+const keyFor = (ownerId: string) => `shift:addons:v1:${JSON.stringify(ownerId)}`;
 
 export function createExtensionState(
   getOwnerId: () => string,
@@ -26,7 +26,7 @@ export function createExtensionState(
     if (cache?.ownerId === ownerId) return cache.values;
     let values = EMPTY;
     try {
-      const raw = window.localStorage.getItem(keyFor(ownerId));
+      const raw = window.localStorage.getItem(keyFor(ownerId)) ?? window.localStorage.getItem(`rustflow:addons:v1:${JSON.stringify(ownerId)}`);
       if (raw && raw.length <= 32768) {
         const data = JSON.parse(raw) as Partial<Envelope> | null;
         if (data?.version === 1 && data.ownerId === ownerId && data.values &&
@@ -74,7 +74,7 @@ export function createExtensionState(
       if (typeof window === "undefined") return;
       const ownerId = getOwnerId();
       cache = { version: 1, ownerId, values: EMPTY };
-      try { window.localStorage.removeItem(keyFor(ownerId)); } catch { /* keep cache */ }
+      try { window.localStorage.setItem(keyFor(ownerId), JSON.stringify(cache)); } catch { /* keep cache */ }
       emit();
     },
   };

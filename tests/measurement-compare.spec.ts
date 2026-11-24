@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("compares measured FPS and validates optional values in both languages", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("shift:setup:v1", JSON.stringify({ version: 1, language: "ru", goal: "smooth", accepted: true })));
   await page.goto("/tools");
   const tool = page.locator("#measurement-compare");
   const before = tool.getByRole("group", { name: "До" });
